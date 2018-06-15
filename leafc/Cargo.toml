@@ -1,0 +1,14 @@
+[package]
+name = "leafc"
+version = "0.0.1"
+authors = ["virusdownloader7@gmail.com"]
+
+[lib]
+name = "leafc"
+path = "src/lib.rs"
+
+[[bin]]
+name = "leafc"
+path = "src/leafc/leafc.rs"
+
+[dependencies]
