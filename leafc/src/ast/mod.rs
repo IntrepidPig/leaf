@@ -1,6 +1,7 @@
 use std::path::Path;
 
 pub mod lexer;
+pub mod tokenizer;
 
 pub struct Ast {
 

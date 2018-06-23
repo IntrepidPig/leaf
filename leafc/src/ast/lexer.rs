@@ -1,8 +1,9 @@
+// TODO include index information with each lexeme
 
 /// A list of lexemes
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Lexemes<'a> {
-	lexemes: Vec<Lexeme<'a>>
+	pub lexemes: Vec<Lexeme<'a>>
 }
 
 impl<'a> Lexemes<'a> {
