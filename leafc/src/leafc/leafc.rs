@@ -12,6 +12,6 @@ fn main() {
 	let input = INPUT_TEST;
 	let lexemes = leafc::ast::lexer::lex(input).unwrap();
 	let de_lexed = &lexemes.de_lex();
-	eprintln!("'{}' => {:#?}", input, lexemes);
+	eprintln!("'{}' => {:?}", input, lexemes);
 	assert_eq!(input, de_lexed);
 }
