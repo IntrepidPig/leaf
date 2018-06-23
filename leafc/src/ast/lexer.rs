@@ -160,22 +160,21 @@ pub fn lex(old_input: &str) -> Result<Lexemes, LexError> {
 	let mut input = old_input;
 	
 	let mut lexemes = Vec::new();
+	// Order of lexemes to try to parse the next as
 	let lexeme_takers: &[&LexemeTaker] = &[&WhitespaceTaker, &BracketTaker, &NumLiteralTaker, &SymbolTaker, &WordTaker, &StringTaker];
 	
+	// Keep cutting down the input string slice with lexeme takers until it's empty
 	'outer: while !input.is_empty() {
-		//lexeme_takers = next_lexeme_takers(&lexemes);
 		for lexeme_taker in lexeme_takers {
 			let (lexeme_opt, remaining) = lexeme_taker.next_lexeme(input, &lexemes)?;
 			input = remaining;
 			if let Some(lexeme) = lexeme_opt {
-				println!("Got lexeme {:?}", lexeme);
 				lexemes.push(lexeme);
 				continue 'outer;
 			}
 		}
 
-		
-		
+		// If none of the lexeme takers succeeded, then something was wrong with the input
 		return Err(LexError::Unexpected(old_input.len() - input.len()))
 	}
 	
@@ -186,36 +185,48 @@ pub trait LexemeTaker: ::std::fmt::Debug {
 	fn next_lexeme<'a>(&self, input: &'a str, current: &[Lexeme]) -> Result<(Option<Lexeme>, &'a str), LexError>;
 }
 
+/// Takes next available whitespace
+/// Returns a stuct enum variant that contains the type of whitespace (tab, newline, or space) and how many occurrences of it
 #[derive(Debug)]
 struct WhitespaceTaker;
 impl LexemeTaker for WhitespaceTaker {
 	fn next_lexeme<'a>(&self, input: &'a str, _current: &[Lexeme]) -> Result<(Option<Lexeme>, &'a str), LexError> {
+		// The whitespace type we are getting (tab | newline | space)
 		let mut whitespace_type = None;
+		// The end of the whitespace
 		let mut end = 0;
 		
 		for c in input.chars() {
+			// If this char is whitespace
 			if let Some(new_whitespace_type) = WhitespaceType::from_char(c) {
+				// If we already have a type of whitespace
 				if let Some(old_whitespace_type) = whitespace_type.clone() {
+					// If they're the same type of whitespce
 					if new_whitespace_type == old_whitespace_type {
 						end += c.len_utf8();
 					} else {
+						// We found all the whitespace of this type
 						break;
 					}
 				} else {
+					// Otherwise this is the type of whitespace we will find from now on
 					whitespace_type = Some(new_whitespace_type);
 					end += c.len_utf8();
 				}
 			} else {
+				// We found all the whitespace available (possibly 0)
 				break;
 			}
 		}
 		
+		// If we have a nonzero whitespace amount
 		if end > 0 {
 			Ok((Some(Lexeme::Whitespace {
-				whitespace_type: whitespace_type.unwrap(),
-				amount: input[0..end].chars().count() as u32,
+				whitespace_type: whitespace_type.unwrap(), // If the end is nonzero then the whitespace_type was set
+				amount: input[0..end].chars().count() as u32, // Count the chars in the substring to get the amount
 			}), &input[end..input.len()]))
 		} else {
+			// No whitespace was found
 			Ok((None, input))
 		}
 	}
@@ -225,14 +236,18 @@ impl LexemeTaker for WhitespaceTaker {
 struct WordTaker;
 impl LexemeTaker for WordTaker {
 	fn next_lexeme<'a>(&self, input: &'a str, _current: &[Lexeme]) -> Result<(Option<Lexeme>, &'a str), LexError> {
+		// The end of the word
 		let mut end = 0;
 		
 		for c in input.chars() {
 			if c.is_ascii_alphabetic() || c == '_' {
+				// Letters and underscores are allowed in words
 				end += c.len_utf8();
 			} else if c.is_ascii_alphanumeric() && end > 0 {
+				// Numbers are allowed so long as they are not the first character
 				end += c.len_utf8();
 			} else {
+				// The word has ended
 				break;
 			}
 		}
@@ -250,6 +265,7 @@ impl LexemeTaker for WordTaker {
 struct BracketTaker;
 impl LexemeTaker for BracketTaker {
 	fn next_lexeme<'a>(&self, input: &'a str, _current: &[Lexeme]) -> Result<(Option<Lexeme>, &'a str), LexError> {
+		// Make sure there is another char available (always should be, except lexemetakers can modify the input without returning a token TODO)
 		let c = if let Some(c) = input.chars().next() {
 			c
 		} else {
@@ -345,6 +361,19 @@ impl LexemeTaker for StringTaker {
 	}
 }
 
+/// Get next symbols available from the input &str
+/// Currently gets:
+/// - ':' Colon
+/// - ',' Comma
+/// - '.' Dot
+/// - '=' Equals
+/// - ';' Semicolon
+/// - '*' Asterisk
+/// - '>' Greater
+/// - '<' Less
+/// - '&' Ampersand
+/// - '?' Question
+/// - '!' Exclamation
 #[derive(Debug)]
 struct SymbolTaker;
 impl LexemeTaker for SymbolTaker {
@@ -373,6 +402,8 @@ impl LexemeTaker for SymbolTaker {
 	}
 }
 
+/// Gets the next numeric literal from the input
+/// Currently only supports decimal integers
 #[derive(Debug)]
 struct NumLiteralTaker;
 impl LexemeTaker for NumLiteralTaker {
