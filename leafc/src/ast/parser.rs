@@ -1,8 +1,5 @@
-use std::mem;
-
 use ast::lexer::{Bracket, BracketState};
-use ast::tokenizer::{Token, Keyword, Symbol as TokenSymbol, Tokens};
-use ast::Ast;
+use ast::tokenizer::{Token, Keyword, Symbol as TokenSymbol};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Symbol {
@@ -39,7 +36,7 @@ impl SyntaxTree {
 			SyntaxTree::Block(ref mut block) => {
 				block.block.push(syntax);
 			},
-			SyntaxTree::Statement(ref mut stmnt) => {
+			SyntaxTree::Statement(ref _stmnt) => {
 				return Err(ParseError::Other);
 			}
 		}
@@ -119,7 +116,7 @@ pub fn parse(full_tokens: &[Token]) -> Result<SyntaxTree, ParseError> {
 
 	let mut tokens = full_tokens;
 
-	let mut syntax_parsers: &[&SyntaxParser] = &[&BlockTaker, &StatementTaker];
+	let syntax_parsers: &[&SyntaxParser] = &[&BlockTaker, &StatementTaker];
 
 	'outer: while !tokens.is_empty() {
 		for syntax_parser in syntax_parsers {
@@ -137,9 +134,7 @@ pub fn parse(full_tokens: &[Token]) -> Result<SyntaxTree, ParseError> {
 }
 
 trait SyntaxParser {
-	fn next_element<'a>(&self, tokens: &'a [Token]) -> Result<Option<(SyntaxTree, &'a [Token])>, ParseError> {
-		Ok(None)
-	}
+	fn next_element<'a>(&self, tokens: &'a [Token]) -> Result<Option<(SyntaxTree, &'a [Token])>, ParseError>;
 }
 
 #[derive(Debug)]
@@ -192,14 +187,13 @@ impl SyntaxParser for BlockTaker {
 }
 
 trait StatementParser {
-	fn next_element<'a>(&self, tokens: &'a [Token]) -> Result<Option<(Statement, &'a [Token])>, ParseError> {
-		unimplemented!();
-	}
+	fn next_element<'a>(&self, tokens: &'a [Token]) -> Result<Option<(Statement, &'a [Token])>, ParseError>;
 }
 
 #[derive(Debug)]
 struct BindingTaker;
 impl StatementParser for BindingTaker {
+	#[allow(unused_mut)]
 	fn next_element<'a>(&self, tokens: &'a [Token]) -> Result<Option<(Statement, &'a [Token])>, ParseError> {
 		if tokens.is_empty() {
 			return Ok(None)
@@ -287,9 +281,7 @@ impl StatementParser for DebugTaker {
 }
 
 trait ExpressionParser {
-	fn next_element<'a>(&self, tokens: &'a [Token]) -> Result<Option<(Expression, &'a [Token])>, ParseError> {
-		unimplemented!();
-	}
+	fn next_element<'a>(&self, tokens: &'a [Token]) -> Result<Option<(Expression, &'a [Token])>, ParseError>;
 }
 
 #[derive(Debug)]
