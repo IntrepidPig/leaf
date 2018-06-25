@@ -8,11 +8,20 @@ pub struct Tokenizer<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
 	Keyword(Keyword),
-	Identifier(String),
+	Name(String),
 	NumberLiteral(u64),
 	StringLiteral(String),
 	Bracket(Bracket, BracketState),
 	Symbol(Symbol)
+}
+
+impl Token {
+	pub fn as_bracket(&self) -> Option<(Bracket, BracketState)> {
+		match *self {
+			Token::Bracket(bracket, state) => Some((bracket, state)),
+			_ => None,
+		}
+	}
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -72,7 +81,7 @@ impl<'a> Tokenizer<'a> {
 						"while" => tokens.push(Token::Keyword(Keyword::While)),
 						"if" => tokens.push(Token::Keyword(Keyword::If)),
 						"else" => tokens.push(Token::Keyword(Keyword::Else)),
-						word => tokens.push(Token::Identifier(word.to_owned()))
+						word => tokens.push(Token::Name(word.to_owned()))
 					}
 				},
 				Lexeme::Bracket(bracket, state) => {

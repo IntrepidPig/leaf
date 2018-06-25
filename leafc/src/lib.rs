@@ -1,3 +1,5 @@
+#![feature(nll)]
+
 use std::path::Path;
 
 pub mod ast;

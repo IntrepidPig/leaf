@@ -1,12 +1,7 @@
 extern crate leafc;
 
 static INPUT_TEST: &'static str = 
-r###"fn true {
-	let a_num = 246;
-	let this: &str = "so true";
-	print(*this);
-}
-"###;
+r###"let d = 1;{{{let qwrty_ok = 5;} let x = 3;}} let c = 4;"###;
 
 fn main() {
 	let input = INPUT_TEST;
@@ -17,7 +12,10 @@ fn main() {
 	assert_eq!(input, de_lexed);
 
 	let mut tokenizer = leafc::ast::tokenizer::Tokenizer::new(lexemes);
-	let tokens = tokenizer.tokenize();
+	let tokens = tokenizer.tokenize().unwrap();
 	
-	println!("{:?}", tokens);
+	println!("{:?}\n\t=>", tokens);
+
+	let ast = leafc::ast::parser::parse(tokens.tokens.as_slice()).unwrap();
+	println!("{:#?}", ast);
 }
