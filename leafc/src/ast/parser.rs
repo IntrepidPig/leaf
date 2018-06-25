@@ -50,7 +50,7 @@ impl SyntaxTree {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Block {
-	block: Vec<SyntaxTree>
+	pub block: Vec<SyntaxTree>
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -93,10 +93,10 @@ pub enum BinaryOp {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Binding {
-	mutable: bool,
-	ident: String,
-	bind_type: Option<String>,
-	val: Option<Expression>,
+	pub mutable: bool,
+	pub ident: String,
+	pub bind_type: Option<String>,
+	pub val: Option<Expression>,
 }
 
 impl SyntaxTree {

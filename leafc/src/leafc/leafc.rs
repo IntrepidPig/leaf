@@ -26,5 +26,8 @@ fn main() {
 	println!("{:?}\n\t=>", tokens);
 
 	let ast = leafc::ast::parser::parse(tokens.tokens.as_slice()).unwrap();
-	println!("{:#?}", ast);
+	println!("{:?}\n\t=>", ast);
+
+	let instructions = leafc::codegen::vmgen::CodeGenerator::gen_instructions(ast);
+	println!("{:#?}", instructions);
 }
