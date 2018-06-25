@@ -1,0 +1,9 @@
+let a = 21;
+{
+	let b = 360;
+	debug b;
+}
+let c = 2;
+debug a;
+debug c;
+
