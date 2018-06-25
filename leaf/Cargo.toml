@@ -12,3 +12,4 @@ name = "leaf"
 path = "src/leaf/leaf.rs"
 
 [dependencies]
+leafc = { path = "../leafc/" }
