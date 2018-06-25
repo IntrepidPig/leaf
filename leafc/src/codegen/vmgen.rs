@@ -2,7 +2,7 @@ use ast::parser::{SyntaxTree, Block, Statement, Expression, Binding as SyntaxBin
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Value {
-	val: u64,
+	pub val: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,48 +22,59 @@ pub struct Binding {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CodeGenerator {
-	blocks: Vec<Block>,
+	block_vars: Vec<Vec<String>>,
 }
 
 impl CodeGenerator {
-	pub fn gen_instructions(ast: SyntaxTree) -> Vec<Instruction> {
-		let instructions = CodeGenerator::gen_from_ast(&ast);
+	pub fn new() -> Self {
+		CodeGenerator {
+			block_vars: vec![Vec::new()],
+		}
+	}
+
+	pub fn gen_instructions(&mut self, ast: SyntaxTree) -> Vec<Instruction> {
+		let instructions = self.gen_from_ast(&ast);
 
 		instructions
 	}
 
-	pub fn gen_from_ast(ast: &SyntaxTree) -> Vec<Instruction> {
+	pub fn gen_from_ast(&mut self, ast: &SyntaxTree) -> Vec<Instruction> {
 		let mut instructions: Vec<Instruction> = Vec::new();
+		println!("Gen from ast: {:?}", ast);
 
 		match ast {
 			SyntaxTree::Block(ref block) => {
-				instructions.append(&mut CodeGenerator::gen_from_block(block));		
+				instructions.append(&mut self.gen_from_block(block));		
 			},
 			SyntaxTree::Statement(ref stmnt) => {
-				instructions.append(&mut CodeGenerator::gen_from_stmnt(stmnt));
+				instructions.append(&mut self.gen_from_stmnt(stmnt));
 			}
 		}
 
 		instructions
 	}
 
-	pub fn gen_from_block(block: &Block) -> Vec<Instruction> {
+	pub fn gen_from_block(&mut self, block: &Block) -> Vec<Instruction> {
 		let mut instructions: Vec<Instruction> = Vec::new();
 
+		self.block_vars.push(Vec::new());
 		for syntax in &block.block {
-			instructions.append(&mut CodeGenerator::gen_from_ast(syntax))
+			instructions.append(&mut self.gen_from_ast(syntax))
+		}
+		for block_var in self.block_vars.pop().unwrap() {
+			instructions.push(Instruction::Drop(block_var));
 		}
 
 		instructions
 	}
 
-	pub fn gen_from_stmnt(stmnt: &Statement) -> Vec<Instruction> {
+	pub fn gen_from_stmnt(&mut self, stmnt: &Statement) -> Vec<Instruction> {
 		let mut instructions: Vec<Instruction> = Vec::new();
 
 		match stmnt {
 			Statement::Binding(SyntaxBinding { ref ident, val: expr, .. }) => {
 				if let Some(expr) = expr {
-					instructions.append(&mut CodeGenerator::gen_from_expr(expr));
+					instructions.append(&mut self.gen_from_expr(expr));
 					instructions.push(Instruction::Bind(ident.to_owned()));
 				} else {
 					instructions.push(Instruction::Push(Value {
@@ -71,20 +82,21 @@ impl CodeGenerator {
 					}));
 					instructions.push(Instruction::Bind(ident.to_owned()));
 				}
+				self.block_vars.last_mut().unwrap().push(ident.to_owned());
 			},
 			Statement::Debug(ref expr) => {
-				instructions.append(&mut CodeGenerator::gen_from_expr(expr));
+				instructions.append(&mut self.gen_from_expr(expr));
 				instructions.push(Instruction::Debug)
 			},
 			Statement::Expression(ref expr) => {
-				instructions.append(&mut CodeGenerator::gen_from_expr(expr));
+				instructions.append(&mut self.gen_from_expr(expr));
 			}
 		}
 
 		instructions
 	}
 
-	pub fn gen_from_expr(expr: &Expression) -> Vec<Instruction> {
+	pub fn gen_from_expr(&mut self, expr: &Expression) -> Vec<Instruction> {
 		let mut instructions: Vec<Instruction> = Vec::new();
 
 		match expr {
@@ -92,7 +104,7 @@ impl CodeGenerator {
 				val: *num,
 			})),
 			Expression::Block(ref block) => {
-				instructions.append(&mut CodeGenerator::gen_from_block(block));
+				instructions.append(&mut self.gen_from_block(block));
 			}
 			Expression::Identifier(ref ident) => {
 				instructions.push(Instruction::PushVar(ident.to_owned()))
@@ -101,5 +113,15 @@ impl CodeGenerator {
 		}
 
 		instructions
+	}
+}
+
+pub struct ByteGen {
+
+}
+
+impl ByteGen {
+	pub fn gen_bytes(instructions: &[Instruction]) {
+		unimplemented!()
 	}
 }
