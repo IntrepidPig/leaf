@@ -32,6 +32,7 @@ pub enum Keyword {
 	While,
 	If,
 	Else,
+	Debug,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -81,6 +82,7 @@ impl<'a> Tokenizer<'a> {
 						"while" => tokens.push(Token::Keyword(Keyword::While)),
 						"if" => tokens.push(Token::Keyword(Keyword::If)),
 						"else" => tokens.push(Token::Keyword(Keyword::Else)),
+						"debug" => tokens.push(Token::Keyword(Keyword::Debug)),
 						word => tokens.push(Token::Name(word.to_owned()))
 					}
 				},

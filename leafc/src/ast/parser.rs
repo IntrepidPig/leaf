@@ -57,6 +57,7 @@ pub struct Block {
 pub enum Statement {
 	Binding(Binding),
 	Expression(Expression),
+	Debug(Expression),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -121,7 +122,6 @@ pub fn parse(full_tokens: &[Token]) -> Result<SyntaxTree, ParseError> {
 	let mut syntax_parsers: &[&SyntaxParser] = &[&BlockTaker, &StatementTaker];
 
 	'outer: while !tokens.is_empty() {
-		println!("Tokens: {:?}", tokens);
 		for syntax_parser in syntax_parsers {
 			if let Some((syntax, leftovers)) = syntax_parser.next_element(tokens)? {
 				stree.push(syntax)?;
@@ -129,8 +129,6 @@ pub fn parse(full_tokens: &[Token]) -> Result<SyntaxTree, ParseError> {
 				continue 'outer;
 			}
 		}
-
-		println!("Now tokens: {:?}", tokens);
 
 		return Err(ParseError::UnexpectedToken(full_tokens.len() - tokens.len()))
 	}
@@ -148,7 +146,7 @@ trait SyntaxParser {
 struct StatementTaker;
 impl SyntaxParser for StatementTaker {
 	fn next_element<'a>(&self, tokens: &'a [Token]) -> Result<Option<(SyntaxTree, &'a [Token])>, ParseError> {
-		let statement_parsers: &[&StatementParser] = &[&BindingTaker];
+		let statement_parsers: &[&StatementParser] = &[&BindingTaker, &DebugTaker];
 
 		for statement_parser in statement_parsers {
 			if let Some((statement, leftovers)) = statement_parser.next_element(tokens)? {
@@ -230,7 +228,7 @@ impl StatementParser for BindingTaker {
 					return Err(ParseError::UnexpectedToken(0))
 				}
 
-				let val = if let Some((expr, leftovers)) = ExpressionTaker.next_element(&tokens[2 + offset + 1..tokens.len()])? {
+				let expr = if let Some((expr, leftovers)) = ExpressionTaker.next_element(&tokens[2 + offset + 1..tokens.len()])? {
 					tokens = leftovers;
 					expr
 				} else {
@@ -247,8 +245,41 @@ impl StatementParser for BindingTaker {
 					mutable: false,
 					ident,
 					bind_type: type_annotation,
-					val: Some(val),
+					val: Some(expr),
 				}), tokens)))
+			},
+			_ => Ok(None),
+		}
+	}
+}
+
+#[derive(Debug)]
+struct DebugTaker;
+impl StatementParser for DebugTaker {
+	fn next_element<'a>(&self, tokens: &'a [Token]) -> Result<Option<(Statement, &'a [Token])>, ParseError> {
+		if tokens.is_empty() {
+			return Ok(None)
+		}
+
+		let mut tokens = tokens;
+
+		match tokens[0] {
+			Token::Keyword(Keyword::Debug) => {
+				let expr = if let Some((expr, leftovers)) = ExpressionTaker.next_element(&tokens[1..tokens.len()])? {
+					tokens = leftovers;
+					expr
+				} else {
+					return Err(ParseError::UnexpectedToken(0))
+				};
+
+				
+				if let Token::Symbol(TokenSymbol::Semicolon) = tokens[0] {
+					tokens = &tokens[1..tokens.len()];
+				} else {
+					return Err(ParseError::UnexpectedToken(0))
+				}
+
+				Ok(Some((Statement::Debug(expr), tokens)))
 			},
 			_ => Ok(None),
 		}
@@ -269,10 +300,15 @@ impl ExpressionParser for ExpressionTaker {
 			return Ok(None)
 		}
 
+		// TODO keep pulling until semicolon
 		match tokens[0] {
 			Token::NumberLiteral(num) => {
 				Ok(Some((Expression::NumberLiteral(num), &tokens[1..tokens.len()])))
 			},
+			Token::Name(ref name) => {
+				Ok(Some((Expression::Identifier(name.to_owned()), &tokens[1..tokens.len()])))
+			}
+			// TODO accept blocks
 			_ => Ok(None)
 		}
 	}

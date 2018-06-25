@@ -1,7 +1,16 @@
 extern crate leafc;
 
 static INPUT_TEST: &'static str = 
-r###"let d = 1;{{{let qwrty_ok = 5;} let x = 3;}} let c = 4;"###;
+r###"
+let a = 21;
+{
+	let b = 360;
+	debug b;
+}
+let c = 2;
+debug a;
+debug c;
+"###;
 
 fn main() {
 	let input = INPUT_TEST;
