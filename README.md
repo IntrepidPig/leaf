@@ -6,10 +6,12 @@ At the moment, the entirety of the language can be encapsulated into a small exa
 
 ```
 let a = 5;
-{
+let b = {
 	let z = 70;
 	debug z;
-}
+	let c = 5;
+	c
+};
 debug a;
 debug z;
 ```
@@ -23,12 +25,15 @@ Value: 5
 
 and then crashes. The reason for that is, like many other languages, variables are confined to the scope they are created in. When the interpreter reaches the end of the scope, it forgets about (drops) all the variables that were created in that scope. If your familiar with rust, then you can see that this language was heavily inspired by it.
 
+You can also see that it is expression oriented, and that blocks can return a value which can be used in assignments. The example above shows a block that returns the value of `c`, which is then bound to `b`.
+
 The entire VM is implemented with only 5 instructions.
 - Push - Pushes a value to the top of the stack
+- Pop - Pops the top value off the stack, sending it into oblivion
 - Bind - Binds an variable to a value popped from the top of the stack
 - PushVar - Pushes the value of a variable to the top of the stack
 - Drop - Destroys a variable from storage
 - Debug - Prints the value at the top of the stack
 
-## Major limitation
-The only type available for now is unsigned 64 bit integers. There's not even a concept of types. I plan on making a type system based on the `Root` type, which is empty. Every type has `Root` type within it. Types will also be able to have other types within them. This will be my implementation of composition. The compiler will help a lot to make polymorphic programming strategies available, and types will all be dynamically allocated on the physical heap to allow for dynamic dispatch without lots of boilerplate, at the cost of performance. Imagine Java, but with composition instead of inheritance and a Rusty error handling paradigm. That's the goal of leaf.
+## Type System?
+The only type available for now is the unsigned 64 bit integer. There's not even a concept of types. I plan on making a type system based on the `Root` type, which is empty. Every type has `Root` type within it. Types will also be able to have other types within them. This will be my implementation of composition. The compiler will help a lot to make polymorphic programming strategies available, and types will all be dynamically allocated on the physical heap to allow for dynamic dispatch without lots of boilerplate, at the cost of performance.
