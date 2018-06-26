@@ -9,13 +9,17 @@ use std::collections::HashMap;
 fn main() {
 	let mut input = String::new();
 	io::stdin().read_to_string(&mut input).unwrap();
+	println!("'\n{}\n'\n\t=>", input);
 	let lexed = leafc::ast::lexer::lex(&input).unwrap();
+	println!("{:?}\n\t=>", lexed);
 	let mut tokenizer = leafc::ast::tokenizer::Tokenizer::new(lexed);
 	let tokens = tokenizer.tokenize().unwrap();
+	println!("{:?}\n\t=>", tokens);
 	let ast = leafc::ast::parser::parse(tokens.tokens.as_slice()).unwrap();
+	println!("{:?}\n\t=>", ast);
 	let mut code_generator = leafc::codegen::vmgen::CodeGenerator::new();
 	let instructions = code_generator.gen_instructions(ast);
-	println!("Instructions: {:#?}", instructions);
+	println!("{:?}", instructions);
 	run_instructions(&instructions).unwrap();
 }
 
@@ -30,6 +34,9 @@ fn run_instructions(instructions: &[Instruction]) -> Result<(), ()> {
 			},
 			Instruction::Push(ref value) => {
 				stack.push(value.clone());
+			},
+			Instruction::Pop => {
+				stack.pop().unwrap();
 			},
 			Instruction::PushVar(ref ident) => {
 				stack.push(vars.get(ident).unwrap().clone());
