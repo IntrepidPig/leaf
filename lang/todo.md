@@ -1,0 +1,3 @@
+- Implement type system
+- Implement defining own types
+- omg there's so much more work
