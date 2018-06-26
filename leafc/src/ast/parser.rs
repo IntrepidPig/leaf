@@ -25,29 +25,17 @@ pub enum Operator {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SyntaxTree {
-	Block(Block),
-	Statement(Statement),
+pub struct SyntaxTree {
+	pub block: Vec<Statement>,
+	pub output: Option<Expression>,
 }
 
 impl SyntaxTree {
-	pub fn push(&mut self, syntax: SyntaxTree) -> Result<(), ParseError> {
-		match *self {
-			SyntaxTree::Block(ref mut block) => {
-				block.block.push(syntax);
-			},
-			SyntaxTree::Statement(ref _stmnt) => {
-				return Err(ParseError::Other);
-			}
-		}
-
+	pub fn push(&mut self, syntax: Statement) -> Result<(), ParseError> {
+		self.block.push(syntax);
+		
 		Ok(())
 	}
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Block {
-	pub block: Vec<SyntaxTree>
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,10 +47,10 @@ pub enum Statement {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Function {
-	name: String,
-	args: Vec<Binding>,
-	return_type: String,
-	body: Block,
+	pub name: String,
+	pub args: Vec<Binding>,
+	pub return_type: String,
+	pub body: SyntaxTree,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -78,7 +66,7 @@ pub enum Expression {
 		args: Vec<Expression>,
 	},
 	Identifier(String),
-	Block(Block),
+	Block(Box<SyntaxTree>),
 	StringLiteral(String),
 	NumberLiteral(u64),
 }
@@ -98,9 +86,10 @@ pub struct Binding {
 
 impl SyntaxTree {
 	pub fn new() -> Self {
-		SyntaxTree::Block(Block {
+		SyntaxTree {
 			block: Vec::new(),
-		})
+			output: None,
+		}
 	}
 }
 
@@ -111,197 +100,179 @@ pub enum ParseError {
 	Other,
 }
 
-pub fn parse(full_tokens: &[Token]) -> Result<SyntaxTree, ParseError> {
+pub fn parse(tokens: &[Token]) -> Result<SyntaxTree, ParseError> {
+	if let Some(ast) = next_syntaxtree(tokens)? {
+		Ok(ast)
+	} else {
+		Err(ParseError::Other)
+	}
+}
+
+pub fn next_syntaxtree<'a>(mut tokens: &'a [Token]) -> Result<Option<SyntaxTree>, ParseError> {
 	let mut stree = SyntaxTree::new();
 
-	let mut tokens = full_tokens;
+	while let Some((stmnt, leftovers)) = next_statement(tokens)? {
+		stree.block.push(stmnt);
+		tokens = leftovers;
+	}
+	if let Some((expr, leftovers)) = next_expression(tokens)? {
+		if !leftovers.is_empty() {
+			return Err(ParseError::UnexpectedToken(0))
+		}
+		stree.output = Some(expr);
+	}
 
-	let syntax_parsers: &[&SyntaxParser] = &[&BlockTaker, &StatementTaker];
+	Ok(Some(stree))
+}
 
-	'outer: while !tokens.is_empty() {
-		for syntax_parser in syntax_parsers {
-			if let Some((syntax, leftovers)) = syntax_parser.next_element(tokens)? {
-				stree.push(syntax)?;
+pub fn next_statement<'a>(tokens: &'a [Token]) -> Result<Option<(Statement, &'a [Token])>, ParseError> {
+	if let Some((binding, leftovers)) = next_binding(tokens)? {
+		return Ok(Some((Statement::Binding(binding), leftovers)))
+	} else if let Some((expression, leftovers)) = next_expression(tokens)? {
+		if leftovers.get(0) == Some(&Token::Symbol(TokenSymbol::Semicolon)) {
+			return Ok(Some((Statement::Expression(expression), &leftovers[1..leftovers.len()])))
+		} else {
+			return Ok(None)
+		}
+	} else if let Some((debug, leftovers)) = next_debug(tokens)? {
+		return Ok(Some((Statement::Debug(debug), leftovers)))
+	}
+
+	Ok(None)
+}
+
+pub fn next_block<'a>(tokens: &'a [Token]) -> Result<Option<(SyntaxTree, &'a [Token])>, ParseError> {
+	if tokens.is_empty() {
+		return Ok(None)
+	}
+	match tokens[0] {
+		Token::Bracket(Bracket::Curly, BracketState::Open) => {
+			let mut buf = 0;
+			for (i, token) in tokens[0..tokens.len()].iter().enumerate() {
+				if let Some((bracket, bracketstate)) = token.as_bracket() {
+					match (bracket, bracketstate) {
+						(Bracket::Curly, BracketState::Open) => buf += 1,
+						(Bracket::Curly, BracketState::Close) => buf -= 1,
+						_ => {},
+					}
+				}
+				if buf == 0 {
+					// Parse whatever's inside this block as an AST [after first brace..last brace]
+					let ast = if let Some(ast) = next_syntaxtree(&tokens[1..i])? {
+						ast
+					} else {
+						return Err(ParseError::UnexpectedToken(0))
+					};
+					// And the leftover tokens [after last brace..end of tokens]
+					return Ok(Some((ast, &tokens[i + 1..tokens.len()])));
+				}
+			}
+
+			return Err(ParseError::UnclosedBrace(0))
+		},
+		_ => return Ok(None)
+	}
+}
+
+#[allow(unused_mut)]
+fn next_binding<'a>(tokens: &'a [Token]) -> Result<Option<(Binding, &'a [Token])>, ParseError> {
+	if tokens.is_empty() {
+		return Ok(None)
+	}
+
+	let mut tokens = tokens;
+
+	match tokens[0] {
+		Token::Keyword(Keyword::Let) => {
+			let ident = if let Token::Name(ref name) = tokens[1] {
+				name.to_owned()
+			} else {
+				return Err(ParseError::UnexpectedToken(0)) // TODO add expected 'identifier'
+			};
+			
+			let mut offset = 0;
+			let mut type_annotation: Option<String> = if let Token::Symbol(TokenSymbol::Colon) = tokens[2] {
+				// if there's a type annotation
+				// change token offset
+				unimplemented!()
+			} else {
+				None
+			};
+
+			if let Token::Symbol(TokenSymbol::Equals) = tokens[2 + offset] {  } else {
+				return Err(ParseError::UnexpectedToken(0))
+			}
+
+			let expr = if let Some((expr, leftovers)) = next_expression(&tokens[2 + offset + 1..tokens.len()])? {
 				tokens = leftovers;
-				continue 'outer;
+				expr
+			} else {
+				return Err(ParseError::UnexpectedToken(0))
+			};
+
+			if let Some(&Token::Symbol(TokenSymbol::Semicolon)) = tokens.get(0) {
+				tokens = &tokens[1..tokens.len()];
+			} else {
+				return Err(ParseError::UnexpectedToken(0))
 			}
-		}
 
-		return Err(ParseError::UnexpectedToken(full_tokens.len() - tokens.len()))
+			Ok(Some((Binding {
+				mutable: false,
+				ident,
+				bind_type: type_annotation,
+				val: Some(expr),
+			}, tokens)))
+		},
+		_ => Ok(None),
+	}
+}
+
+fn next_debug<'a>(tokens: &'a [Token]) -> Result<Option<(Expression, &'a [Token])>, ParseError> {
+	if tokens.is_empty() {
+		return Ok(None)
 	}
 
-	Ok(stree)
-}
+	let mut tokens = tokens;
 
-trait SyntaxParser {
-	fn next_element<'a>(&self, tokens: &'a [Token]) -> Result<Option<(SyntaxTree, &'a [Token])>, ParseError>;
-}
+	match tokens[0] {
+		Token::Keyword(Keyword::Debug) => {
+			let expr = if let Some((expr, leftovers)) = next_expression(&tokens[1..tokens.len()])? {
+				tokens = leftovers;
+				expr
+			} else {
+				return Err(ParseError::UnexpectedToken(0))
+			};
 
-#[derive(Debug)]
-struct StatementTaker;
-impl SyntaxParser for StatementTaker {
-	fn next_element<'a>(&self, tokens: &'a [Token]) -> Result<Option<(SyntaxTree, &'a [Token])>, ParseError> {
-		let statement_parsers: &[&StatementParser] = &[&BindingTaker, &DebugTaker];
-
-		for statement_parser in statement_parsers {
-			if let Some((statement, leftovers)) = statement_parser.next_element(tokens)? {
-				return Ok(Some((SyntaxTree::Statement(statement), leftovers)))
+			
+			if let Token::Symbol(TokenSymbol::Semicolon) = tokens[0] {
+				tokens = &tokens[1..tokens.len()];
+			} else {
+				return Err(ParseError::UnexpectedToken(0))
 			}
-		}
 
-		Ok(None)
+			Ok(Some((expr, tokens)))
+		},
+		_ => Ok(None),
 	}
 }
 
-#[derive(Debug)]
-struct BlockTaker;
-impl SyntaxParser for BlockTaker {
-	fn next_element<'a>(&self, tokens: &'a [Token]) -> Result<Option<(SyntaxTree, &'a [Token])>, ParseError> {
-		if tokens.is_empty() {
-			return Ok(None)
-		}
-		match tokens[0] {
-			Token::Bracket(Bracket::Curly, BracketState::Open) => {
-				let mut buf = 0;
-				for (i, token) in tokens[0..tokens.len()].iter().enumerate() {
-					if let Some((bracket, bracketstate)) = token.as_bracket() {
-						match (bracket, bracketstate) {
-							(Bracket::Curly, BracketState::Open) => buf += 1,
-							(Bracket::Curly, BracketState::Close) => buf -= 1,
-							_ => {},
-						}
-					}
-					if buf == 0 {
-						// Parse whatever's inside this block as an AST [after first brace..last brace]
-						let ast = parse(&tokens[1..i])?;
-						// I have no idea why this works
-						return Ok(Some((ast, &tokens[i + 1..tokens.len()])));
-					}
-				}
 
-				return Err(ParseError::UnclosedBrace(0))
-			},
-			_ => return Ok(None)
-		}
+fn next_expression<'a>(tokens: &'a [Token]) -> Result<Option<(Expression, &'a [Token])>, ParseError> {
+	if tokens.is_empty() {
+		return Ok(None)
 	}
-}
 
-trait StatementParser {
-	fn next_element<'a>(&self, tokens: &'a [Token]) -> Result<Option<(Statement, &'a [Token])>, ParseError>;
-}
-
-#[derive(Debug)]
-struct BindingTaker;
-impl StatementParser for BindingTaker {
-	#[allow(unused_mut)]
-	fn next_element<'a>(&self, tokens: &'a [Token]) -> Result<Option<(Statement, &'a [Token])>, ParseError> {
-		if tokens.is_empty() {
-			return Ok(None)
-		}
-
-		let mut tokens = tokens;
-
-		match tokens[0] {
-			Token::Keyword(Keyword::Let) => {
-				let ident = if let Token::Name(ref name) = tokens[1] {
-					name.to_owned()
-				} else {
-					return Err(ParseError::UnexpectedToken(0)) // TODO add expected 'identifier'
-				};
-				
-				let mut offset = 0;
-				let mut type_annotation: Option<String> = if let Token::Symbol(TokenSymbol::Colon) = tokens[2] {
-					// if there's a type annotation
-					// change token offset
-					unimplemented!()
-				} else {
-					None
-				};
-
-				if let Token::Symbol(TokenSymbol::Equals) = tokens[2 + offset] {  } else {
-					return Err(ParseError::UnexpectedToken(0))
-				}
-
-				let expr = if let Some((expr, leftovers)) = ExpressionTaker.next_element(&tokens[2 + offset + 1..tokens.len()])? {
-					tokens = leftovers;
-					expr
-				} else {
-					return Err(ParseError::UnexpectedToken(0))
-				};
-
-				if let Token::Symbol(TokenSymbol::Semicolon) = tokens[0] {
-					tokens = &tokens[1..tokens.len()];
-				} else {
-					return Err(ParseError::UnexpectedToken(0))
-				}
-
-				Ok(Some((Statement::Binding(Binding {
-					mutable: false,
-					ident,
-					bind_type: type_annotation,
-					val: Some(expr),
-				}), tokens)))
-			},
-			_ => Ok(None),
-		}
-	}
-}
-
-#[derive(Debug)]
-struct DebugTaker;
-impl StatementParser for DebugTaker {
-	fn next_element<'a>(&self, tokens: &'a [Token]) -> Result<Option<(Statement, &'a [Token])>, ParseError> {
-		if tokens.is_empty() {
-			return Ok(None)
-		}
-
-		let mut tokens = tokens;
-
-		match tokens[0] {
-			Token::Keyword(Keyword::Debug) => {
-				let expr = if let Some((expr, leftovers)) = ExpressionTaker.next_element(&tokens[1..tokens.len()])? {
-					tokens = leftovers;
-					expr
-				} else {
-					return Err(ParseError::UnexpectedToken(0))
-				};
-
-				
-				if let Token::Symbol(TokenSymbol::Semicolon) = tokens[0] {
-					tokens = &tokens[1..tokens.len()];
-				} else {
-					return Err(ParseError::UnexpectedToken(0))
-				}
-
-				Ok(Some((Statement::Debug(expr), tokens)))
-			},
-			_ => Ok(None),
-		}
-	}
-}
-
-trait ExpressionParser {
-	fn next_element<'a>(&self, tokens: &'a [Token]) -> Result<Option<(Expression, &'a [Token])>, ParseError>;
-}
-
-#[derive(Debug)]
-struct ExpressionTaker;
-impl ExpressionParser for ExpressionTaker {
-	fn next_element<'a>(&self, tokens: &'a [Token]) -> Result<Option<(Expression, &'a [Token])>, ParseError> {
-		if tokens.is_empty() {
-			return Ok(None)
-		}
-
-		// TODO keep pulling until semicolon
-		match tokens[0] {
-			Token::NumberLiteral(num) => {
-				Ok(Some((Expression::NumberLiteral(num), &tokens[1..tokens.len()])))
-			},
-			Token::Name(ref name) => {
-				Ok(Some((Expression::Identifier(name.to_owned()), &tokens[1..tokens.len()])))
-			}
-			// TODO accept blocks
-			_ => Ok(None)
-		}
+	// TODO keep pulling until semicolon
+	match tokens[0] {
+		Token::NumberLiteral(num) => {
+			Ok(Some((Expression::NumberLiteral(num), &tokens[1..tokens.len()])))
+		},
+		Token::Name(ref name) => {
+			Ok(Some((Expression::Identifier(name.to_owned()), &tokens[1..tokens.len()])))
+		},
+		Token::Bracket(Bracket::Curly, BracketState::Open) => {
+			Ok(next_block(tokens)?.map(|b| (Expression::Block(Box::new(b.0)), b.1)))
+		},
+		_ => Ok(None)
 	}
 }

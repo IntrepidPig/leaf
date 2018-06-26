@@ -1,4 +1,4 @@
-use ast::parser::{SyntaxTree, Block, Statement, Expression, Binding as SyntaxBinding};
+use ast::parser::{SyntaxTree, Statement, Expression, Binding};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Value {
@@ -8,6 +8,7 @@ pub struct Value {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Instruction {
 	Push(Value),
+	Pop,
 	Bind(String),
 	PushVar(String),
 	Drop(String),
@@ -15,13 +16,11 @@ pub enum Instruction {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Binding {
-	name: String,
-	val: i32,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CodeGenerator {
+	/// The stack currently as of the parsing stage. Each binding adds a variable to the last vec,
+	/// each new block pushes a new vec, and when a block ends, a drop instruction for each binding
+	/// in the last vec and then the last vec is popped. This creates a drop when variables go out
+	/// of scope mechanism.
 	block_vars: Vec<Vec<String>>,
 }
 
@@ -40,26 +39,13 @@ impl CodeGenerator {
 
 	pub fn gen_from_ast(&mut self, ast: &SyntaxTree) -> Vec<Instruction> {
 		let mut instructions: Vec<Instruction> = Vec::new();
-		println!("Gen from ast: {:?}", ast);
-
-		match ast {
-			SyntaxTree::Block(ref block) => {
-				instructions.append(&mut self.gen_from_block(block));		
-			},
-			SyntaxTree::Statement(ref stmnt) => {
-				instructions.append(&mut self.gen_from_stmnt(stmnt));
-			}
-		}
-
-		instructions
-	}
-
-	pub fn gen_from_block(&mut self, block: &Block) -> Vec<Instruction> {
-		let mut instructions: Vec<Instruction> = Vec::new();
 
 		self.block_vars.push(Vec::new());
-		for syntax in &block.block {
-			instructions.append(&mut self.gen_from_ast(syntax))
+		for statement in &ast.block {
+			instructions.append(&mut self.gen_from_stmnt(statement));
+		}
+		if let Some(ref output) = ast.output {
+			instructions.append(&mut self.gen_from_expr(output))
 		}
 		for block_var in self.block_vars.pop().unwrap() {
 			instructions.push(Instruction::Drop(block_var));
@@ -72,7 +58,7 @@ impl CodeGenerator {
 		let mut instructions: Vec<Instruction> = Vec::new();
 
 		match stmnt {
-			Statement::Binding(SyntaxBinding { ref ident, val: expr, .. }) => {
+			Statement::Binding(Binding { ref ident, val: expr, .. }) => {
 				if let Some(expr) = expr {
 					instructions.append(&mut self.gen_from_expr(expr));
 					instructions.push(Instruction::Bind(ident.to_owned()));
@@ -90,6 +76,7 @@ impl CodeGenerator {
 			},
 			Statement::Expression(ref expr) => {
 				instructions.append(&mut self.gen_from_expr(expr));
+				instructions.push(Instruction::Pop);
 			}
 		}
 
@@ -103,8 +90,8 @@ impl CodeGenerator {
 			Expression::NumberLiteral(num) => instructions.push(Instruction::Push(Value {
 				val: *num,
 			})),
-			Expression::Block(ref block) => {
-				instructions.append(&mut self.gen_from_block(block));
+			Expression::Block(ref ast) => {
+				instructions.append(&mut self.gen_from_ast(ast));
 			}
 			Expression::Identifier(ref ident) => {
 				instructions.push(Instruction::PushVar(ident.to_owned()))
@@ -121,7 +108,7 @@ pub struct ByteGen {
 }
 
 impl ByteGen {
-	pub fn gen_bytes(instructions: &[Instruction]) {
+	pub fn gen_bytes(_instructions: &[Instruction]) {
 		unimplemented!()
 	}
 }
