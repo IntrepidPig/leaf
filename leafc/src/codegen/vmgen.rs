@@ -1,4 +1,4 @@
-use ast::parser::{SyntaxTree, Statement, Expression, Binding};
+use ast::parser::{SyntaxTree, Statement, Expression, Binding, BinaryOp};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Value {
@@ -7,27 +7,27 @@ pub struct Value {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Instruction {
+	Frame,
+	Exit,
 	Push(Value),
-	Pop,
+	Return,
 	Bind(String),
-	PushVar(String),
-	Drop(String),
+	Load(String),
+	Set(String),
+	Pop,
+	Add,
 	Debug,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CodeGenerator {
-	/// The stack currently as of the parsing stage. Each binding adds a variable to the last vec,
-	/// each new block pushes a new vec, and when a block ends, a drop instruction for each binding
-	/// in the last vec and then the last vec is popped. This creates a drop when variables go out
-	/// of scope mechanism.
-	block_vars: Vec<Vec<String>>,
+
 }
 
 impl CodeGenerator {
 	pub fn new() -> Self {
 		CodeGenerator {
-			block_vars: vec![Vec::new()],
+			
 		}
 	}
 
@@ -40,16 +40,15 @@ impl CodeGenerator {
 	pub fn gen_from_ast(&mut self, ast: &SyntaxTree) -> Vec<Instruction> {
 		let mut instructions: Vec<Instruction> = Vec::new();
 
-		self.block_vars.push(Vec::new());
+		instructions.push(Instruction::Frame);
 		for statement in &ast.block {
 			instructions.append(&mut self.gen_from_stmnt(statement));
 		}
 		if let Some(ref output) = ast.output {
-			instructions.append(&mut self.gen_from_expr(output))
+			instructions.append(&mut self.gen_from_expr(output));
+			instructions.push(Instruction::Return);
 		}
-		for block_var in self.block_vars.pop().unwrap() {
-			instructions.push(Instruction::Drop(block_var));
-		}
+		instructions.push(Instruction::Exit);
 
 		instructions
 	}
@@ -67,8 +66,8 @@ impl CodeGenerator {
 						val: 0,
 					}));
 					instructions.push(Instruction::Bind(ident.to_owned()));
+					unimplemented!();
 				}
-				self.block_vars.last_mut().unwrap().push(ident.to_owned());
 			},
 			Statement::Debug(ref expr) => {
 				instructions.append(&mut self.gen_from_expr(expr));
@@ -94,8 +93,15 @@ impl CodeGenerator {
 				instructions.append(&mut self.gen_from_ast(ast));
 			}
 			Expression::Identifier(ref ident) => {
-				instructions.push(Instruction::PushVar(ident.to_owned()))
+				instructions.push(Instruction::Load(ident.to_owned()))
 			},
+			Expression::Binary { left, right, op } => {
+				instructions.append(&mut self.gen_from_expr(left));
+				instructions.append(&mut self.gen_from_expr(right));
+				instructions.push(match op {
+					BinaryOp::Add => Instruction::Add,
+				});
+			}
 			_ => unimplemented!()
 		}
 
