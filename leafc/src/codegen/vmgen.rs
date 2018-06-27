@@ -47,6 +47,11 @@ impl CodeGenerator {
 		if let Some(ref output) = ast.output {
 			instructions.append(&mut self.gen_from_expr(output));
 			instructions.push(Instruction::Return);
+		} else {
+			instructions.push(Instruction::Push(Value {
+				val: 0,
+			}));
+			instructions.push(Instruction::Return);
 		}
 		instructions.push(Instruction::Exit);
 

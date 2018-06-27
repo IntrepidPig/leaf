@@ -29,7 +29,7 @@ fn run_instructions(instructions: &[Instruction]) -> Result<(), ()> {
 	let mut vars: HashMap<String, usize> = HashMap::new();
 
 	for instruction in instructions {
-		println!("Instruction: {:?}", instruction);
+		//println!("Instruction: {:?}", instruction);
 
 		match instruction {
 			Instruction::Bind(ref ident) => {
@@ -41,25 +41,30 @@ fn run_instructions(instructions: &[Instruction]) -> Result<(), ()> {
 			},
 			Instruction::Pop => {
 				stack.last_mut().unwrap().pop().unwrap();
+				ptr -= 1;
 			},
 			Instruction::Load(ref ident) => {
 				let val = deref_stack(&stack, *vars.get(ident).unwrap());
 				stack.last_mut().unwrap().push(val);
+				ptr += 1;
 			},
 			Instruction::Debug => {
 				let val = stack.last_mut().unwrap().pop().unwrap();
 				println!("\t => Value: {}", val.val);
+				ptr -= 1;
 			},
 			Instruction::Frame => {
 				stack.push(Vec::new());
 			},
 			Instruction::Exit => {
+				ptr -= stack.last().unwrap().len();
 				stack.pop().unwrap();
 				// TODO drop all items in stack
 			},
 			Instruction::Set(ref ident) => {
 				let val = stack.last_mut().unwrap().pop().unwrap();
 				*deref_stack_mut(&mut stack, *vars.get(ident).unwrap()) = val;
+				ptr -= 1;
 				// TODO drop old value
 			},
 			Instruction::Return => {
@@ -74,16 +79,16 @@ fn run_instructions(instructions: &[Instruction]) -> Result<(), ()> {
 				stack.last_mut().unwrap().push(Value {
 					val: output,
 				});
+				ptr -= 1;
 			}
 		}
 
-		println!("Stack: {:?}", stack);
-		println!("Vars: {:?}", vars);
+		//println!("Ptr: {}", ptr);
+		//println!("Stack: {:?}", stack);
+		//println!("Vars: {:?}", vars);
 	}
 
-	if let Some(val) = stack.pop().unwrap().pop() {
-		println!("Program output: {}", val.val);
-	}
+	println!("Program output: {}", stack.pop().unwrap().pop().unwrap().val);
 
 	Ok(())
 }
