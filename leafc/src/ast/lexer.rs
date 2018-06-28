@@ -226,7 +226,7 @@ impl LexemeTaker for WhitespaceTaker {
 			Ok(Some((Lexeme::Whitespace {
 				whitespace_type: whitespace_type.unwrap(), // If the end is nonzero then the whitespace_type was set
 				amount: input[0..end].chars().count() as u32, // Count the chars in the substring to get the amount
-			}, &input[end..input.len()])))
+			}, &input[end..])))
 		} else {
 			// No whitespace was found
 			Ok(None)
@@ -255,7 +255,7 @@ impl LexemeTaker for WordTaker {
 		}
 		
 		if end > 0 {
-			Ok(Some((Lexeme::Word(&input[0..end]), &input[end..input.len()])))
+			Ok(Some((Lexeme::Word(&input[0..end]), &input[end..])))
 		} else {
 			Ok(None)
 		}
@@ -282,7 +282,7 @@ impl LexemeTaker for BracketTaker {
 			']' => Lexeme::Bracket(Bracket::Square, BracketState::Close),
 			')' => Lexeme::Bracket(Bracket::Paren, BracketState::Close),
 			_ => return Ok(None)
-		}, &input[c.len_utf8()..input.len()])))
+		}, &input[c.len_utf8()..])))
 	}
 }
 
@@ -308,7 +308,7 @@ impl LexemeTaker for StringTaker {
 		}
 		
 		// now start parsing from after the first quote
-		let input = &input[start..input.len()];
+		let input = &input[start..];
 		// chars iter afterf first quote mark
 		let chars = input.chars();
 		// end of string literal before final quote mark
@@ -356,7 +356,7 @@ impl LexemeTaker for StringTaker {
 		}
 		
 		if found_end {
-			Ok(Some((Lexeme::String(string), &input[end..input.len()])))
+			Ok(Some((Lexeme::String(string), &input[end..])))
 		} else {
 			Err(LexError::UnterminatedStringLiteral(actual_index))
 		}
@@ -398,7 +398,7 @@ impl LexemeTaker for SymbolTaker {
 				'!' => Lexeme::Exclamation,
 				'+' => Lexeme::Plus,
 				_ => return Ok(None)
-			}, &input[end..input.len()])))
+			}, &input[end..])))
 		}
 
 		Ok(None)
@@ -423,7 +423,7 @@ impl LexemeTaker for NumLiteralTaker {
 
 		if end > 0 {
 			let num_str = &input[0..end];
-			Ok(Some((Lexeme::Number(num_str), &input[end..input.len()])))
+			Ok(Some((Lexeme::Number(num_str), &input[end..])))
 		} else {
 			Ok(None)
 		}

@@ -175,7 +175,7 @@ impl TerminatorCounter {
 		for (i, token) in tokens.iter().enumerate() {
 			counter.add(token);
 			if counter.is_terminated() {
-				return (&tokens[0..i], &tokens[i..tokens.len()])
+				return (&tokens[0..i], &tokens[i..])
 			}
 		}
 
@@ -265,7 +265,7 @@ pub fn next_statement<'a>(tokens: &'a [Token]) -> Result<Option<(Statement, &'a 
 	// Try to parse an expression followed by a semicolon
 	} else if let Some((expression, leftovers)) = next_expression(tokens)? {
 		if leftovers.get(0) == Some(&Token::Symbol(TokenSymbol::Semicolon)) {
-			return Ok(Some((Statement::Expression(expression), &leftovers[1..leftovers.len()])))
+			return Ok(Some((Statement::Expression(expression), &leftovers[1..])))
 		} else {
 			return Ok(None)
 		}
@@ -284,7 +284,7 @@ pub fn next_block<'a>(tokens: &'a [Token]) -> Result<Option<(SyntaxTree, &'a [To
 		Token::Bracket(Bracket::Curly, BracketState::Open) => {
 			let mut buf = 0;
 			// TODO use TerminatorCounter
-			for (i, token) in tokens[0..tokens.len()].iter().enumerate() {
+			for (i, token) in tokens[0..].iter().enumerate() {
 				if let Some((bracket, bracketstate)) = token.as_bracket() {
 					match (bracket, bracketstate) {
 						(Bracket::Curly, BracketState::Open) => buf += 1,
@@ -301,7 +301,7 @@ pub fn next_block<'a>(tokens: &'a [Token]) -> Result<Option<(SyntaxTree, &'a [To
 						return Err(ParseError::UnexpectedToken.into())
 					};
 					// And the leftover tokens [after last brace..end of tokens]
-					return Ok(Some((ast, &tokens[i + 1..tokens.len()])));
+					return Ok(Some((ast, &tokens[i + 1..])));
 				}
 			}
 			
@@ -348,7 +348,7 @@ fn next_binding<'a>(tokens: &'a [Token]) -> Result<Option<(Binding, &'a [Token])
 			}
 			
 			// Parse the expression part of the binding
-			let expr = if let Some((expr, leftovers)) = next_expression(&tokens[2 + offset + 1..tokens.len()])? {
+			let expr = if let Some((expr, leftovers)) = next_expression(&tokens[2 + offset + 1..])? {
 				tokens = leftovers;
 				expr
 			} else {
@@ -357,7 +357,7 @@ fn next_binding<'a>(tokens: &'a [Token]) -> Result<Option<(Binding, &'a [Token])
 
 			// Make sure there's a semicolon
 			if let Some(&Token::Symbol(TokenSymbol::Semicolon)) = tokens.get(0) {
-				tokens = &tokens[1..tokens.len()];
+				tokens = &tokens[1..];
 			} else {
 				return Ok(None)
 			}
@@ -386,7 +386,7 @@ fn next_debug<'a>(tokens: &'a [Token]) -> Result<Option<(Expression, &'a [Token]
 		// If the first token is debug it's a debug statement
 		Token::Keyword(Keyword::Debug) => {
 			// Get the expression after the keyword
-			let expr = if let Some((expr, leftovers)) = next_expression(&tokens[1..tokens.len()])? {
+			let expr = if let Some((expr, leftovers)) = next_expression(&tokens[1..])? {
 				tokens = leftovers;
 				expr
 			} else {
@@ -395,7 +395,7 @@ fn next_debug<'a>(tokens: &'a [Token]) -> Result<Option<(Expression, &'a [Token]
 
 			// Make sure there's a semicolon
 			if let Token::Symbol(TokenSymbol::Semicolon) = tokens[0] {
-				tokens = &tokens[1..tokens.len()];
+				tokens = &tokens[1..];
 			} else {
 				return Ok(None)
 			}
@@ -535,7 +535,7 @@ mod expressions {
 						_ => return Ok(None)
 					},
 					_ => return Ok(None)
-				})), &[&PrefixTaker, &OperandTaker], &tokens[1..tokens.len()])))
+				})), &[&PrefixTaker, &OperandTaker], &tokens[1..])))
 			} else {
 				Ok(None)
 			}
@@ -555,7 +555,7 @@ mod expressions {
 						_ => return Ok(None)
 					},
 					_ => return Ok(None)
-				})), &[&PrefixTaker, &OperandTaker], &tokens[1..tokens.len()])))
+				})), &[&PrefixTaker, &OperandTaker], &tokens[1..])))
 			} else {
 				Ok(None)
 			}
@@ -568,7 +568,7 @@ mod expressions {
 	struct OperandTaker;
 	impl ItemTaker for OperandTaker {
 		fn next_item<'a>(&self, tokens: &'a [Token]) -> Result<Option<(ExpressionItem, &'static [&'static ItemTaker], &'a [Token])>, Error<ParseError>> {
-			let mut remaining = &tokens[1..tokens.len()];
+			let mut remaining = &tokens[1..];
 			if let Some(token) = tokens.get(0) {
 				Ok(Some((ExpressionItem::Operand(match token {
 					Token::NumberLiteral(num) => Expression::NumberLiteral(*num),
