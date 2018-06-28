@@ -48,6 +48,7 @@ pub enum Symbol {
 	Ampersand,
 	Question,
 	Exclamation,
+	Plus,
 }
 
 #[derive(Debug, Clone)]
@@ -131,6 +132,9 @@ impl<'a> Tokenizer<'a> {
 				Lexeme::Exclamation => {
 					tokens.push(Token::Symbol(Symbol::Exclamation));
 				},
+				Lexeme::Plus => {
+					tokens.push(Token::Symbol(Symbol::Plus));
+				}
 				Lexeme::Whitespace { .. } => {} // whitespace isn't syntax python
 			}
 		}

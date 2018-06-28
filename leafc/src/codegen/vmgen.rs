@@ -105,6 +105,7 @@ impl CodeGenerator {
 				instructions.append(&mut self.gen_from_expr(right));
 				instructions.push(match op {
 					BinaryOp::Add => Instruction::Add,
+					_ => unimplemented!()
 				});
 			}
 			_ => unimplemented!()
