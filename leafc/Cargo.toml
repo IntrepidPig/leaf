@@ -7,8 +7,9 @@ authors = ["virusdownloader7@gmail.com"]
 name = "leafc"
 path = "src/lib.rs"
 
+[dependencies]
+backtrace = "0.3"
+
 [[bin]]
 name = "leafc"
 path = "src/leafc/leafc.rs"
-
-[dependencies]
