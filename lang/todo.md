@@ -1,3 +1,6 @@
+- Implement assignment
+- Implement other math operations
+- Implement requirement of braces to define order of operations
 - Implement type system
 - Implement defining own types
 - omg there's so much more work
