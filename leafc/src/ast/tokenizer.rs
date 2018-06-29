@@ -45,6 +45,8 @@ pub enum Symbol {
 	Asterisk,
 	Greater,
 	Less,
+	Assign,
+	Equality,
 	Ampersand,
 	Question,
 	Exclamation,
@@ -122,6 +124,12 @@ impl<'a> Tokenizer<'a> {
 				},
 				Lexeme::Less => {
 					tokens.push(Token::Symbol(Symbol::Less));
+				},
+				Lexeme::Equality => {
+					tokens.push(Token::Symbol(Symbol::Equality));
+				},
+				Lexeme::Assign => {
+					tokens.push(Token::Symbol(Symbol::Assign));
 				},
 				Lexeme::Ampersand => {
 					tokens.push(Token::Symbol(Symbol::Ampersand));

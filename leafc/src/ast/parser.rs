@@ -17,7 +17,24 @@ pub enum Symbol {
 pub enum Operator {
 	Binary(BinaryOp),
 	Prefix(PrefixOp),
-	Postifx(PostfixOp),
+	Postfix(PostfixOp),
+}
+
+impl Operator {
+	pub fn precedence(self) -> i32 {
+		match self {
+			Operator::Binary(binop) => binop.precedence(),
+			Operator::Prefix(preop) => preop.precedence(),
+			Operator::Postfix(postop) => postop.precedence(),
+		}
+	}
+
+	pub fn left_associative(self) -> bool {
+		match self {
+			Operator::Binary(binop) => binop.left_associative(),
+			_ => false,
+		}
+	}
 }
 
 /// A binary operator
@@ -34,6 +51,25 @@ pub enum BinaryOp {
 	Namespace,
 }
 
+impl BinaryOp {
+	pub fn precedence(self) -> i32 {
+		match self {
+			BinaryOp::Dot => 6,
+			BinaryOp::Equality => 4,
+			BinaryOp::Add => 5,
+			BinaryOp::Assign => 3,
+			_ => unimplemented!()
+		}
+	}
+
+	pub fn left_associative(self) -> bool {
+		match self {
+			BinaryOp::Assign => false,
+			_ => true,
+		}
+	}
+}
+
 /// A prefix operator
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PrefixOp {
@@ -41,11 +77,29 @@ pub enum PrefixOp {
 	Ampersand,
 }
 
+impl PrefixOp {
+	pub fn precedence(self) -> i32 {
+		match self {
+			PrefixOp::Asterisk => 1,
+			PrefixOp::Ampersand => 1,
+		}
+	}
+}
+
 /// A postfix operator
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PostfixOp {
 	Question,
 	Exclamation,
+}
+
+impl PostfixOp {
+	pub fn precedence(self) -> i32 {
+		match self {
+			PostfixOp::Question => 2,
+			PostfixOp::Exclamation => 2,
+		}
+	}
 }
 
 /// A list of statements and an optional return expression
@@ -102,11 +156,20 @@ pub enum Expression {
 		right: Box<Expression>,
 		op: BinaryOp,
 	},
+	Prefix {
+		right: Box<Expression>,
+		op: PrefixOp,
+	},
+	Postfix {
+		left: Box<Expression>,
+		op: PostfixOp,
+	},
 	FunctionCall {
 		base: Option<Box<Expression>>,
 		function: String,
 		args: Vec<Expression>,
 	},
+	Assign(Box<Assignment>),
 	Identifier(String),
 	Block(Box<SyntaxTree>),
 	StringLiteral(String),
@@ -343,7 +406,7 @@ fn next_binding<'a>(tokens: &'a [Token]) -> Result<Option<(Binding, &'a [Token])
 			};
 
 			// Make sure there's an equals sign after the identifier or type annotation
-			if let Token::Symbol(TokenSymbol::Equals) = tokens[2 + offset] {  } else {
+			if let Token::Symbol(TokenSymbol::Assign) = tokens[2 + offset] {  } else {
 				return Ok(None)
 			}
 			
@@ -456,70 +519,100 @@ mod expressions {
 			return Err(ParseError::Other.into())
 		}
 
-		// This converts the operands and operators in expr_items into a single operand that is an expression containing the previous
-		// contents. For example, if expr_items were [Operand(3), Operator(+), Operand(5)] then it would become [Operand(Expression(Binary(3, 5, +)))].
-		// Right now it accecpts multiple binary operations but it should only accept one operation and require other operations to be contained
-		// in braces to enforce explicit ordering of operations.failure
-		// TODO handle prefix and postfix operations
-		// TODO enforce explicit order of operations
-		// TODO define order of operations in regards to prefix and postifx operators
-		//  --- will probably by postfix precedence over prefix always
-		while expr_items.len() > 1 {
-			// Get the first item
-			let item1 = expr_items.remove(0);
-			match item1 {
-				// If its an operand than there's either a binary operator and another operand after it or just a postfix operator
-				ExpressionItem::Operand(item1expr) => {
-					if !expr_items.is_empty() {
-						// The next operator after it
-						let operator = expr_items.remove(0);
-						match operator {
-							// It has to be an operator
-							ExpressionItem::Operator(operator) => match operator {
-								// If its a binary op
-								Operator::Binary(binop) => {
-									// There should be an operand after the binary op
-									if !expr_items.is_empty() {
-										let item2 = expr_items.remove(0);
-										match item2 {
-											// Make sure there's an operand after the binary operator
-											ExpressionItem::Operand(item2expr) => {
-												expr_items.insert(0, ExpressionItem::Operand(Expression::Binary {
-													left: Box::new(item1expr),
-													right: Box::new(item2expr),
-													op: binop,
-												}))
-											},
-											_ => return Err(ParseError::Other.into()) // There was an operator after a binary operator
-										}
-									} else {
-										return Err(ParseError::Other.into()) // There was no operand after a binary operator
-									}
-								},
-								_ => return Err(ParseError::Other.into()) // There was no operator after an operand
-							},
-							_ => return Err(ParseError::Other.into()) // There was an operand after an operator
-						}
-					} else {
-						// There was nothing after an operand.
-						// The while loop condition will prevent this, since this state is technically finished
-						return Err(ParseError::Other.into())
+		// Simplifies the list of expression items into a single expression. Works recursively, step by step, with a lot of
+		// heap allocation.
+		// TODO disallow chained binary operators, require parentheses for explicit order of operations
+		fn simplify(items: &[ExpressionItem]) -> Result<Expression, Error<ParseError>> {
+			if items.len() == 0 {
+				// A previous iteration returned something bad
+				return Err(ParseError::Other.into())
+			}
+
+			// If there's only one item left it should be an expression and not an operator
+			if items.len() == 1 {
+				match items[0] {
+					ExpressionItem::Operand(ref expr) => return Ok(expr.clone()),
+					ExpressionItem::Operator(_) => return Err(ParseError::Other.into()), // The expression parsed into an operator
+				}
+			}
+
+			// Get the highest (lowest precedence) priority operator in this list.
+			// Priority is the lowest precedence so for
+			let mut priority = 100;
+			// Priority op is the index of the lowest precedence so far
+			let mut priority_op: usize = 0;
+
+			for (i, item) in items.iter().enumerate() {
+				match item {
+					ExpressionItem::Operator(op) => if op.precedence() < priority {
+						priority = op.precedence();
+						priority_op = i;
+					} else if op.left_associative() && op.precedence() == priority {
+						priority = op.precedence();
+						priority_op = i;
 					}
+					_ => {},
+				}
+			}
+
+			// Recursively call simplify on each side of an operator that will have an expression
+			match items[priority_op] {
+				ExpressionItem::Operator(op) => match op {
+					Operator::Binary(binop) => {
+						// Simplify the tokens to the left and to the right of the binary operation
+						let lhs = &items[..priority_op];
+						let rhs = &items[priority_op + 1..];
+						let lhs = simplify(lhs)?;
+						let rhs = simplify(rhs)?;
+						match binop {
+							// Assign is a special case that returns a special expression, not a binary operation
+							// and requires the lhs to be an identifier
+							BinaryOp::Assign => {
+								match lhs {
+									Expression::Identifier(ref ident) => {
+										Ok(Expression::Assign(Box::new(Assignment {
+											ident: ident.to_owned(),
+											expr: rhs,
+										})))
+									},
+									_ => Err(ParseError::Other.into()) // The left hand side wasn't an identifier
+								}
+							},
+							binop => {
+								Ok(Expression::Binary {
+									left: Box::new(lhs),
+									right: Box::new(rhs),
+									op: binop,
+								})
+							}
+						}
+					},
+					Operator::Prefix(preop) => {
+						// Simplify the items to the right of a prefix operator
+						let rhs = &items[priority_op + 1..];
+						let rhs = simplify(rhs)?;
+						Ok(Expression::Prefix {
+							right: Box::new(rhs),
+							op: preop,
+						})
+					},
+					Operator::Postfix(postop) => {
+						// Simplify the items to the left of a postfix operator
+						let lhs = &items[..priority_op];
+						let lhs = simplify(lhs)?;
+						Ok(Expression::Postfix {
+							left: Box::new(lhs),
+							op: postop,
+						})
+					},
 				},
-				// If the first token is an operator then it's a prefix operator
-				ExpressionItem::Operator(Operator::Prefix(_operator)) => {
-					unimplemented!()
-				},
-				_ => return Err(ParseError::Other.into())
+				ExpressionItem::Operand(_) => {
+					return Err(ParseError::Other.into()) // The token at this index should be an operator
+				}
 			}
 		}
 
-		match expr_items.pop().unwrap() {
-			ExpressionItem::Operand(expr) => {
-				Ok(expr)
-			},
-			_ => Err(ParseError::Other.into())
-		}
+		simplify(&expr_items)
 	}
 
 	/// Tries to get a prefix operator
@@ -550,8 +643,8 @@ mod expressions {
 			if let Some(token) = tokens.get(0) {
 				Ok(Some((ExpressionItem::Operator(Operator::Binary(match token {
 					Token::Symbol(symbol) => match symbol {
-						TokenSymbol::Equals => BinaryOp::Assign,
 						TokenSymbol::Plus => BinaryOp::Add,
+						TokenSymbol::Assign => BinaryOp::Assign,
 						_ => return Ok(None)
 					},
 					_ => return Ok(None)

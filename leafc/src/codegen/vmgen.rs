@@ -144,10 +144,23 @@ impl CodeGenerator {
 				// Push the value of the right hand side to the stack
 				instructions.append(&mut self.gen_from_expr(right));
 				// Perform the operation
-				instructions.push(match op {
-					BinaryOp::Add => Instruction::Add,
+				match op {
+					BinaryOp::Add => instructions.push(Instruction::Add),
+					BinaryOp::Assign => {
+						panic!("Assign binary operator found. This should have been converted to a standalone\
+						expression during the parsing phase, not a binary operation")
+					},
 					_ => unimplemented!()
-				});
+				};
+			},
+			Expression::Assign(ref assignment) => {
+				// Load the value that used to be in the variable being assigned to
+				instructions.push(Instruction::Load(assignment.ident.to_owned()));
+				// Push the result of the expr onto the stack
+				instructions.append(&mut self.gen_from_expr(&assignment.expr));
+				// Move the result into the variable
+				instructions.push(Instruction::Set(assignment.ident.to_owned()));
+				// And the old value will be left on the stack as the result of the expression
 			}
 			_ => unimplemented!()
 		}

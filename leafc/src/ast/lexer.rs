@@ -52,6 +52,8 @@ impl<'a> Lexemes<'a> {
 				Lexeme::Asterisk => out.push('*'),
 				Lexeme::Greater => out.push('>'),
 				Lexeme::Less => out.push('<'),
+				Lexeme::Assign => out.push_str(":="),
+				Lexeme::Equality => out.push_str("=="),
 				Lexeme::Ampersand => out.push('&'),
 				Lexeme::Question => out.push('?'),
 				Lexeme::Exclamation => out.push('!'),
@@ -83,6 +85,8 @@ pub enum Lexeme<'a> {
 	Asterisk,
 	Greater,
 	Less,
+	Assign,
+	Equality,
 	Ampersand,
 	Question,
 	Exclamation,
@@ -376,32 +380,50 @@ impl LexemeTaker for StringTaker {
 /// - '&' Ampersand
 /// - '?' Question
 /// - '!' Exclamation
+/// - ':=' Assign,
+/// - '==' Equality
 #[derive(Debug)]
 struct SymbolTaker;
 impl LexemeTaker for SymbolTaker {
 	fn next_lexeme<'a>(&self, input: &'a str, _actual_index: usize) -> Result<Option<(Lexeme<'a>, &'a str)>, LexError> {
-		let mut end = 0;
+		// Make sure there's at least one character
+		let mut chars = input.chars();
+		let c1 = if let Some(c1) = chars.next() {
+			c1
+		} else {
+			return Err(LexError::Empty)
+		};
 
-		for c in input.chars() {
-			end += c.len_utf8();
-			return Ok(Some((match c {
-				':' => Lexeme::Colon,
-				',' => Lexeme::Comma,
-				'.' => Lexeme::Dot,
-				'=' => Lexeme::Equals,
-				';' => Lexeme::Semicolon,
-				'*' => Lexeme::Asterisk,
-				'>' => Lexeme::Greater,
-				'<' => Lexeme::Less,
-				'&' => Lexeme::Ampersand,
-				'?' => Lexeme::Question,
-				'!' => Lexeme::Exclamation,
-				'+' => Lexeme::Plus,
-				_ => return Ok(None)
-			}, &input[end..])))
-		}
+		// Optionally get the second
+		let c2 = chars.next();
 
-		Ok(None)
+		// The length of the second char to add to the amount taken away from the input slice
+		let mut char2_len = 0;
+
+		// If there's a second char, set the char2_len
+		return Ok(Some((match (c1, c2) {
+			(':', Some('=')) => {
+				char2_len = c2.unwrap().len_utf8();
+				Lexeme::Assign
+			},
+			('=', Some('=')) => {
+				char2_len = c2.unwrap().len_utf8();
+				Lexeme::Equality
+			},
+			(':', _) => Lexeme::Colon,
+			(',', _) => Lexeme::Comma,
+			('.', _) => Lexeme::Dot,
+			('=', _) => Lexeme::Equals,
+			(';', _) => Lexeme::Semicolon,
+			('*', _) => Lexeme::Asterisk,
+			('>', _) => Lexeme::Greater,
+			('<', _) => Lexeme::Less,
+			('&', _) => Lexeme::Ampersand,
+			('?', _) => Lexeme::Question,
+			('!', _) => Lexeme::Exclamation,
+			('+', _) => Lexeme::Plus,
+			(_, _) => return Ok(None)
+		}, &input[c1.len_utf8() + char2_len..])))
 	}
 }
 
