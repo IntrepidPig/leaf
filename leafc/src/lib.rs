@@ -1,5 +1,3 @@
-#![feature(nll)]
-
 extern crate backtrace;
 
 use std::path::Path;
