@@ -17,7 +17,7 @@ fn main() {
 	println!("{:?}\n\t=>", tokens);
 	let ast = leafc::ast::parser::parse(tokens.tokens.as_slice()).unwrap();
 	println!("{:?}\n\t=>", ast);
-	let mut code_generator = leafc::codegen::vmgen::CodeGenerator::new();
+	let code_generator = leafc::codegen::vmgen::CodeGenerator::new();
 	let instructions = code_generator.gen_instructions(ast);
 	println!("{:?}", instructions);
 	run_instructions(&instructions).unwrap();
@@ -28,10 +28,27 @@ fn run_instructions(instructions: &[Instruction]) -> Result<(), ()> {
 	let mut stack: Vec<Vec<Value>> = vec![Vec::new()];
 	let mut vars: HashMap<String, usize> = HashMap::new();
 
-	for instruction in instructions {
-		//println!("Instruction: {:?}", instruction);
+	let mut instr_ptr: usize = 0;
+	let mut iter: usize = 0;
 
-		match instruction {
+	loop {
+		if instr_ptr == instructions.len() {
+			break;
+		}
+
+		/*iter += 1;
+		if iter > 50 {
+			println!("Reached maximum instruction execution");
+			return Ok(());
+		}
+
+		println!(
+			"Instruction {}: {:?}",
+			instr_ptr,
+			instructions[instr_ptr],
+		);*/
+
+		match instructions[instr_ptr] {
 			Instruction::Bind(ref ident) => {
 				vars.insert(ident.clone(), ptr);
 			},
@@ -65,7 +82,6 @@ fn run_instructions(instructions: &[Instruction]) -> Result<(), ()> {
 				let val = stack.last_mut().unwrap().pop().unwrap();
 				*deref_stack_mut(&mut stack, *vars.get(ident).unwrap()) = val;
 				ptr -= 1;
-				// TODO drop old value
 			},
 			Instruction::Return => {
 				let val = stack.last_mut().unwrap().pop().unwrap();
@@ -79,11 +95,19 @@ fn run_instructions(instructions: &[Instruction]) -> Result<(), ()> {
 				stack.last_mut().unwrap().push(Value { val: output });
 				ptr -= 1;
 			},
+			Instruction::Jump(ptr) => {
+				instr_ptr = ptr;
+			}
 		}
 
-		//println!("Ptr: {}", ptr);
-		//println!("Stack: {:?}", stack);
-		//println!("Vars: {:?}", vars);
+		instr_ptr += 1;
+
+		/*println!(
+			"Stack: {:?}\n\
+			Vars: {:?}\n",
+			stack,
+			vars
+		);*/
 	}
 
 	println!(

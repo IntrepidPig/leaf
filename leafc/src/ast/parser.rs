@@ -170,6 +170,7 @@ pub enum Expression {
 		args: Vec<Expression>,
 	},
 	Assign(Box<Assignment>),
+	Loop(Box<SyntaxTree>),
 	Identifier(String),
 	Block(Box<SyntaxTree>),
 	StringLiteral(String),
@@ -498,8 +499,21 @@ fn next_expression<'a>(
 	// Get the tokens before the terminator
 	let (expr_tokens, leftovers) = TerminatorCounter::split_until_end(tokens);
 
-	// Parse the expression
-	expressions::parse_expression(expr_tokens).map(|expr| Some((expr, leftovers)))
+	// Handle all different kinds of expressions, like loop blocks, or just plain arithmetic
+	match expr_tokens[0] {
+		Token::Keyword(Keyword::Loop) => {
+			if let Some((block, extra_leftovers)) = next_block(&expr_tokens[1..])? {
+				if !extra_leftovers.is_empty() {
+					// The TerminatorCounter above should have ensured that only a block was included in expr_tokens
+					return Err(ParseError::Other.into())
+				}
+				Ok(Some((Expression::Loop(Box::new(block)), leftovers)))
+			} else {
+				return Err(ParseError::Other.into()) // Loop keywords needs a block directly after
+			}
+		},
+		_ => expressions::parse_expression(expr_tokens).map(|expr| Some((expr, leftovers)))
+	}	
 }
 
 /// Contains logic for parsing expressions

@@ -28,54 +28,54 @@ pub enum Instruction {
 	Add,
 	/// Print the value at the top of the stack and pop it
 	Debug,
+	/// Set the instruction pointer
+	Jump(usize),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CodeGenerator {}
+pub struct CodeGenerator {
+	instructions: Vec<Instruction>,
+}
 
 impl CodeGenerator {
 	pub fn new() -> Self {
-		CodeGenerator {}
+		CodeGenerator {
+			instructions: Vec::new(),
+		}
 	}
 
-	pub fn gen_instructions(&mut self, ast: SyntaxTree) -> Vec<Instruction> {
-		let instructions = self.gen_from_ast(&ast);
+	pub fn gen_instructions(mut self, ast: SyntaxTree) -> Vec<Instruction> {
+		self.gen_from_ast(&ast);
 
-		instructions
+		self.instructions
 	}
 
 	/// Generate instructions for a block
-	pub fn gen_from_ast(&mut self, ast: &SyntaxTree) -> Vec<Instruction> {
-		let mut instructions: Vec<Instruction> = Vec::new();
-
+	pub fn gen_from_ast(&mut self, ast: &SyntaxTree) {
 		// Start a new stack frame
-		instructions.push(Instruction::Frame);
+		self.instructions.push(Instruction::Frame);
 		// Generate instructions for each statement in the block
 		for statement in &ast.block {
-			instructions.append(&mut self.gen_from_stmnt(statement));
+			self.gen_from_stmnt(statement);
 		}
 		// Generate instructions for the block output (if there is one)
 		if let Some(ref output) = ast.output {
 			// Load the value of the exression onto the stack
-			instructions.append(&mut self.gen_from_expr(output));
+			self.gen_from_expr(output);
 			// Return the value into the previous stack frame
-			instructions.push(Instruction::Return);
+			self.instructions.push(Instruction::Return);
 		} else {
 			// Return a nil value
 			// This is necessary because if the block was a statement then it will always drop the result
-			instructions.push(Instruction::Push(Value { val: 0 }));
-			instructions.push(Instruction::Return);
+			self.instructions.push(Instruction::Push(Value { val: 0 }));
+			self.instructions.push(Instruction::Return);
 		}
 		// Exit the stack frame
-		instructions.push(Instruction::Exit);
-
-		instructions
+		self.instructions.push(Instruction::Exit);
 	}
 
 	/// Generate the instructions for a statement
-	pub fn gen_from_stmnt(&mut self, stmnt: &Statement) -> Vec<Instruction> {
-		let mut instructions: Vec<Instruction> = Vec::new();
-
+	pub fn gen_from_stmnt(&mut self, stmnt: &Statement) {
 		match stmnt {
 			Statement::Binding(Binding {
 				ref ident,
@@ -86,62 +86,58 @@ impl CodeGenerator {
 				if let Some(expr) = expr {
 					// Generate the instructions from the expression
 					// This will push the result onto the stack
-					instructions.append(&mut self.gen_from_expr(expr));
+					self.gen_from_expr(expr);
 					// Bind the variable to the current stack pointer
-					instructions.push(Instruction::Bind(ident.to_owned()));
+					self.instructions.push(Instruction::Bind(ident.to_owned()));
 				} else {
 					// Push a nil value to the stack
-					instructions.push(Instruction::Push(Value { val: 0 }));
+					self.instructions.push(Instruction::Push(Value { val: 0 }));
 					// Bind the variable to the nil value
-					instructions.push(Instruction::Bind(ident.to_owned()));
+					self.instructions.push(Instruction::Bind(ident.to_owned()));
 					unimplemented!();
 					// Unimplemented because binding a variable to default is not supported right now
 				}
 			},
 			Statement::Debug(ref expr) => {
 				// Generate the expression instructions
-				instructions.append(&mut self.gen_from_expr(expr));
+				self.gen_from_expr(expr);
 				// Debug the value at the top of the stack (pops it automatically)
-				instructions.push(Instruction::Debug)
+				self.instructions.push(Instruction::Debug)
 			},
 			Statement::Expression(ref expr) => {
 				// Generate instructions from expression
-				instructions.append(&mut self.gen_from_expr(expr));
+				self.gen_from_expr(expr);
 				// Pop the unused result from the stack
-				instructions.push(Instruction::Pop);
+				self.instructions.push(Instruction::Pop);
 			},
 		}
-
-		instructions
 	}
 
 	/// Generate instructions from an expression
-	pub fn gen_from_expr(&mut self, expr: &Expression) -> Vec<Instruction> {
-		let mut instructions: Vec<Instruction> = Vec::new();
-
+	pub fn gen_from_expr(&mut self, expr: &Expression) {
 		match expr {
 			// Push literal values onto the stack
 			Expression::NumberLiteral(num) => {
-				instructions.push(Instruction::Push(Value { val: *num }))
+				self.instructions.push(Instruction::Push(Value { val: *num }))
 			},
 			// Generate instructions for nested blocks
 			Expression::Block(ref ast) => {
-				instructions.append(&mut self.gen_from_ast(ast));
+				self.gen_from_ast(ast);
 			},
 			// Dereference variables
 			Expression::Identifier(ref ident) => {
 				// Push the value of the variable onto the top of the stack
-				instructions.push(Instruction::Load(ident.to_owned()))
+				self.instructions.push(Instruction::Load(ident.to_owned()))
 			},
 			// Evalute binary expressions
 			Expression::Binary { left, right, op } => {
 				// Push the value of the left hand side to the stack
-				instructions.append(&mut self.gen_from_expr(left));
+				self.gen_from_expr(left);
 				// Push the value of the right hand side to the stack
-				instructions.append(&mut self.gen_from_expr(right));
+				self.gen_from_expr(right);
 				// Perform the operation
 				match op {
-					BinaryOp::Add => instructions.push(Instruction::Add),
+					BinaryOp::Add => self.instructions.push(Instruction::Add),
 					BinaryOp::Assign => {
 						panic!("Assign binary operator found. This should have been converted to a standalone\
 						expression during the parsing phase, not a binary operation")
@@ -151,17 +147,23 @@ impl CodeGenerator {
 			},
 			Expression::Assign(ref assignment) => {
 				// Load the value that used to be in the variable being assigned to
-				instructions.push(Instruction::Load(assignment.ident.to_owned()));
+				self.instructions.push(Instruction::Load(assignment.ident.to_owned()));
 				// Push the result of the expr onto the stack
-				instructions.append(&mut self.gen_from_expr(&assignment.expr));
+				self.gen_from_expr(&assignment.expr);
 				// Move the result into the variable
-				instructions.push(Instruction::Set(assignment.ident.to_owned()));
+				self.instructions.push(Instruction::Set(assignment.ident.to_owned()));
 				// And the old value will be left on the stack as the result of the expression
+			},
+			Expression::Loop(ref block) => {
+				// Record the instruction pointer for the start of the loop
+				let loop_start = self.instructions.len() - 1;
+				// Push the instructions for the block
+				self.gen_from_ast(block);
+				// Push the jump instruction to the previously recorded index
+				self.instructions.push(Instruction::Jump(loop_start));
 			},
 			_ => unimplemented!(),
 		}
-
-		instructions
 	}
 }
 

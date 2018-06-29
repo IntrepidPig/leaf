@@ -33,6 +33,8 @@ pub enum Keyword {
 	If,
 	Else,
 	Debug,
+	Loop,
+	Break,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -83,6 +85,8 @@ impl<'a> Tokenizer<'a> {
 					"if" => tokens.push(Token::Keyword(Keyword::If)),
 					"else" => tokens.push(Token::Keyword(Keyword::Else)),
 					"debug" => tokens.push(Token::Keyword(Keyword::Debug)),
+					"loop" => tokens.push(Token::Keyword(Keyword::Loop)),
+					"break" => tokens.push(Token::Keyword(Keyword::Break)),
 					word => tokens.push(Token::Name(word.to_owned())),
 				},
 				Lexeme::Bracket(bracket, state) => {
