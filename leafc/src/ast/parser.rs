@@ -1,6 +1,6 @@
 use ast::lexer::{Bracket, BracketState};
-use ast::tokenizer::{Token, Keyword, Symbol as TokenSymbol};
-use failure::{Error};
+use ast::tokenizer::{Keyword, Symbol as TokenSymbol, Token};
+use failure::Error;
 
 /// A symbol
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -58,7 +58,7 @@ impl BinaryOp {
 			BinaryOp::Equality => 4,
 			BinaryOp::Add => 5,
 			BinaryOp::Assign => 3,
-			_ => unimplemented!()
+			_ => unimplemented!(),
 		}
 	}
 
@@ -114,7 +114,7 @@ pub struct SyntaxTree {
 impl SyntaxTree {
 	pub fn push(&mut self, syntax: Statement) -> Result<(), Error<ParseError>> {
 		self.block.push(syntax);
-		
+
 		Ok(())
 	}
 }
@@ -208,7 +208,7 @@ impl ::std::fmt::Display for ParseError {
 	}
 }
 
-impl ::std::error::Error for ParseError { }
+impl ::std::error::Error for ParseError {}
 
 /// A struct that counts the amunot of braces
 struct TerminatorCounter {
@@ -227,7 +227,7 @@ impl TerminatorCounter {
 			semicolon: 0,
 		}
 	}
-	
+
 	/// Split the tokens into a slic of tokens before a terminating token, and the tokens after and including
 	/// the terminating token.
 	/// A semicolon is a terminating token if it's not inside any brackets.
@@ -238,7 +238,7 @@ impl TerminatorCounter {
 		for (i, token) in tokens.iter().enumerate() {
 			counter.add(token);
 			if counter.is_terminated() {
-				return (&tokens[0..i], &tokens[i..])
+				return (&tokens[0..i], &tokens[i..]);
 			}
 		}
 
@@ -266,7 +266,7 @@ impl TerminatorCounter {
 
 				*target += 1 * match bracketstate {
 					BracketState::Open => 1,
-					BracketState::Close => -1
+					BracketState::Close => -1,
 				};
 			},
 			_ => {},
@@ -294,7 +294,9 @@ pub fn parse(tokens: &[Token]) -> Result<SyntaxTree, Error<ParseError>> {
 }
 
 /// Gets statements until it can't from the tokens, and then gets a final expression if there is one
-pub fn next_syntaxtree<'a>(mut tokens: &'a [Token]) -> Result<Option<SyntaxTree>, Error<ParseError>> {
+pub fn next_syntaxtree<'a>(
+	mut tokens: &'a [Token],
+) -> Result<Option<SyntaxTree>, Error<ParseError>> {
 	let mut stree = SyntaxTree::new();
 
 	// Parse each statement until none are left
@@ -305,7 +307,7 @@ pub fn next_syntaxtree<'a>(mut tokens: &'a [Token]) -> Result<Option<SyntaxTree>
 	// Parse the final expression if there is one
 	if let Some((expr, leftovers)) = next_expression(tokens)? {
 		if !leftovers.is_empty() {
-			return Err(ParseError::UnexpectedToken.into()) // There were tokens after the final expression which there shouldn't be
+			return Err(ParseError::UnexpectedToken.into()); // There were tokens after the final expression which there shouldn't be
 		}
 		stree.output = Some(expr);
 	}
@@ -314,34 +316,38 @@ pub fn next_syntaxtree<'a>(mut tokens: &'a [Token]) -> Result<Option<SyntaxTree>
 }
 
 /// Gets the next statement until a terminating semicolon
-pub fn next_statement<'a>(tokens: &'a [Token]) -> Result<Option<(Statement, &'a [Token])>, Error<ParseError>> {
+pub fn next_statement<'a>(
+	tokens: &'a [Token],
+) -> Result<Option<(Statement, &'a [Token])>, Error<ParseError>> {
 	if tokens.is_empty() {
-		return Ok(None)
+		return Ok(None);
 	}
 
 	// Try to parse a let binding
 	if let Some((binding, leftovers)) = next_binding(tokens)? {
-		return Ok(Some((Statement::Binding(binding), leftovers)))
+		return Ok(Some((Statement::Binding(binding), leftovers)));
 	// Try to parse a debug statement
 	} else if let Some((debug, leftovers)) = next_debug(tokens)? {
-		return Ok(Some((Statement::Debug(debug), leftovers)))
+		return Ok(Some((Statement::Debug(debug), leftovers)));
 	// Try to parse an expression followed by a semicolon
 	} else if let Some((expression, leftovers)) = next_expression(tokens)? {
 		if leftovers.get(0) == Some(&Token::Symbol(TokenSymbol::Semicolon)) {
-			return Ok(Some((Statement::Expression(expression), &leftovers[1..])))
+			return Ok(Some((Statement::Expression(expression), &leftovers[1..])));
 		} else {
-			return Ok(None)
+			return Ok(None);
 		}
 	}
 
 	Err(ParseError::Other.into()) // maybe should be (Ok(None))
 }
 
-/// Gets the next block from a token list, starting from an open brace ('{') and parsing everything until the close
-/// brace, and returning everything after the last close brace as leftovers
-pub fn next_block<'a>(tokens: &'a [Token]) -> Result<Option<(SyntaxTree, &'a [Token])>, Error<ParseError>> {
+/// Gets the next block from a token list, starting from an open brace ('{') and parsing everything
+/// until the close brace, and returning everything after the last close brace as leftovers
+pub fn next_block<'a>(
+	tokens: &'a [Token],
+) -> Result<Option<(SyntaxTree, &'a [Token])>, Error<ParseError>> {
 	if tokens.is_empty() {
-		return Ok(None)
+		return Ok(None);
 	}
 	match tokens[0] {
 		Token::Bracket(Bracket::Curly, BracketState::Open) => {
@@ -361,25 +367,27 @@ pub fn next_block<'a>(tokens: &'a [Token]) -> Result<Option<(SyntaxTree, &'a [To
 						ast
 					} else {
 						// Did not parse what was within the block (will never happen)
-						return Err(ParseError::UnexpectedToken.into())
+						return Err(ParseError::UnexpectedToken.into());
 					};
 					// And the leftover tokens [after last brace..end of tokens]
 					return Ok(Some((ast, &tokens[i + 1..])));
 				}
 			}
-			
+
 			// A brace was not closed by the end of the token list
-			return Err(ParseError::UnclosedBrace.into())
+			return Err(ParseError::UnclosedBrace.into());
 		},
-		_ => return Ok(None)
+		_ => return Ok(None),
 	}
 }
 
 /// Gets the next `let` binding
 #[allow(unused_mut)]
-fn next_binding<'a>(tokens: &'a [Token]) -> Result<Option<(Binding, &'a [Token])>, Error<ParseError>> {
+fn next_binding<'a>(
+	tokens: &'a [Token],
+) -> Result<Option<(Binding, &'a [Token])>, Error<ParseError>> {
 	if tokens.is_empty() {
-		return Ok(None)
+		return Ok(None);
 	}
 
 	let mut tokens = tokens;
@@ -391,46 +399,52 @@ fn next_binding<'a>(tokens: &'a [Token]) -> Result<Option<(Binding, &'a [Token])
 			let ident = if let Token::Name(ref name) = tokens[1] {
 				name.to_owned()
 			} else {
-				return Ok(None) // TODO add expected 'identifier'
+				return Ok(None); // TODO add expected 'identifier'
 			};
-			
+
 			// If there's a type annotation, parse it
 			// Set offset to how many tokens the type annotation occupied
 			let mut offset = 0;
-			let mut type_annotation: Option<String> = if let Token::Symbol(TokenSymbol::Colon) = tokens[2] {
-				// if there's a type annotation
-				// change token offset
-				unimplemented!()
-			} else {
-				None
-			};
+			let mut type_annotation: Option<String> =
+				if let Token::Symbol(TokenSymbol::Colon) = tokens[2] {
+					// if there's a type annotation
+					// change token offset
+					unimplemented!()
+				} else {
+					None
+				};
 
 			// Make sure there's an equals sign after the identifier or type annotation
-			if let Token::Symbol(TokenSymbol::Assign) = tokens[2 + offset] {  } else {
-				return Ok(None)
+			if let Token::Symbol(TokenSymbol::Assign) = tokens[2 + offset] {
+			} else {
+				return Ok(None);
 			}
-			
+
 			// Parse the expression part of the binding
-			let expr = if let Some((expr, leftovers)) = next_expression(&tokens[2 + offset + 1..])? {
+			let expr = if let Some((expr, leftovers)) = next_expression(&tokens[2 + offset + 1..])?
+			{
 				tokens = leftovers;
 				expr
 			} else {
-				return Ok(None)
+				return Ok(None);
 			};
 
 			// Make sure there's a semicolon
 			if let Some(&Token::Symbol(TokenSymbol::Semicolon)) = tokens.get(0) {
 				tokens = &tokens[1..];
 			} else {
-				return Ok(None)
+				return Ok(None);
 			}
 
-			Ok(Some((Binding {
-				mutable: false,
-				ident,
-				bind_type: type_annotation,
-				val: Some(expr),
-			}, tokens)))
+			Ok(Some((
+				Binding {
+					mutable: false,
+					ident,
+					bind_type: type_annotation,
+					val: Some(expr),
+				},
+				tokens,
+			)))
 		},
 		_ => Ok(None),
 	}
@@ -438,9 +452,11 @@ fn next_binding<'a>(tokens: &'a [Token]) -> Result<Option<(Binding, &'a [Token])
 
 /// Gets the next debug statement
 // TODO include expression original string repr with debug
-fn next_debug<'a>(tokens: &'a [Token]) -> Result<Option<(Expression, &'a [Token])>, Error<ParseError>> {
+fn next_debug<'a>(
+	tokens: &'a [Token],
+) -> Result<Option<(Expression, &'a [Token])>, Error<ParseError>> {
 	if tokens.is_empty() {
-		return Ok(None)
+		return Ok(None);
 	}
 
 	let mut tokens = tokens;
@@ -453,14 +469,14 @@ fn next_debug<'a>(tokens: &'a [Token]) -> Result<Option<(Expression, &'a [Token]
 				tokens = leftovers;
 				expr
 			} else {
-				return Ok(None)
+				return Ok(None);
 			};
 
 			// Make sure there's a semicolon
 			if let Token::Symbol(TokenSymbol::Semicolon) = tokens[0] {
 				tokens = &tokens[1..];
 			} else {
-				return Ok(None)
+				return Ok(None);
 			}
 
 			// Return the expression being debugged
@@ -472,9 +488,11 @@ fn next_debug<'a>(tokens: &'a [Token]) -> Result<Option<(Expression, &'a [Token]
 
 /// Gets the entirety of the next expression available as a single expression. This taker only stops upon recieving a semicolon outside of
 /// a block or an unmatched closing brace. The expression it returns may contain nested expressions, parsed as their own blocks.
-fn next_expression<'a>(tokens: &'a [Token]) -> Result<Option<(Expression, &'a [Token])>, Error<ParseError>> {
+fn next_expression<'a>(
+	tokens: &'a [Token],
+) -> Result<Option<(Expression, &'a [Token])>, Error<ParseError>> {
 	if tokens.is_empty() {
-		return Ok(None)
+		return Ok(None);
 	}
 
 	// Get the tokens before the terminator
@@ -496,7 +514,13 @@ mod expressions {
 
 	/// Trait for a struct that takes an ExpressionItem
 	pub trait ItemTaker: ::std::fmt::Debug {
-		fn next_item<'a>(&self, tokens: &'a [Token]) -> Result<Option<(ExpressionItem, &'static [&'static ItemTaker], &'a [Token])>, Error<ParseError>>;
+		fn next_item<'a>(
+			&self,
+			tokens: &'a [Token],
+		) -> Result<
+			Option<(ExpressionItem, &'static [&'static ItemTaker], &'a [Token])>,
+			Error<ParseError>,
+		>;
 	}
 
 	/// Parse the entirety of the tokens passed as an expression. If not all the tokens are used up, then there was an error.
@@ -508,7 +532,9 @@ mod expressions {
 		// Separate operators from operands and put them in expr_items
 		'outer: while !tokens.is_empty() {
 			for item_taker in item_takers {
-				if let Some((item, next_item_takers, leftover_tokens)) = item_taker.next_item(tokens)? {
+				if let Some((item, next_item_takers, leftover_tokens)) =
+					item_taker.next_item(tokens)?
+				{
 					expr_items.push(item);
 					item_takers = next_item_takers;
 					tokens = leftover_tokens;
@@ -516,7 +542,7 @@ mod expressions {
 				}
 			}
 
-			return Err(ParseError::Other.into())
+			return Err(ParseError::Other.into());
 		}
 
 		// Simplifies the list of expression items into a single expression. Works recursively, step by step, with a lot of
@@ -525,7 +551,7 @@ mod expressions {
 		fn simplify(items: &[ExpressionItem]) -> Result<Expression, Error<ParseError>> {
 			if items.len() == 0 {
 				// A previous iteration returned something bad
-				return Err(ParseError::Other.into())
+				return Err(ParseError::Other.into());
 			}
 
 			// If there's only one item left it should be an expression and not an operator
@@ -550,7 +576,7 @@ mod expressions {
 					} else if op.left_associative() && op.precedence() == priority {
 						priority = op.precedence();
 						priority_op = i;
-					}
+					},
 					_ => {},
 				}
 			}
@@ -575,16 +601,14 @@ mod expressions {
 											expr: rhs,
 										})))
 									},
-									_ => Err(ParseError::Other.into()) // The left hand side wasn't an identifier
+									_ => Err(ParseError::Other.into()), // The left hand side wasn't an identifier
 								}
 							},
-							binop => {
-								Ok(Expression::Binary {
-									left: Box::new(lhs),
-									right: Box::new(rhs),
-									op: binop,
-								})
-							}
+							binop => Ok(Expression::Binary {
+								left: Box::new(lhs),
+								right: Box::new(rhs),
+								op: binop,
+							}),
 						}
 					},
 					Operator::Prefix(preop) => {
@@ -607,8 +631,8 @@ mod expressions {
 					},
 				},
 				ExpressionItem::Operand(_) => {
-					return Err(ParseError::Other.into()) // The token at this index should be an operator
-				}
+					return Err(ParseError::Other.into()); // The token at this index should be an operator
+				},
 			}
 		}
 
@@ -619,16 +643,26 @@ mod expressions {
 	#[derive(Debug)]
 	struct PrefixTaker;
 	impl ItemTaker for PrefixTaker {
-		fn next_item<'a>(&self, tokens: &'a [Token]) -> Result<Option<(ExpressionItem, &'static [&'static ItemTaker], &'a [Token])>, Error<ParseError>> {
+		fn next_item<'a>(
+			&self,
+			tokens: &'a [Token],
+		) -> Result<
+			Option<(ExpressionItem, &'static [&'static ItemTaker], &'a [Token])>,
+			Error<ParseError>,
+		> {
 			if let Some(token) = tokens.get(0) {
-				Ok(Some((ExpressionItem::Operator(Operator::Prefix(match token {
-					Token::Symbol(symbol) => match symbol {
-						TokenSymbol::Asterisk => PrefixOp::Asterisk,
-						TokenSymbol::Ampersand => PrefixOp::Ampersand,
-						_ => return Ok(None)
-					},
-					_ => return Ok(None)
-				})), &[&PrefixTaker, &OperandTaker], &tokens[1..])))
+				Ok(Some((
+					ExpressionItem::Operator(Operator::Prefix(match token {
+						Token::Symbol(symbol) => match symbol {
+							TokenSymbol::Asterisk => PrefixOp::Asterisk,
+							TokenSymbol::Ampersand => PrefixOp::Ampersand,
+							_ => return Ok(None),
+						},
+						_ => return Ok(None),
+					})),
+					&[&PrefixTaker, &OperandTaker],
+					&tokens[1..],
+				)))
 			} else {
 				Ok(None)
 			}
@@ -639,16 +673,26 @@ mod expressions {
 	#[derive(Debug)]
 	struct BinaryTaker;
 	impl ItemTaker for BinaryTaker {
-		fn next_item<'a>(&self, tokens: &'a [Token]) -> Result<Option<(ExpressionItem, &'static [&'static ItemTaker], &'a [Token])>, Error<ParseError>> {
+		fn next_item<'a>(
+			&self,
+			tokens: &'a [Token],
+		) -> Result<
+			Option<(ExpressionItem, &'static [&'static ItemTaker], &'a [Token])>,
+			Error<ParseError>,
+		> {
 			if let Some(token) = tokens.get(0) {
-				Ok(Some((ExpressionItem::Operator(Operator::Binary(match token {
-					Token::Symbol(symbol) => match symbol {
-						TokenSymbol::Plus => BinaryOp::Add,
-						TokenSymbol::Assign => BinaryOp::Assign,
-						_ => return Ok(None)
-					},
-					_ => return Ok(None)
-				})), &[&PrefixTaker, &OperandTaker], &tokens[1..])))
+				Ok(Some((
+					ExpressionItem::Operator(Operator::Binary(match token {
+						Token::Symbol(symbol) => match symbol {
+							TokenSymbol::Plus => BinaryOp::Add,
+							TokenSymbol::Assign => BinaryOp::Assign,
+							_ => return Ok(None),
+						},
+						_ => return Ok(None),
+					})),
+					&[&PrefixTaker, &OperandTaker],
+					&tokens[1..],
+				)))
 			} else {
 				Ok(None)
 			}
@@ -660,23 +704,33 @@ mod expressions {
 	#[derive(Debug)]
 	struct OperandTaker;
 	impl ItemTaker for OperandTaker {
-		fn next_item<'a>(&self, tokens: &'a [Token]) -> Result<Option<(ExpressionItem, &'static [&'static ItemTaker], &'a [Token])>, Error<ParseError>> {
+		fn next_item<'a>(
+			&self,
+			tokens: &'a [Token],
+		) -> Result<
+			Option<(ExpressionItem, &'static [&'static ItemTaker], &'a [Token])>,
+			Error<ParseError>,
+		> {
 			let mut remaining = &tokens[1..];
 			if let Some(token) = tokens.get(0) {
-				Ok(Some((ExpressionItem::Operand(match token {
-					Token::NumberLiteral(num) => Expression::NumberLiteral(*num),
-					Token::Name(ref name) => Expression::Identifier(name.to_owned()),
-					Token::Bracket(Bracket::Curly, BracketState::Open) => {
-						// Try to parse the block as a syntax tree
-						if let Some((block, leftovers)) = next_block(tokens)? {
-							remaining = leftovers;
-							Expression::Block(Box::new(block))
-						} else {
-							return Ok(None)
-						}
-					}
-					_ => return Ok(None),
-				}), &[&BinaryTaker], remaining)))
+				Ok(Some((
+					ExpressionItem::Operand(match token {
+						Token::NumberLiteral(num) => Expression::NumberLiteral(*num),
+						Token::Name(ref name) => Expression::Identifier(name.to_owned()),
+						Token::Bracket(Bracket::Curly, BracketState::Open) => {
+							// Try to parse the block as a syntax tree
+							if let Some((block, leftovers)) = next_block(tokens)? {
+								remaining = leftovers;
+								Expression::Block(Box::new(block))
+							} else {
+								return Ok(None);
+							}
+						},
+						_ => return Ok(None),
+					}),
+					&[&BinaryTaker],
+					remaining,
+				)))
 			} else {
 				Ok(None)
 			}

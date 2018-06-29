@@ -1,7 +1,6 @@
 extern crate leafc;
 
-static INPUT_TEST: &'static str = 
-r###"
+static INPUT_TEST: &'static str = r###"
 let a = 21;
 {
 	let b = 360;
@@ -22,7 +21,7 @@ fn main() {
 
 	let mut tokenizer = leafc::ast::tokenizer::Tokenizer::new(lexemes);
 	let tokens = tokenizer.tokenize().unwrap();
-	
+
 	println!("{:?}\n\t=>", tokens);
 
 	let ast = leafc::ast::parser::parse(tokens.tokens.as_slice()).unwrap();

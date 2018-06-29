@@ -1,4 +1,4 @@
-use ast::lexer::{Lexeme, Lexemes, Bracket, BracketState};
+use ast::lexer::{Bracket, BracketState, Lexeme, Lexemes};
 
 #[derive(Debug, Clone)]
 pub struct Tokenizer<'a> {
@@ -12,7 +12,7 @@ pub enum Token {
 	NumberLiteral(u64),
 	StringLiteral(String),
 	Bracket(Bracket, BracketState),
-	Symbol(Symbol)
+	Symbol(Symbol),
 }
 
 impl Token {
@@ -65,9 +65,7 @@ pub enum TokenizeError {
 
 impl<'a> Tokenizer<'a> {
 	pub fn new(lexemes: Lexemes<'a>) -> Self {
-		Tokenizer {
-			lexemes,
-		}
+		Tokenizer { lexemes }
 	}
 
 	pub fn tokenize(&mut self) -> Result<Tokens, TokenizeError> {
@@ -77,17 +75,15 @@ impl<'a> Tokenizer<'a> {
 			let lexeme = self.lexemes.lexemes.remove(0);
 
 			match lexeme {
-				Lexeme::Word(word) => {
-					match word {
-						"fn" => tokens.push(Token::Keyword(Keyword::Function)),
-						"return" => tokens.push(Token::Keyword(Keyword::Return)),
-						"let" => tokens.push(Token::Keyword(Keyword::Let)),
-						"while" => tokens.push(Token::Keyword(Keyword::While)),
-						"if" => tokens.push(Token::Keyword(Keyword::If)),
-						"else" => tokens.push(Token::Keyword(Keyword::Else)),
-						"debug" => tokens.push(Token::Keyword(Keyword::Debug)),
-						word => tokens.push(Token::Name(word.to_owned()))
-					}
+				Lexeme::Word(word) => match word {
+					"fn" => tokens.push(Token::Keyword(Keyword::Function)),
+					"return" => tokens.push(Token::Keyword(Keyword::Return)),
+					"let" => tokens.push(Token::Keyword(Keyword::Let)),
+					"while" => tokens.push(Token::Keyword(Keyword::While)),
+					"if" => tokens.push(Token::Keyword(Keyword::If)),
+					"else" => tokens.push(Token::Keyword(Keyword::Else)),
+					"debug" => tokens.push(Token::Keyword(Keyword::Debug)),
+					word => tokens.push(Token::Name(word.to_owned())),
 				},
 				Lexeme::Bracket(bracket, state) => {
 					tokens.push(Token::Bracket(bracket, state));
@@ -95,11 +91,9 @@ impl<'a> Tokenizer<'a> {
 				Lexeme::String(string) => {
 					tokens.push(Token::StringLiteral(string));
 				},
-				Lexeme::Number(num_string) => {
-					match num_string.parse() {
-						Ok(n) => tokens.push(Token::NumberLiteral(n)),
-						Err(_e) => return Err(TokenizeError::Other),
-					}
+				Lexeme::Number(num_string) => match num_string.parse() {
+					Ok(n) => tokens.push(Token::NumberLiteral(n)),
+					Err(_e) => return Err(TokenizeError::Other),
 				},
 				Lexeme::Colon => {
 					tokens.push(Token::Symbol(Symbol::Colon));
@@ -142,13 +136,11 @@ impl<'a> Tokenizer<'a> {
 				},
 				Lexeme::Plus => {
 					tokens.push(Token::Symbol(Symbol::Plus));
-				}
-				Lexeme::Whitespace { .. } => {} // whitespace isn't syntax python
+				},
+				Lexeme::Whitespace { .. } => {}, // whitespace isn't syntax python
 			}
 		}
 
-		Ok(Tokens {
-			tokens
-		})
+		Ok(Tokens { tokens })
 	}
 }

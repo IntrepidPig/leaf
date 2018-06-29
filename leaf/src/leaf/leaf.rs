@@ -76,11 +76,9 @@ fn run_instructions(instructions: &[Instruction]) -> Result<(), ()> {
 				let right = stack.last_mut().unwrap().pop().unwrap();
 				let left = stack.last_mut().unwrap().pop().unwrap();
 				let output = left.val + right.val;
-				stack.last_mut().unwrap().push(Value {
-					val: output,
-				});
+				stack.last_mut().unwrap().push(Value { val: output });
 				ptr -= 1;
-			}
+			},
 		}
 
 		//println!("Ptr: {}", ptr);
@@ -88,7 +86,10 @@ fn run_instructions(instructions: &[Instruction]) -> Result<(), ()> {
 		//println!("Vars: {:?}", vars);
 	}
 
-	println!("Program output: {}", stack.pop().unwrap().pop().unwrap().val);
+	println!(
+		"Program output: {}",
+		stack.pop().unwrap().pop().unwrap().val
+	);
 
 	Ok(())
 }

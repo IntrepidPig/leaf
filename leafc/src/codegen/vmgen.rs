@@ -1,4 +1,4 @@
-use ast::parser::{SyntaxTree, Statement, Expression, Binding, BinaryOp};
+use ast::parser::{BinaryOp, Binding, Expression, Statement, SyntaxTree};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Value {
@@ -31,15 +31,11 @@ pub enum Instruction {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CodeGenerator {
-
-}
+pub struct CodeGenerator {}
 
 impl CodeGenerator {
 	pub fn new() -> Self {
-		CodeGenerator {
-			
-		}
+		CodeGenerator {}
 	}
 
 	pub fn gen_instructions(&mut self, ast: SyntaxTree) -> Vec<Instruction> {
@@ -67,9 +63,7 @@ impl CodeGenerator {
 		} else {
 			// Return a nil value
 			// This is necessary because if the block was a statement then it will always drop the result
-			instructions.push(Instruction::Push(Value {
-				val: 0,
-			}));
+			instructions.push(Instruction::Push(Value { val: 0 }));
 			instructions.push(Instruction::Return);
 		}
 		// Exit the stack frame
@@ -83,7 +77,11 @@ impl CodeGenerator {
 		let mut instructions: Vec<Instruction> = Vec::new();
 
 		match stmnt {
-			Statement::Binding(Binding { ref ident, val: expr, .. }) => {
+			Statement::Binding(Binding {
+				ref ident,
+				val: expr,
+				..
+			}) => {
 				// If there's an expression
 				if let Some(expr) = expr {
 					// Generate the instructions from the expression
@@ -93,9 +91,7 @@ impl CodeGenerator {
 					instructions.push(Instruction::Bind(ident.to_owned()));
 				} else {
 					// Push a nil value to the stack
-					instructions.push(Instruction::Push(Value {
-						val: 0,
-					}));
+					instructions.push(Instruction::Push(Value { val: 0 }));
 					// Bind the variable to the nil value
 					instructions.push(Instruction::Bind(ident.to_owned()));
 					unimplemented!();
@@ -113,7 +109,7 @@ impl CodeGenerator {
 				instructions.append(&mut self.gen_from_expr(expr));
 				// Pop the unused result from the stack
 				instructions.push(Instruction::Pop);
-			}
+			},
 		}
 
 		instructions
@@ -125,13 +121,13 @@ impl CodeGenerator {
 
 		match expr {
 			// Push literal values onto the stack
-			Expression::NumberLiteral(num) => instructions.push(Instruction::Push(Value {
-				val: *num,
-			})),
+			Expression::NumberLiteral(num) => {
+				instructions.push(Instruction::Push(Value { val: *num }))
+			},
 			// Generate instructions for nested blocks
 			Expression::Block(ref ast) => {
 				instructions.append(&mut self.gen_from_ast(ast));
-			}
+			},
 			// Dereference variables
 			Expression::Identifier(ref ident) => {
 				// Push the value of the variable onto the top of the stack
@@ -161,17 +157,15 @@ impl CodeGenerator {
 				// Move the result into the variable
 				instructions.push(Instruction::Set(assignment.ident.to_owned()));
 				// And the old value will be left on the stack as the result of the expression
-			}
-			_ => unimplemented!()
+			},
+			_ => unimplemented!(),
 		}
 
 		instructions
 	}
 }
 
-pub struct ByteGen {
-
-}
+pub struct ByteGen {}
 
 impl ByteGen {
 	pub fn gen_bytes(_instructions: &[Instruction]) {

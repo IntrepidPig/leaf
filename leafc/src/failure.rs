@@ -1,7 +1,4 @@
-use std::{
-	fmt::{Debug, Display, Formatter, self},
-	error::{Error as StdError}
-};
+use std::{error::Error as StdError, fmt::{self, Debug, Display, Formatter}};
 
 use backtrace::Backtrace;
 
@@ -31,19 +28,21 @@ impl<T: StdError> Debug for Error<T> {
 	}
 }
 
-
-impl<T: StdError> From<T> for Error<T> where T: Failure + 'static {
+impl<T: StdError> From<T> for Error<T>
+where
+	T: Failure + 'static,
+{
 	fn from(t: T) -> Error<T> {
 		Error::new(t)
 	}
 }
 
-pub trait Failure: Display {
+pub trait Failure: Display {}
 
-}
-
-impl<T> Failure for T where T: StdError {
-	
+impl<T> Failure for T
+where
+	T: StdError,
+{
 }
 
 pub struct GenericError {
@@ -60,7 +59,10 @@ impl GenericError {
 	}
 }
 
-impl<T> From<T> for GenericError where T: Failure + 'static {
+impl<T> From<T> for GenericError
+where
+	T: Failure + 'static,
+{
 	fn from(t: T) -> GenericError {
 		GenericError::new(t)
 	}
