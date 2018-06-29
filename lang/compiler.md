@@ -36,3 +36,8 @@ Debug:
 Assignment:
 	-> Gen instructions for expression;
 	Pop top of stack to stack location referred to binding name; (Set)
+
+## TODO: Errors
+
+The current error handling system for the compiler sucks. It returns a ParseError::Other 99% of the time. The plan is to give each token an ID, as well as a range of
+lexemes it refers to. Then each error will be able to reference a token, and in turn, a set of lexemes, and so errors will be much more helpful. This will require a major refactoring though.
