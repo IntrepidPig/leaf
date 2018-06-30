@@ -30,23 +30,26 @@ fn run_instructions(instructions: &[Instruction]) -> Result<(), ()> {
 
 	let mut instr_ptr: usize = 0;
 	let mut iter: usize = 0;
+	let debug = true;
 
 	loop {
 		if instr_ptr == instructions.len() {
 			break;
 		}
 
-		/*iter += 1;
-		if iter > 50 {
-			println!("Reached maximum instruction execution");
-			return Ok(());
-		}
+		if debug {
+			iter += 1;
+			if iter > 50 {
+				println!("Reached maximum instruction execution");
+				return Ok(());
+			}
 
-		println!(
-			"Instruction {}: {:?}",
-			instr_ptr,
-			instructions[instr_ptr],
-		);*/
+			println!(
+				"Instruction {}: {:?}",
+				instr_ptr,
+				instructions[instr_ptr],
+			);
+		}
 
 		match instructions[instr_ptr] {
 			Instruction::Bind(ref ident) => {
@@ -97,17 +100,20 @@ fn run_instructions(instructions: &[Instruction]) -> Result<(), ()> {
 			},
 			Instruction::Jump(ptr) => {
 				instr_ptr = ptr;
+				continue;
 			}
 		}
 
 		instr_ptr += 1;
 
-		/*println!(
-			"Stack: {:?}\n\
-			Vars: {:?}\n",
-			stack,
-			vars
-		);*/
+		if debug {
+			println!(
+				"Stack: {:?}\n\
+				Vars: {:?}\n",
+				stack,
+				vars
+			);
+		}
 	}
 
 	println!(

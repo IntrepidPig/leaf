@@ -35,12 +35,16 @@ pub enum Instruction {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CodeGenerator {
 	instructions: Vec<Instruction>,
+	loop_breaks: Vec<Vec<usize>>,
+	block_is_loop: bool,
 }
 
 impl CodeGenerator {
 	pub fn new() -> Self {
 		CodeGenerator {
 			instructions: Vec::new(),
+			loop_breaks: Vec::new(),
+			block_is_loop: false,
 		}
 	}
 
@@ -62,14 +66,14 @@ impl CodeGenerator {
 		if let Some(ref output) = ast.output {
 			// Load the value of the exression onto the stack
 			self.gen_from_expr(output);
-			// Return the value into the previous stack frame
-			self.instructions.push(Instruction::Return);
+			
 		} else {
 			// Return a nil value
 			// This is necessary because if the block was a statement then it will always drop the result
 			self.instructions.push(Instruction::Push(Value { val: 0 }));
-			self.instructions.push(Instruction::Return);
 		}
+		// Return the value into the previous stack frame
+		self.instructions.push(Instruction::Return);
 		// Exit the stack frame
 		self.instructions.push(Instruction::Exit);
 	}
@@ -110,7 +114,55 @@ impl CodeGenerator {
 				// Pop the unused result from the stack
 				self.instructions.push(Instruction::Pop);
 			},
+			Statement::Break(ref expr) => {
+				// If there's an associated expression then gen instructions for it, otherwise just push a nil
+				if let Some(expr) = expr {
+					self.gen_from_expr(expr);
+				} else {
+					self.instructions.push(Instruction::Push(Value { val: 0 }))
+				}
+
+				// Push a jump instrction with a 0 because we don't know where the loop ends yet
+				self.instructions.push(Instruction::Jump(0));
+				// Add the index of the jump instruction to the latest loop_break frame
+				self.loop_breaks.last_mut().unwrap().push(self.instructions.len() - 1);
+			}
 		}
+	}
+
+	pub fn gen_from_loop(&mut self, block: &SyntaxTree) {
+		// Record the start of the loop
+		let loop_start = self.instructions.len();
+		// Start a new stack frame
+		self.instructions.push(Instruction::Frame);
+		// Start a list of breaks for this loop
+		self.loop_breaks.push(Vec::new());
+		// Gen the instructions for each statement
+		for statement in &block.block {
+			match statement {
+				// Handle break statements
+				Statement::Break(ref break_expr_opt) => {
+					// Evaluate the expression if there is one
+					// Will be returned to the previous stack frame
+					if  let Some(break_expr) = break_expr_opt {
+						self.gen_from_expr(break_expr);
+					} else {
+						self.instructions.push(Instruction::Push(Value { val: 0 }))
+					}
+					// Push a jump instruction to 0 that will be changed once we know where the loop ends
+					self.instructions.push(Instruction::Jump(0));
+					// Record the index of the todo break instructions
+					self.loop_breaks.last_mut().unwrap().push(self.instructions.len() - 1);
+				},
+				statement => {
+					self.gen_from_stmnt(statement);
+				}
+			}
+		}
+		// Drop the current stack frame but don't return anything because we're going back to run it again
+		self.instructions.push(Instruction::Exit);
+		// Jump back to the beginning
+		self.instructions.push(Instruction::Jump(loop_start));
 	}
 
 	/// Generate instructions from an expression
@@ -155,12 +207,20 @@ impl CodeGenerator {
 				// And the old value will be left on the stack as the result of the expression
 			},
 			Expression::Loop(ref block) => {
-				// Record the instruction pointer for the start of the loop
-				let loop_start = self.instructions.len() - 1;
 				// Push the instructions for the block
-				self.gen_from_ast(block);
-				// Push the jump instruction to the previously recorded index
-				self.instructions.push(Instruction::Jump(loop_start));
+				self.gen_from_loop(block);
+				// The place after the loop
+				let loop_end = self.instructions.len();
+				// Change each break statement to point to the proper place now that we know where the loop ends
+				for break_index in self.loop_breaks.pop().unwrap() {
+					match self.instructions[break_index] {
+						Instruction::Jump(ref mut target) => *target = loop_end,
+						_ => panic!("Failed to change all break statements")
+					}
+				}
+				// Return the value being broken and exit the stack frame
+				self.instructions.push(Instruction::Return);
+				self.instructions.push(Instruction::Exit);
 			},
 			_ => unimplemented!(),
 		}

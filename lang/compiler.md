@@ -37,6 +37,22 @@ Assignment:
 	-> Gen instructions for expression;
 	Pop top of stack to stack location referred to binding name; (Set)
 
+Loop:
+	-> gen instructions for each statement
+	-> If a statement is a break:
+		-> If it has a value:
+			-> Gen instructions for the expression
+			Return the value (Return)
+			Jump to the instruction after the jump back to beginning instruction (Jump)
+		-> If not:
+			Push a nil value (Push)
+			Return it (Return)
+			Jump to the instruction after the jump back to beginning instruction (Jump)
+	-> If not
+		-> Generate the normal instructions
+	Jump back to the beginning of the loop (Jump)
+	Exit the stack frame (Exit)
+
 ## TODO: Errors
 
 The current error handling system for the compiler sucks. It returns a ParseError::Other 99% of the time. The plan is to give each token an ID, as well as a range of

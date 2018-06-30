@@ -127,6 +127,7 @@ pub enum Statement {
 	Binding(Binding),
 	Expression(Expression),
 	Debug(Expression),
+	Break(Option<Expression>),
 }
 
 /// An assignment
@@ -328,8 +329,11 @@ pub fn next_statement<'a>(
 	if let Some((binding, leftovers)) = next_binding(tokens)? {
 		return Ok(Some((Statement::Binding(binding), leftovers)));
 	// Try to parse a debug statement
-	} else if let Some((debug, leftovers)) = next_debug(tokens)? {
-		return Ok(Some((Statement::Debug(debug), leftovers)));
+	} else if let Some((debug_expr, leftovers)) = next_debug(tokens)? {
+		return Ok(Some((Statement::Debug(debug_expr), leftovers)));
+	// Try to parse a break statement
+	} else if let Some((break_expr, leftovers)) = next_break(tokens)? {
+		return Ok(Some((Statement::Break(break_expr), leftovers)));
 	// Try to parse an expression followed by a semicolon
 	} else if let Some((expression, leftovers)) = next_expression(tokens)? {
 		if leftovers.get(0) == Some(&Token::Symbol(TokenSymbol::Semicolon)) {
@@ -482,6 +486,46 @@ fn next_debug<'a>(
 
 			// Return the expression being debugged
 			Ok(Some((expr, tokens)))
+		},
+		_ => Ok(None),
+	}
+}
+
+/// Gets the next debug statement
+// TODO include expression original string repr with debug
+fn next_break<'a>(
+	tokens: &'a [Token],
+) -> Result<Option<(Option<Expression>, &'a [Token])>, Error<ParseError>> {
+	if tokens.is_empty() {
+		return Ok(None);
+	}
+
+	let mut tokens = tokens;
+
+	match tokens[0] {
+		// If the first token is debug it's a break statement
+		Token::Keyword(Keyword::Break) => {
+			if tokens[1] == Token::Symbol(TokenSymbol::Semicolon) {
+				return Ok(Some((None, &tokens[2..])))
+			}
+
+			// Get the expression after the keyword
+			let expr = if let Some((expr, leftovers)) = next_expression(&tokens[1..])? {
+				tokens = leftovers;
+				expr
+			} else {
+				return Ok(None);
+			};
+
+			// Make sure there's a semicolon
+			if let Token::Symbol(TokenSymbol::Semicolon) = tokens[0] {
+				tokens = &tokens[1..];
+			} else {
+				return Ok(None);
+			}
+
+			// Return the expression that's being broken out
+			Ok(Some((Some(expr), tokens)))
 		},
 		_ => Ok(None),
 	}
