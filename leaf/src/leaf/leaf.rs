@@ -136,9 +136,10 @@ fn run_instructions(instructions: &[Instruction]) -> Result<(), ()> {
 }
 
 fn print_instructions(instructions: &[Instruction]) {
+	let max_length = instructions.len().to_string().len();
 	for (i, instr) in instructions.iter().enumerate() {
 		let i_str = i.to_string();
-		for _ in 0..5-i_str.len() {
+		for _ in 0..max_length-i_str.len() {
 			print!(" ");
 		}
 		println!("{}: {:?}", i_str, instr);
