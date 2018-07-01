@@ -1,4 +1,4 @@
-use ast::parser::{BinaryOp, Binding, Expression, Statement, SyntaxTree};
+use ast::parser::{BinaryOp, Binding, Expression, Statement, SyntaxTree, If};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Value {
@@ -30,6 +30,8 @@ pub enum Instruction {
 	Debug,
 	/// Set the instruction pointer
 	Jump(usize),
+	/// Jump to the location if the top of the stack is false
+	Check(usize),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,6 +39,7 @@ pub struct CodeGenerator {
 	instructions: Vec<Instruction>,
 	loop_breaks: Vec<Vec<usize>>,
 	block_is_loop: bool,
+	if_jumps: Vec<usize>,
 }
 
 impl CodeGenerator {
@@ -45,6 +48,7 @@ impl CodeGenerator {
 			instructions: Vec::new(),
 			loop_breaks: Vec::new(),
 			block_is_loop: false,
+			if_jumps: Vec::new(),
 		}
 	}
 
@@ -165,6 +169,43 @@ impl CodeGenerator {
 		self.instructions.push(Instruction::Jump(loop_start));
 	}
 
+	pub fn gen_from_if(&mut self, if_stmnt: &If) {
+		// Condition at top of stack
+		self.gen_from_ast(&if_stmnt.condition);
+		// Location of check instruction
+		let if_check = self.instructions.len();
+		// Temporary placeholder check instruction
+		self.instructions.push(Instruction::Check(0));
+		// The if body right after the check instruction, happens if check was true
+		self.gen_from_ast(&if_stmnt.body);
+		// Jump to the end of the else clause after the if clause executes
+		// The location of the jump to after the else clause
+		let jump_to_after_else = self.instructions.len();
+		// Placeholder jump to after else block
+		self.instructions.push(Instruction::Jump(0));
+		
+		// Fix the check instruction jump locations
+		let current_ip = self.instructions.len();
+		match self.instructions[if_check] {
+			Instruction::Check(ref mut ptr) => *ptr = current_ip,
+			_ => panic!("Failed to change check instruction pointer")
+		}
+
+		// Generate stuff for the else block if it exists, otherwise just generate nil value
+		if let Some(else_block) = &if_stmnt.else_block {
+			self.gen_from_ast(else_block);
+		} else {
+			self.instructions.push(Instruction::Push(Value { val: 0 }));
+		}
+
+		// Fix the jump to after else locations
+		let current_ip = self.instructions.len();
+		match self.instructions[jump_to_after_else] {
+			Instruction::Jump(ref mut ptr) => *ptr = current_ip,
+			_ => panic!("Failed to change check instruction pointer")
+		}
+	}
+
 	/// Generate instructions from an expression
 	pub fn gen_from_expr(&mut self, expr: &Expression) {
 		match expr {
@@ -222,6 +263,10 @@ impl CodeGenerator {
 				self.instructions.push(Instruction::Return);
 				self.instructions.push(Instruction::Exit);
 			},
+			Expression::If(ref if_stmnt) => {
+				// Gen the instructions for the if statement
+				self.gen_from_if(if_stmnt);
+			}
 			_ => unimplemented!(),
 		}
 	}

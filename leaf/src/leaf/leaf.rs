@@ -19,7 +19,7 @@ fn main() {
 	println!("{:?}\n\t=>", ast);
 	let code_generator = leafc::codegen::vmgen::CodeGenerator::new();
 	let instructions = code_generator.gen_instructions(ast);
-	println!("{:?}", instructions);
+	print_instructions(&instructions);
 	run_instructions(&instructions).unwrap();
 }
 
@@ -30,7 +30,7 @@ fn run_instructions(instructions: &[Instruction]) -> Result<(), ()> {
 
 	let mut instr_ptr: usize = 0;
 	let mut iter: usize = 0;
-	let debug = true;
+	let debug = false;
 
 	loop {
 		if instr_ptr == instructions.len() {
@@ -98,9 +98,18 @@ fn run_instructions(instructions: &[Instruction]) -> Result<(), ()> {
 				stack.last_mut().unwrap().push(Value { val: output });
 				ptr -= 1;
 			},
-			Instruction::Jump(ptr) => {
-				instr_ptr = ptr;
+			Instruction::Jump(target_instr_ptr) => {
+				instr_ptr = target_instr_ptr;
 				continue;
+			},
+			Instruction::Check(target_instr_ptr) => {
+				let val = stack.last_mut().unwrap().pop().unwrap();
+				ptr -= 1;
+				// If the value is false jump past the if block
+				if val.val == 0 {
+					instr_ptr = target_instr_ptr;
+					continue;
+				}
 			}
 		}
 
@@ -109,9 +118,11 @@ fn run_instructions(instructions: &[Instruction]) -> Result<(), ()> {
 		if debug {
 			println!(
 				"Stack: {:?}\n\
-				Vars: {:?}\n",
+				Vars: {:?}\n\
+				Stack ptr: {:?}\n",
 				stack,
-				vars
+				vars,
+				ptr,
 			);
 		}
 	}
@@ -122,6 +133,16 @@ fn run_instructions(instructions: &[Instruction]) -> Result<(), ()> {
 	);
 
 	Ok(())
+}
+
+fn print_instructions(instructions: &[Instruction]) {
+	for (i, instr) in instructions.iter().enumerate() {
+		let i_str = i.to_string();
+		for _ in 0..5-i_str.len() {
+			print!(" ");
+		}
+		println!("{}: {:?}", i_str, instr);
+	}
 }
 
 fn deref_stack(stack: &Vec<Vec<Value>>, mut ptr: usize) -> Value {

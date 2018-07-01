@@ -172,10 +172,19 @@ pub enum Expression {
 	},
 	Assign(Box<Assignment>),
 	Loop(Box<SyntaxTree>),
+	If(Box<If>),
 	Identifier(String),
 	Block(Box<SyntaxTree>),
 	StringLiteral(String),
 	NumberLiteral(u64),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct If {
+	pub condition: SyntaxTree,
+	pub body: SyntaxTree,
+	pub elif: Option<Box<If>>,
+	pub else_block: Option<SyntaxTree>,
 }
 
 /// A let binding. Contains the identifier being bound to, the type of the binding, the expression being bound, and whether is mutable
@@ -554,6 +563,26 @@ fn next_expression<'a>(
 				Ok(Some((Expression::Loop(Box::new(block)), leftovers)))
 			} else {
 				return Err(ParseError::Other.into()) // Loop keywords needs a block directly after
+			}
+		},
+		Token::Keyword(Keyword::If) => {
+			if let Some((condition, extra_leftovers)) = next_block(&expr_tokens[1..])? {
+				if let Some((block, extra_leftovers)) = next_block(extra_leftovers)? {
+					if !extra_leftovers.is_empty() {
+						return Err(ParseError::Other.into()) // There were extra tokens after the if block but before the terminating semicolon
+					}
+
+					Ok(Some((Expression::If(Box::new(If {
+						condition,
+						body: block,
+						elif: None,
+						else_block: None,
+					})), leftovers)))
+				} else {
+					return Err(ParseError::Other.into()) // There was no block after the if condition
+				}
+			} else {
+				return Err(ParseError::Other.into()) // There was no condition block after the is statement
 			}
 		},
 		_ => expressions::parse_expression(expr_tokens).map(|expr| Some((expr, leftovers)))

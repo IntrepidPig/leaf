@@ -53,6 +53,11 @@ Loop:
 	Jump back to the beginning of the loop (Jump)
 	Exit the stack frame (Exit)
 
+If statement:
+	-> Gen instructions for the condition expression
+	Push instruction that jumps to the end of the if statement if it's false (Check)
+	-> Gen instructions for the block inside the if statement
+
 ## TODO: Errors
 
 The current error handling system for the compiler sucks. It returns a ParseError::Other 99% of the time. The plan is to give each token an ID, as well as a range of
