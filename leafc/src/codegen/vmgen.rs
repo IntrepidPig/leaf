@@ -134,50 +134,26 @@ impl CodeGenerator {
 		}
 	}
 
-	pub fn gen_from_loop(&mut self, block: &SyntaxTree) {
+	pub fn gen_from_loop(&mut self, body: &Expression) {
 		// Record the start of the loop
 		let loop_start = self.instructions.len();
-		// Start a new stack frame
-		self.instructions.push(Instruction::Frame);
 		// Start a list of breaks for this loop
 		self.loop_breaks.push(Vec::new());
 		// Gen the instructions for each statement
-		for statement in &block.block {
-			match statement {
-				// Handle break statements
-				Statement::Break(ref break_expr_opt) => {
-					// Evaluate the expression if there is one
-					// Will be returned to the previous stack frame
-					if  let Some(break_expr) = break_expr_opt {
-						self.gen_from_expr(break_expr);
-					} else {
-						self.instructions.push(Instruction::Push(Value { val: 0 }))
-					}
-					// Push a jump instruction to 0 that will be changed once we know where the loop ends
-					self.instructions.push(Instruction::Jump(0));
-					// Record the index of the todo break instructions
-					self.loop_breaks.last_mut().unwrap().push(self.instructions.len() - 1);
-				},
-				statement => {
-					self.gen_from_stmnt(statement);
-				}
-			}
-		}
-		// Drop the current stack frame but don't return anything because we're going back to run it again
-		self.instructions.push(Instruction::Exit);
+		self.gen_from_expr(body);
 		// Jump back to the beginning
 		self.instructions.push(Instruction::Jump(loop_start));
 	}
 
 	pub fn gen_from_if(&mut self, if_stmnt: &If) {
 		// Condition at top of stack
-		self.gen_from_ast(&if_stmnt.condition);
+		self.gen_from_expr(&if_stmnt.condition);
 		// Location of check instruction
 		let if_check = self.instructions.len();
 		// Temporary placeholder check instruction
 		self.instructions.push(Instruction::Check(0));
 		// The if body right after the check instruction, happens if check was true
-		self.gen_from_ast(&if_stmnt.body);
+		self.gen_from_expr(&if_stmnt.body);
 		// Jump to the end of the else clause after the if clause executes
 		// The location of the jump to after the else clause
 		let jump_to_after_else = self.instructions.len();
@@ -193,7 +169,7 @@ impl CodeGenerator {
 
 		// Generate stuff for the else block if it exists, otherwise just generate nil value
 		if let Some(else_block) = &if_stmnt.else_block {
-			self.gen_from_ast(else_block);
+			self.gen_from_expr(else_block);
 		} else {
 			self.instructions.push(Instruction::Push(Value { val: 0 }));
 		}

@@ -15,7 +15,9 @@ fn main() {
 	let mut tokenizer = leafc::ast::tokenizer::Tokenizer::new(lexed);
 	let tokens = tokenizer.tokenize().unwrap();
 	println!("{:?}\n\t=>", tokens);
-	let ast = leafc::ast::parser::parse(tokens.tokens.as_slice()).unwrap();
+	let tokentree = leafc::ast::treeify::treeify(&tokens.tokens).unwrap();
+	println!("{:?}\n\t=>", tokentree);
+	let ast = leafc::ast::parser::parse(tokentree.as_slice()).unwrap();
 	println!("{:?}\n\t=>", ast);
 	let code_generator = leafc::codegen::vmgen::CodeGenerator::new();
 	let instructions = code_generator.gen_instructions(ast);
@@ -30,7 +32,7 @@ fn run_instructions(instructions: &[Instruction]) -> Result<(), ()> {
 
 	let mut instr_ptr: usize = 0;
 	let mut iter: usize = 0;
-	let debug = false;
+	let debug = true;
 
 	loop {
 		if instr_ptr == instructions.len() {

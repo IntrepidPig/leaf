@@ -3,6 +3,7 @@ use std::path::Path;
 pub mod lexer;
 pub mod tokenizer;
 pub mod parser;
+pub mod treeify;
 
 use self::parser::SyntaxTree;
 

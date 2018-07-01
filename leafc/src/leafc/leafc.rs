@@ -21,10 +21,12 @@ fn main() {
 
 	let mut tokenizer = leafc::ast::tokenizer::Tokenizer::new(lexemes);
 	let tokens = tokenizer.tokenize().unwrap();
-
 	println!("{:?}\n\t=>", tokens);
 
-	let ast = leafc::ast::parser::parse(tokens.tokens.as_slice()).unwrap();
+	let tokentree = leafc::ast::treeify::treeify(&tokens.tokens).unwrap();
+	println!("{:?}\n\t=>", tokentree);
+
+	let ast = leafc::ast::parser::parse(tokentree.as_slice()).unwrap();
 	println!("{:?}\n\t=>", ast);
 
 	let code_generator = leafc::codegen::vmgen::CodeGenerator::new();
