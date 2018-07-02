@@ -1,5 +1,8 @@
 extern crate leaf;
 extern crate leafc;
+extern crate log;
+extern crate fern;
+extern crate clap;
 
 use std::io::{self, Read};
 
@@ -7,8 +10,46 @@ use leafc::codegen::vmgen::{Instruction, Value};
 use std::collections::HashMap;
 
 fn main() {
-	let mut input = String::new();
-	io::stdin().read_to_string(&mut input).unwrap();
+	let matches = clap::App::new("Leaf")
+		.author("IntrepidPig")
+		.about("Leaf bytecode VM")
+		.arg(clap::Arg::with_name("debug")
+			.short("d")
+			.long("debug")
+			.help("Print debugging info"))
+		.arg(clap::Arg::with_name("program")
+			.short("p")
+			.long("prog")
+			.help("The program to be run")
+			.takes_value(true))
+		.get_matches();
+	
+	let debug = matches.is_present("debug");
+
+	fern::Dispatch::new()
+		.format(|out, message, record| {
+			out.finish(format_args!(
+				"[{}] {}",
+				record.level(),
+				message
+			))
+		})
+		.level(if debug {
+			log::LevelFilter::Trace
+		} else {
+			log::LevelFilter::Info
+		})
+		.chain(std::io::stdout())
+		.apply()
+		.expect("Failed to initialize logger");
+
+	let input = if let Some(program) = matches.value_of("program") {
+		program.to_owned()
+	} else {
+		let mut input = String::new();
+		io::stdin().read_to_string(&mut input).unwrap();
+		input
+	};
 	println!("'\n{}\n'\n\t=>", input);
 	let lexed = leafc::ast::lexer::lex(&input).unwrap();
 	println!("{:?}\n\t=>", lexed);
@@ -22,17 +63,16 @@ fn main() {
 	let code_generator = leafc::codegen::vmgen::CodeGenerator::new();
 	let instructions = code_generator.gen_instructions(ast);
 	print_instructions(&instructions);
-	run_instructions(&instructions).unwrap();
+	run_instructions(&instructions, debug).unwrap();
 }
 
-fn run_instructions(instructions: &[Instruction]) -> Result<(), ()> {
+fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<(), ()> {
 	let mut ptr: usize = 0;
 	let mut stack: Vec<Vec<Value>> = vec![Vec::new()];
 	let mut vars: HashMap<String, usize> = HashMap::new();
 
 	let mut instr_ptr: usize = 0;
 	let mut iter: usize = 0;
-	let debug = false;
 
 	loop {
 		if instr_ptr == instructions.len() {

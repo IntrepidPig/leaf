@@ -13,3 +13,6 @@ path = "src/leaf/leaf.rs"
 
 [dependencies]
 leafc = { path = "../leafc/" }
+log = "0.4.3"
+fern = "0.5.6"
+clap = "2.32.0"
