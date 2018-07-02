@@ -1,4 +1,4 @@
-use ast::tokenizer::{Keyword, Symbol as TokenSymbol};
+use ast::tokenizer::{Symbol as TokenSymbol};
 use ast::treeify::{Token, TokenTree};
 use ast::parser::*;
 use failure::Error;
