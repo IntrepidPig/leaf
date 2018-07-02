@@ -55,6 +55,13 @@ impl TokenTree {
 			_ => false,
 		}
 	}
+
+	pub fn is_brace_expr(&self) -> bool {
+		match self {
+			TokenTree::Brace(_) => true,
+			_ => false,
+		}
+	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

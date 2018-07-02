@@ -4,6 +4,7 @@ pub mod lexer;
 pub mod tokenizer;
 pub mod parser;
 pub mod treeify;
+pub mod expression;
 
 use self::parser::Block;
 
