@@ -124,6 +124,9 @@ impl CodeGenerator {
 				} else {
 					self.instructions.push(Instruction::Push(Value { val: 0 }))
 				}
+				// Return the value being broken and exit the loop stack frame
+				self.instructions.push(Instruction::Return);
+				self.instructions.push(Instruction::Exit);
 
 				// Push a jump instrction with a 0 because we don't know where the loop ends yet
 				self.instructions.push(Instruction::Jump(0));
@@ -238,9 +241,6 @@ impl CodeGenerator {
 						_ => panic!("Failed to change all break statements"),
 					}
 				}
-				// Return the value being broken and exit the stack frame
-				self.instructions.push(Instruction::Return);
-				self.instructions.push(Instruction::Exit);
 			},
 			Expression::If(ref if_stmnt) => {
 				// Gen the instructions for the if statement
