@@ -224,6 +224,7 @@ impl ::std::error::Error for ParseError {}
 
 /// Parse a block from the tokens (will use all of the tokens or error)
 pub fn parse(tokens: &[TokenTree]) -> Result<Block, Error<ParseError>> {
+	debug!("Parsing tokens: {:?}", tokens);
 	if let Some(ast) = next_syntaxtree(tokens)? {
 		Ok(ast)
 	} else {
@@ -234,9 +235,11 @@ pub fn parse(tokens: &[TokenTree]) -> Result<Block, Error<ParseError>> {
 static mut RECURSION_LEVEL: usize = 0;
 
 /// Gets statements until it can't from the tokens, and then gets a final expression if there is one
+// TODO allow statements that don't end in semicolons as expression
 pub fn next_syntaxtree<'a>(
 	mut tokens: &'a [TokenTree],
 ) -> Result<Option<Block>, Error<ParseError>> {
+	debug!("Parsing syntaxtree from: {:?}", tokens);
 	unsafe {
 		RECURSION_LEVEL = RECURSION_LEVEL + 1;
 		if RECURSION_LEVEL > 10 {
@@ -247,7 +250,7 @@ pub fn next_syntaxtree<'a>(
 	let mut stree = Block::new();
 
 	// Parse each statement until none are left
-	while let Some((stmnt, leftovers)) = next_statement(tokens)? {
+	while let Some((stmnt, leftovers)) = next_statement(tokens, true)? {
 		stree.block.push(stmnt);
 		tokens = leftovers;
 	}
@@ -259,18 +262,22 @@ pub fn next_syntaxtree<'a>(
 		stree.output = Some(expr);
 	}
 
+	debug!("Got syntaxtree {:?}", stree);
+
 	Ok(Some(stree))
 }
 
 /// Gets the next statement until a terminating semicolon
 pub fn next_statement<'a>(
-	tokens: &'a [TokenTree],
+	start_tokens: &'a [TokenTree],
+	require_semicolon: bool,
 ) -> Result<Option<(Statement, &'a [TokenTree])>, Error<ParseError>> {
-	if tokens.is_empty() {
+	debug!("Parsing statement from: {:?}", start_tokens);
+	if start_tokens.is_empty() {
 		return Ok(None);
 	}
 
-	let mut tokens = tokens;
+	let mut tokens = start_tokens;
 
 	// Try to parse a let binding
 	let statement = if let Some((binding, leftovers)) = next_binding(tokens)? {
@@ -294,11 +301,15 @@ pub fn next_statement<'a>(
 		return Ok(None);
 	};
 
-	if let Some(TokenTree::Token(Token::Symbol(TokenSymbol::Semicolon))) = tokens.get(0) {
-		tokens = &tokens[1..];
-	} else {
-		return Ok(None);
+	if require_semicolon {
+		if let Some(TokenTree::Token(Token::Symbol(TokenSymbol::Semicolon))) = tokens.get(0) {
+			tokens = &tokens[1..];
+		} else {
+			return Ok(None);
+		}
 	}
+
+	debug!("Got statement {:?} from {:?} with leftovers {:?}", statement, start_tokens, tokens);
 
 	Ok(Some((statement, tokens)))
 }
@@ -308,6 +319,7 @@ pub fn next_statement<'a>(
 pub fn next_block<'a>(
 	tokens: &'a [TokenTree],
 ) -> Result<Option<(Block, &'a [TokenTree])>, Error<ParseError>> {
+	debug!("Parsing block from: {:?}", tokens);
 	if tokens.is_empty() {
 		return Ok(None);
 	}
@@ -329,6 +341,7 @@ pub fn next_block<'a>(
 fn next_binding<'a>(
 	tokens: &'a [TokenTree],
 ) -> Result<Option<(Binding, &'a [TokenTree])>, Error<ParseError>> {
+	debug!("Parsing binding from {:?}", tokens);
 	if tokens.is_empty() {
 		return Ok(None);
 	}
@@ -393,6 +406,7 @@ fn next_binding<'a>(
 fn next_debug<'a>(
 	tokens: &'a [TokenTree],
 ) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
+	debug!("Parsing debug from: {:?}", tokens);
 	if tokens.is_empty() {
 		return Ok(None);
 	}
@@ -424,6 +438,7 @@ fn next_debug<'a>(
 fn next_break<'a>(
 	tokens: &'a [TokenTree],
 ) -> Result<Option<(Option<Expression>, &'a [TokenTree])>, Error<ParseError>> {
+	debug!("Parsing break from: {:?}", tokens);
 	if tokens.is_empty() {
 		return Ok(None);
 	}
@@ -450,6 +465,7 @@ fn next_expression<'a>(
 	tokens: &'a [TokenTree],
 	end_predicate: Box<FnMut(&TokenTree) -> bool>,
 ) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
+	debug!("Parsing next expression from: {:?}", tokens);
 	if tokens.is_empty() {
 		return Ok(None);
 	}
@@ -457,7 +473,7 @@ fn next_expression<'a>(
 	// Get the tokens involved in the next expression
 	let (expr_tokens, leftovers) = split_at(tokens, end_predicate, false);
 
-	println!("Expr tokens : {:?}", expr_tokens);
+	trace!("Expr tokens : {:?}", expr_tokens);
 
 	// Handle all different kinds of expressions, like loop blocks, or just plain arithmetic
 	match expr_tokens[0] {
@@ -465,13 +481,21 @@ fn next_expression<'a>(
 			// If theres a brace block after loop keyword, just include that in the loop expression
 			if let Some(TokenTree::Brace(_)) = expr_tokens.get(1) {
 				if let Some((block, extra_leftovers)) = next_expression(&expr_tokens[1..], Box::new(|token| !token.is_brace_expr()))? {
-					Ok(Some((Expression::Loop(Box::new(block)), extra_leftovers)))
+					if !extra_leftovers.is_empty() {
+						return Err(ParseError::Other.into()) // There where leftover tokens in the expression
+					}
+
+					Ok(Some((Expression::Loop(Box::new(block)), leftovers)))
 				} else {
 					Ok(None)
 				}
 			} else {
-				if let Some((block, extra_leftovers)) = next_expression(&expr_tokens[1..], Box::new(|token| !token.is_semicolon()))? {
-					Ok(Some((Expression::Loop(Box::new(block)), extra_leftovers)))
+				if let Some((block, extra_leftovers)) = next_expression(&expr_tokens[1..], Box::new(|token| token.is_semicolon()))? {
+					if !extra_leftovers.is_empty() {
+						return Err(ParseError::Other.into()) // There where leftover tokens in the expression
+					}
+
+					Ok(Some((Expression::Loop(Box::new(block)), leftovers)))
 				} else {
 					Ok(None)
 				}

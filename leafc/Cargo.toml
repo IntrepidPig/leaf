@@ -9,6 +9,7 @@ path = "src/lib.rs"
 
 [dependencies]
 backtrace = "0.3"
+log = "0.4.3"
 
 [[bin]]
 name = "leafc"

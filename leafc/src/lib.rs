@@ -1,4 +1,6 @@
 extern crate backtrace;
+#[macro_use]
+extern crate log;
 
 use std::path::Path;
 

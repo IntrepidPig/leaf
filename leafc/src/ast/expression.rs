@@ -28,6 +28,7 @@ pub trait ItemTaker: ::std::fmt::Debug {
 
 /// Parse the entirety of the tokens passed as an expression. If not all the tokens are used up, then there was an error.
 pub fn parse_expression(tokens: &[TokenTree]) -> Result<Expression, Error<ParseError>> {
+	debug!("Parsing expression from: {:?}", tokens);
 	let mut expr_items: Vec<ExpressionItem> = Vec::new();
 	let mut item_takers: &[&ItemTaker] = &[&PrefixTaker, &OperandTaker];
 	let mut tokens = tokens;
@@ -47,6 +48,8 @@ pub fn parse_expression(tokens: &[TokenTree]) -> Result<Expression, Error<ParseE
 
 		return Err(ParseError::Other.into());
 	}
+
+	trace!("Got operators and operands {:?}", expr_items);
 
 	// Simplifies the list of expression items into a single expression. Works recursively, step by step, with a lot of
 	// heap allocation.
@@ -195,6 +198,7 @@ impl ItemTaker for BinaryTaker {
 		>,
 		Error<ParseError>,
 	> {
+		debug!("Taking binary from: {:?}", tokens);
 		if let Some(token) = tokens.get(0) {
 			Ok(Some((
 				ExpressionItem::Operator(Operator::Binary(match token {
@@ -214,7 +218,7 @@ impl ItemTaker for BinaryTaker {
 	}
 }
 
-/// TODO allow break statements to be operands I guess... so 1if 1 then break;` works
+/// TODO allow break statements to be operands I guess... so if 1 then break;` works
 /// Tries to get an operand
 /// The operand can be either a literal, an identifier, or a block (which will be classified as a single operand)
 #[derive(Debug)]
@@ -233,6 +237,7 @@ impl ItemTaker for OperandTaker {
 		>,
 		Error<ParseError>,
 	> {
+		debug!("Taking operand from: {:?}", tokens);
 		if let Some(token) = tokens.get(0) {
 			let mut remaining = &tokens[1..];
 			Ok(Some((
