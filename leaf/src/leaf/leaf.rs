@@ -28,11 +28,21 @@ fn main() {
 
 	fern::Dispatch::new()
 		.format(|out, message, record| {
-			out.finish(format_args!(
-				"[{}] {}",
-				record.level(),
-				message
-			))
+			if let (Some(file), Some(line)) = (record.file(), record.line()) {
+				out.finish(format_args!(
+					"{}:{} [{}] {}",
+					file,
+					line,
+					record.level(),
+					message
+				))
+			} else {
+				out.finish(format_args!(
+					"[{}] {}",
+					record.level(),
+					message
+				))
+			}			
 		})
 		.level(if debug {
 			log::LevelFilter::Trace
