@@ -5,11 +5,11 @@ pub mod tokenizer;
 pub mod parser;
 pub mod treeify;
 
-use self::parser::SyntaxTree;
+use self::parser::Block;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ast {
-	pub tree: SyntaxTree,
+	pub tree: Block,
 }
 
 #[derive(Debug, Clone)]

@@ -32,7 +32,7 @@ fn run_instructions(instructions: &[Instruction]) -> Result<(), ()> {
 
 	let mut instr_ptr: usize = 0;
 	let mut iter: usize = 0;
-	let debug = true;
+	let debug = false;
 
 	loop {
 		if instr_ptr == instructions.len() {

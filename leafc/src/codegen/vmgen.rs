@@ -1,4 +1,4 @@
-use ast::parser::{BinaryOp, Binding, Expression, Statement, SyntaxTree, If};
+use ast::parser::{BinaryOp, Binding, Expression, Statement, Block, If};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Value {
@@ -52,14 +52,14 @@ impl CodeGenerator {
 		}
 	}
 
-	pub fn gen_instructions(mut self, ast: SyntaxTree) -> Vec<Instruction> {
-		self.gen_from_ast(&ast);
+	pub fn gen_instructions(mut self, ast: Block) -> Vec<Instruction> {
+		self.gen_from_block(&ast);
 
 		self.instructions
 	}
 
 	/// Generate instructions for a block
-	pub fn gen_from_ast(&mut self, ast: &SyntaxTree) {
+	pub fn gen_from_block(&mut self, ast: &Block) {
 		// Start a new stack frame
 		self.instructions.push(Instruction::Frame);
 		// Generate instructions for each statement in the block
@@ -191,7 +191,7 @@ impl CodeGenerator {
 			},
 			// Generate instructions for nested blocks
 			Expression::Block(ref ast) => {
-				self.gen_from_ast(ast);
+				self.gen_from_block(ast);
 			},
 			// Dereference variables
 			Expression::Identifier(ref ident) => {
