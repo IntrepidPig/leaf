@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ast::lexer::{Bracket, BracketState};
-use ast::tokenizer::{Token as OldToken, Symbol, Keyword};
+use ast::tokenizer::{Keyword, Symbol, Token as OldToken};
 use failure::Error;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -21,7 +21,7 @@ impl Token {
 			OldToken::NumberLiteral(num) => Token::NumberLiteral(num),
 			OldToken::StringLiteral(string) => Token::StringLiteral(string),
 			OldToken::Symbol(symbol) => Token::Symbol(symbol),
-			OldToken::Bracket(_, _) => return Err(TreeifyError::IncorrectBrace.into())
+			OldToken::Bracket(_, _) => return Err(TreeifyError::IncorrectBrace.into()),
 		})
 	}
 }
@@ -70,7 +70,7 @@ impl fmt::Display for TreeifyError {
 	}
 }
 
-impl ::std::error::Error for TreeifyError { }
+impl ::std::error::Error for TreeifyError {}
 
 pub fn treeify(mut old_tokens: &[OldToken]) -> Result<Vec<TokenTree>, Error<TreeifyError>> {
 	let mut tokens: Vec<TokenTree> = Vec::new();
@@ -91,14 +91,17 @@ pub fn treeify(mut old_tokens: &[OldToken]) -> Result<Vec<TokenTree>, Error<Tree
 			token => {
 				tokens.push(TokenTree::Token(Token::from_old_token(token.clone())?));
 				old_tokens = &old_tokens[1..];
-			}
+			},
 		}
 	}
 
 	Ok(tokens)
 }
 
-fn get_sub(old_tokens: &[OldToken], bracket: Bracket) -> Result<(&[OldToken], &[OldToken]), Error<TreeifyError>> {
+fn get_sub(
+	old_tokens: &[OldToken],
+	bracket: Bracket,
+) -> Result<(&[OldToken], &[OldToken]), Error<TreeifyError>> {
 	let mut count = 0;
 	for (i, token) in old_tokens.iter().enumerate() {
 		match token {

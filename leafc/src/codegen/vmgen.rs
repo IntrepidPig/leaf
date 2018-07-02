@@ -1,4 +1,4 @@
-use ast::parser::{BinaryOp, Binding, Expression, Statement, Block, If};
+use ast::parser::{BinaryOp, Binding, Block, Expression, If, Statement};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Value {
@@ -70,7 +70,6 @@ impl CodeGenerator {
 		if let Some(ref output) = ast.output {
 			// Load the value of the exression onto the stack
 			self.gen_from_expr(output);
-			
 		} else {
 			// Return a nil value
 			// This is necessary because if the block was a statement then it will always drop the result
@@ -129,8 +128,11 @@ impl CodeGenerator {
 				// Push a jump instrction with a 0 because we don't know where the loop ends yet
 				self.instructions.push(Instruction::Jump(0));
 				// Add the index of the jump instruction to the latest loop_break frame
-				self.loop_breaks.last_mut().unwrap().push(self.instructions.len() - 1);
-			}
+				self.loop_breaks
+					.last_mut()
+					.unwrap()
+					.push(self.instructions.len() - 1);
+			},
 		}
 	}
 
@@ -159,12 +161,12 @@ impl CodeGenerator {
 		let jump_to_after_else = self.instructions.len();
 		// Placeholder jump to after else block
 		self.instructions.push(Instruction::Jump(0));
-		
+
 		// Fix the check instruction jump locations
 		let current_ip = self.instructions.len();
 		match self.instructions[if_check] {
 			Instruction::Check(ref mut ptr) => *ptr = current_ip,
-			_ => panic!("Failed to change check instruction pointer")
+			_ => panic!("Failed to change check instruction pointer"),
 		}
 
 		// Generate stuff for the else block if it exists, otherwise just generate nil value
@@ -178,7 +180,7 @@ impl CodeGenerator {
 		let current_ip = self.instructions.len();
 		match self.instructions[jump_to_after_else] {
 			Instruction::Jump(ref mut ptr) => *ptr = current_ip,
-			_ => panic!("Failed to change check instruction pointer")
+			_ => panic!("Failed to change check instruction pointer"),
 		}
 	}
 
@@ -186,9 +188,8 @@ impl CodeGenerator {
 	pub fn gen_from_expr(&mut self, expr: &Expression) {
 		match expr {
 			// Push literal values onto the stack
-			Expression::NumberLiteral(num) => {
-				self.instructions.push(Instruction::Push(Value { val: *num }))
-			},
+			Expression::NumberLiteral(num) => self.instructions
+				.push(Instruction::Push(Value { val: *num })),
 			// Generate instructions for nested blocks
 			Expression::Block(ref ast) => {
 				self.gen_from_block(ast);
@@ -216,11 +217,13 @@ impl CodeGenerator {
 			},
 			Expression::Assign(ref assignment) => {
 				// Load the value that used to be in the variable being assigned to
-				self.instructions.push(Instruction::Load(assignment.ident.to_owned()));
+				self.instructions
+					.push(Instruction::Load(assignment.ident.to_owned()));
 				// Push the result of the expr onto the stack
 				self.gen_from_expr(&assignment.expr);
 				// Move the result into the variable
-				self.instructions.push(Instruction::Set(assignment.ident.to_owned()));
+				self.instructions
+					.push(Instruction::Set(assignment.ident.to_owned()));
 				// And the old value will be left on the stack as the result of the expression
 			},
 			Expression::Loop(ref block) => {
@@ -232,7 +235,7 @@ impl CodeGenerator {
 				for break_index in self.loop_breaks.pop().unwrap() {
 					match self.instructions[break_index] {
 						Instruction::Jump(ref mut target) => *target = loop_end,
-						_ => panic!("Failed to change all break statements")
+						_ => panic!("Failed to change all break statements"),
 					}
 				}
 				// Return the value being broken and exit the stack frame
@@ -242,7 +245,7 @@ impl CodeGenerator {
 			Expression::If(ref if_stmnt) => {
 				// Gen the instructions for the if statement
 				self.gen_from_if(if_stmnt);
-			}
+			},
 			_ => unimplemented!(),
 		}
 	}

@@ -46,11 +46,7 @@ fn run_instructions(instructions: &[Instruction]) -> Result<(), ()> {
 				return Ok(());
 			}
 
-			println!(
-				"Instruction {}: {:?}",
-				instr_ptr,
-				instructions[instr_ptr],
-			);
+			println!("Instruction {}: {:?}", instr_ptr, instructions[instr_ptr],);
 		}
 
 		match instructions[instr_ptr] {
@@ -112,7 +108,7 @@ fn run_instructions(instructions: &[Instruction]) -> Result<(), ()> {
 					instr_ptr = target_instr_ptr;
 					continue;
 				}
-			}
+			},
 		}
 
 		instr_ptr += 1;
@@ -120,11 +116,9 @@ fn run_instructions(instructions: &[Instruction]) -> Result<(), ()> {
 		if debug {
 			println!(
 				"Stack: {:?}\n\
-				Vars: {:?}\n\
-				Stack ptr: {:?}\n",
-				stack,
-				vars,
-				ptr,
+				 Vars: {:?}\n\
+				 Stack ptr: {:?}\n",
+				stack, vars, ptr,
 			);
 		}
 	}
@@ -141,7 +135,7 @@ fn print_instructions(instructions: &[Instruction]) {
 	let max_length = instructions.len().to_string().len();
 	for (i, instr) in instructions.iter().enumerate() {
 		let i_str = i.to_string();
-		for _ in 0..max_length-i_str.len() {
+		for _ in 0..max_length - i_str.len() {
 			print!(" ");
 		}
 		println!("{}: {:?}", i_str, instr);

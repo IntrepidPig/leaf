@@ -239,7 +239,7 @@ pub fn next_syntaxtree<'a>(
 	unsafe {
 		RECURSION_LEVEL = RECURSION_LEVEL + 1;
 		if RECURSION_LEVEL > 10 {
-			return Err(ParseError::Other.into()) // Too much nesting DEBUG purposes only
+			return Err(ParseError::Other.into()); // Too much nesting DEBUG purposes only
 		}
 	}
 
@@ -271,7 +271,6 @@ pub fn next_statement<'a>(
 
 	let mut tokens = tokens;
 
-	
 	// Try to parse a let binding
 	let statement = if let Some((binding, leftovers)) = next_binding(tokens)? {
 		tokens = leftovers;
@@ -285,17 +284,19 @@ pub fn next_statement<'a>(
 		tokens = leftovers;
 		Statement::Break(break_expr)
 	// Try to parse an expression followed by a semicolon
-	} else if let Some((expression, leftovers)) = next_expression(tokens, Box::new(|token| token.is_semicolon()))? {
+	} else if let Some((expression, leftovers)) =
+		next_expression(tokens, Box::new(|token| token.is_semicolon()))?
+	{
 		tokens = leftovers;
 		Statement::Expression(expression)
 	} else {
-		return Ok(None)
+		return Ok(None);
 	};
 
 	if let Some(TokenTree::Token(Token::Symbol(TokenSymbol::Semicolon))) = tokens.get(0) {
 		tokens = &tokens[1..];
 	} else {
-		return Ok(None)
+		return Ok(None);
 	}
 
 	Ok(Some((statement, tokens)))
@@ -331,7 +332,6 @@ fn next_binding<'a>(
 		return Ok(None);
 	}
 
-
 	let mut tokens = tokens;
 
 	match tokens[0] {
@@ -347,13 +347,14 @@ fn next_binding<'a>(
 			// If there's a type annotation, parse it
 			// Set offset to how many tokens the type annotation occupied
 			let mut offset = 0;
-			let mut type_annotation: Option<String> = if let TokenTree::Token(Token::Symbol(TokenSymbol::Colon)) = tokens[2] {
-				// if there's a type annotation
-				// change token offset
-				unimplemented!()
-			} else {
-				None
-			};
+			let mut type_annotation: Option<String> =
+				if let TokenTree::Token(Token::Symbol(TokenSymbol::Colon)) = tokens[2] {
+					// if there's a type annotation
+					// change token offset
+					unimplemented!()
+				} else {
+					None
+				};
 
 			// Make sure there's an equals sign after the identifier or type annotation
 			if let TokenTree::Token(Token::Symbol(TokenSymbol::Assign)) = tokens[2 + offset] {
@@ -362,8 +363,10 @@ fn next_binding<'a>(
 			}
 
 			// Parse the expression part of the binding
-			let expr = if let Some((expr, leftovers)) = next_expression(&tokens[2 + offset + 1..], Box::new(|token| token.is_semicolon()))?
-			{
+			let expr = if let Some((expr, leftovers)) = next_expression(
+				&tokens[2 + offset + 1..],
+				Box::new(|token| token.is_semicolon()),
+			)? {
 				tokens = leftovers;
 				expr
 			} else {
@@ -399,7 +402,9 @@ fn next_debug<'a>(
 		// If the first token is debug it's a debug statement
 		TokenTree::Token(Token::Keyword(Keyword::Debug)) => {
 			// Get the expression after the keyword
-			let expr = if let Some((expr, leftovers)) = next_expression(&tokens[1..], Box::new(|token| token.is_semicolon()))? {
+			let expr = if let Some((expr, leftovers)) =
+				next_expression(&tokens[1..], Box::new(|token| token.is_semicolon()))?
+			{
 				tokens = leftovers;
 				expr
 			} else {
@@ -426,7 +431,9 @@ fn next_break<'a>(
 		// If the first token is debug it's a break statement
 		TokenTree::Token(Token::Keyword(Keyword::Break)) => {
 			// Get the expression after the keyword
-			if let Some((expr, leftovers)) = next_expression(&tokens[1..], Box::new(|token| token.is_semicolon()))? {
+			if let Some((expr, leftovers)) =
+				next_expression(&tokens[1..], Box::new(|token| token.is_semicolon()))?
+			{
 				Ok(Some((Some(expr), leftovers)))
 			} else {
 				Ok(Some((None, &tokens[1..])))
@@ -446,96 +453,117 @@ fn next_expression<'a>(
 		return Ok(None);
 	}
 
-
 	// Get the tokens involved in the next expression
-	let (expr_tokens, leftovers) = split_at(
-		tokens,
-		end_predicate,
-		false
-	);
+	let (expr_tokens, leftovers) = split_at(tokens, end_predicate, false);
 
 	// TODO dont require brackets
 	// Handle all different kinds of expressions, like loop blocks, or just plain arithmetic
 	match expr_tokens[0] {
 		TokenTree::Token(Token::Keyword(Keyword::Loop)) => {
-			if let Some((block, extra_leftovers)) = next_expression(&expr_tokens[1..], Box::new(|token| token.is_semicolon()))? {
+			if let Some((block, extra_leftovers)) =
+				next_expression(&expr_tokens[1..], Box::new(|token| token.is_semicolon()))?
+			{
 				if !extra_leftovers.is_empty() {
-					// The TerminatorCounter above should have ensured that only a block was included in expr_tokens
-					return Err(ParseError::Other.into())
+					// All that is necessary for the expression should be the only thing
+					// present here.
+					return Err(ParseError::Other.into());
 				}
 				Ok(Some((Expression::Loop(Box::new(block)), leftovers)))
 			} else {
-				return Err(ParseError::Other.into()) // Loop keywords needs a block directly after
+				return Err(ParseError::Other.into()); // Loop keywords needs a block directly after
 			}
 		},
 		TokenTree::Token(Token::Keyword(Keyword::If)) => {
-			let (condition, sub_leftovers) = if let Some((condition, extra_leftovers)) = next_expression(&expr_tokens[1..], Box::new(|token| token.is_then()))? {
+			let (condition, sub_leftovers) = if let Some((condition, extra_leftovers)) =
+				next_expression(&expr_tokens[1..], Box::new(|token| token.is_then()))?
+			{
 				match extra_leftovers.get(0) {
 					Some(TokenTree::Token(Token::Keyword(Keyword::Then))) => {},
-					_ => return Err(ParseError::Other.into()) // Missing a then keyword in the if
+					_ => return Err(ParseError::Other.into()), // Missing a then keyword in the if
 				}
 
 				(condition, extra_leftovers)
 			} else {
-				return Err(ParseError::Other.into()) // The if statement had no condition
+				return Err(ParseError::Other.into()); // The if statement had no condition
 			};
 
 			let (body, sub_leftovers) = if let Some(token) = sub_leftovers.get(0) {
 				match token {
 					TokenTree::Token(Token::Keyword(Keyword::Then)) => {
-						if let Some((body, extra_leftovers)) = next_expression(&sub_leftovers[1..], Box::new(|token| token.is_else() || token.is_semicolon()))? {				
+						if let Some((body, extra_leftovers)) = next_expression(
+							&sub_leftovers[1..],
+							Box::new(|token| token.is_else() || token.is_semicolon()),
+						)? {
 							(body, extra_leftovers)
 						} else {
-							return Err(ParseError::Other.into()) // There was no condition block after the is statement
+							// There was no condition block after the is statement
+							return Err(ParseError::Other.into());
 						}
 					},
-					_ => return Err(ParseError::Other.into()) // There was no then keyword after the condition
+					// There was no then keyword after the condition
+					_ => return Err(ParseError::Other.into()),
 				}
 			} else {
-				return Err(ParseError::Other.into()) // THere was no then keyword after the condition
+				// There was no then keyword after the condition
+				return Err(ParseError::Other.into());
 			};
 
 			let (else_block, sub_leftovers) = if let Some(token) = sub_leftovers.get(0) {
 				match token {
-					TokenTree::Token(Token::Symbol(TokenSymbol::Semicolon)) => (None, sub_leftovers),
+					TokenTree::Token(Token::Symbol(TokenSymbol::Semicolon)) => {
+						(None, sub_leftovers)
+					},
 					TokenTree::Token(Token::Keyword(Keyword::Else)) => {
-						if let Some((body, extra_leftovers)) = next_expression(&sub_leftovers[1..], Box::new(|token| token.is_semicolon()))? {
+						if let Some((body, extra_leftovers)) = next_expression(
+							&sub_leftovers[1..],
+							Box::new(|token| token.is_semicolon()),
+						)? {
 							(Some(body), extra_leftovers)
 						} else {
-							return Err(ParseError::Other.into()) // There should be an expression after the else keyword and before the semicolon
+							// There should be an expression after the else keyword
+							// and before the semicolon
+							return Err(ParseError::Other.into());
 						}
 					},
-					_ => return Err(ParseError::Other.into()) // There should be either an else or a semicolon after an else block
+					// There should be an expression after the else keyword and before the semicolon
+					_ => return Err(ParseError::Other.into()),
 				}
 			} else {
 				(None, sub_leftovers)
 			};
 
 			if !sub_leftovers.is_empty() {
-				return Err(ParseError::Other.into()) // Could parse it as an expression
+				return Err(ParseError::Other.into()); // Could parse it as an expression
 			}
 
 			// TODO support elif
 
-			Ok(Some((Expression::If(Box::new(If {
-				condition,
-				body,
-				elif: None,
-				else_block,
-			})), leftovers)))
+			Ok(Some((
+				Expression::If(Box::new(If {
+					condition,
+					body,
+					elif: None,
+					else_block,
+				})),
+				leftovers,
+			)))
 		},
-		_ => expressions::parse_expression(expr_tokens).map(|expr| Some((expr, leftovers)))
-	}	
+		_ => expressions::parse_expression(expr_tokens).map(|expr| Some((expr, leftovers))),
+	}
 }
 
-fn split_at(tokens: &[TokenTree], condition: Box<Fn(&TokenTree) -> bool>, exclusive: bool) -> (&[TokenTree], &[TokenTree]) {
+fn split_at(
+	tokens: &[TokenTree],
+	condition: Box<Fn(&TokenTree) -> bool>,
+	exclusive: bool,
+) -> (&[TokenTree], &[TokenTree]) {
 	for (i, token) in tokens.iter().enumerate() {
 		if condition(token) {
 			return (&tokens[0..i], &tokens[i + exclusive as usize..]);
 		}
 	}
 
-	return (&tokens[..], &tokens[tokens.len()..])
+	return (&tokens[..], &tokens[tokens.len()..]);
 }
 
 /// Contains logic for parsing expressions
@@ -554,7 +582,13 @@ mod expressions {
 			&self,
 			tokens: &'a [TokenTree],
 		) -> Result<
-			Option<(ExpressionItem, &'static [&'static ItemTaker], &'a [TokenTree])>,
+			Option<
+				(
+					ExpressionItem,
+					&'static [&'static ItemTaker],
+					&'a [TokenTree],
+				),
+			>,
 			Error<ParseError>,
 		>;
 	}
@@ -683,7 +717,13 @@ mod expressions {
 			&self,
 			tokens: &'a [TokenTree],
 		) -> Result<
-			Option<(ExpressionItem, &'static [&'static ItemTaker], &'a [TokenTree])>,
+			Option<
+				(
+					ExpressionItem,
+					&'static [&'static ItemTaker],
+					&'a [TokenTree],
+				),
+			>,
 			Error<ParseError>,
 		> {
 			if let Some(token) = tokens.get(0) {
@@ -713,7 +753,13 @@ mod expressions {
 			&self,
 			tokens: &'a [TokenTree],
 		) -> Result<
-			Option<(ExpressionItem, &'static [&'static ItemTaker], &'a [TokenTree])>,
+			Option<
+				(
+					ExpressionItem,
+					&'static [&'static ItemTaker],
+					&'a [TokenTree],
+				),
+			>,
 			Error<ParseError>,
 		> {
 			if let Some(token) = tokens.get(0) {
@@ -745,16 +791,28 @@ mod expressions {
 			&self,
 			tokens: &'a [TokenTree],
 		) -> Result<
-			Option<(ExpressionItem, &'static [&'static ItemTaker], &'a [TokenTree])>,
+			Option<
+				(
+					ExpressionItem,
+					&'static [&'static ItemTaker],
+					&'a [TokenTree],
+				),
+			>,
 			Error<ParseError>,
 		> {
 			if let Some(token) = tokens.get(0) {
 				let mut remaining = &tokens[1..];
 				Ok(Some((
 					ExpressionItem::Operand(match token {
-						TokenTree::Token(Token::Name(ref name)) => Expression::Identifier(name.clone()),
-						TokenTree::Token(Token::NumberLiteral(num)) => Expression::NumberLiteral(*num),
-						TokenTree::Token(Token::StringLiteral(ref string)) => Expression::StringLiteral(string.clone()),
+						TokenTree::Token(Token::Name(ref name)) => {
+							Expression::Identifier(name.clone())
+						},
+						TokenTree::Token(Token::NumberLiteral(num)) => {
+							Expression::NumberLiteral(*num)
+						},
+						TokenTree::Token(Token::StringLiteral(ref string)) => {
+							Expression::StringLiteral(string.clone())
+						},
 						TokenTree::Brace(ref sub_tokens) => {
 							// Try to parse the block as a syntax tree
 							if let Some(block) = next_syntaxtree(sub_tokens)? {
@@ -768,9 +826,9 @@ mod expressions {
 								remaining = &tokens[tokens.len()..];
 								Expression::Block(Box::new(block))
 							} else {
-								return Ok(None)
+								return Ok(None);
 							}
-						}
+						},
 					}),
 					&[&BinaryTaker],
 					remaining,
