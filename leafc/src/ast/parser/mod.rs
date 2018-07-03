@@ -17,12 +17,6 @@ pub mod operation;
 pub mod literal;
 pub mod identifier;
 
-/// TODO
-/// refactor entire thing again to parse into an expression tree, like a buffed up treeify, where
-/// it's just operators and operands, so a loop block would be an operand, a plus would be an operator,
-/// and wait it's already like that hmm so next_expression and operation_taker need to be merged to
-/// work together better somehow hmmmmmmm....
-
 /// Trait that takes an expression from a stream of tokens. If it was successfull, then it returns an option with
 /// the expression and the tokens that are still left over. If the expression wasn't there, then it returns None.
 /// It can also return an error if there was an unrecoverable error.

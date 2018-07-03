@@ -136,7 +136,6 @@ mod parse {
 						// Simplify the tokens to the left and to the right of the binary operation
 						let lhs = &items[..priority_op];
 						let rhs = &items[priority_op + 1..];
-						println!("lhs: {:?}\nrhs:{:?}\n", lhs, rhs);
 						let lhs = simplify(lhs)?;
 						let rhs = simplify(rhs)?;
 						match binop {
