@@ -12,7 +12,6 @@ impl ExpressionTaker for DebugTaker {
 		in_tokens: &'a [TokenTree],
 		_args: Self::Args,
 	) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
-		debug!("Parsing debug from: {:?}", in_tokens);
 		if in_tokens.is_empty() {
 			return Ok(None);
 		}

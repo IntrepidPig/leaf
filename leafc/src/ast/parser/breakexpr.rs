@@ -11,7 +11,6 @@ impl ExpressionTaker for BreakTaker {
 		in_tokens: &'a [TokenTree],
 		_args: Self::Args,
 	) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
-		debug!("Parsing break from: {:?}", in_tokens);
 		if in_tokens.is_empty() {
 			return Ok(None);
 		}

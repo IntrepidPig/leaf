@@ -2,6 +2,12 @@ use ast::parser::*;
 
 pub struct LoopTaker;
 
+impl LoopTaker {
+	pub fn new() -> Self {
+		LoopTaker
+	}
+}
+
 impl ExpressionTaker for LoopTaker {
 	type Args = ();
 
@@ -11,34 +17,18 @@ impl ExpressionTaker for LoopTaker {
 		_args: Self::Args,
 	) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
 		match in_tokens.get(0) {
-			Some(TokenTree::Token(Token::Keyword(Keyword::Loop))) => {
-				// If theres a brace block after loop keyword, include only
-				// that in the loop expression
-				if let Some(TokenTree::Brace(_)) = in_tokens.get(1) {
-					if let Some((block, extra_leftovers)) =
-						next_expression(&in_tokens[1..], Box::new(|token| !token.is_brace_expr()))?
-					{
-						Ok(Some((Expression::Loop(Box::new(block)), extra_leftovers)))
-					} else {
-						// Failed to parse the block after the loop
-						Err(ParseError::Other.into())
-					}
+			Some(TokenTree::Loop(tokens)) => {
+				let expr = if let Some(res) = next_syntaxtree(tokens)? {
+					res
 				} else {
-					if let Some((expr, extra_leftovers)) =
-						next_expression(&in_tokens[1..], Box::new(|token| token.is_semicolon()))?
-					{
-						Ok(Some((
-							Expression::Loop(Box::new(Expression::Block(Box::new(Block {
-								block: vec![expr],
-								output: None,
-							})))),
-							extra_leftovers,
-						)))
-					} else {
-						// Failed to parse the expression after the loop
-						Err(ParseError::Other.into())
-					}
+					return Err(ParseError::Other.into()) // Failed to parse loop expression body
+				};
+				
+				if expr.output.is_some() {
+					return Err(ParseError::Other.into()) // Loop blocks can't have an output
 				}
+				
+				Ok(Some((Expression::Loop(Box::new(Expression::Block(Box::new(expr)))), &in_tokens[1..])))
 			},
 			_ => Ok(None),
 		}

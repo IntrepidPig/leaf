@@ -14,6 +14,14 @@ pub mod binding;
 pub mod ifexpr;
 pub mod loopexpr;
 pub mod operation;
+pub mod literal;
+pub mod identifier;
+
+/// TODO
+/// refactor entire thing again to parse into an expression tree, like a buffed up treeify, where
+/// it's just operators and operands, so a loop block would be an operand, a plus would be an operator,
+/// and wait it's already like that hmm so next_expression and operation_taker need to be merged to
+/// work together better somehow hmmmmmmm....
 
 /// Trait that takes an expression from a stream of tokens. If it was successfull, then it returns an option with
 /// the expression and the tokens that are still left over. If the expression wasn't there, then it returns None.
@@ -153,7 +161,6 @@ mod errors {
 
 	/// Parse a block from the tokens (will use all of the tokens or error)
 	pub fn parse(tokens: &[TokenTree]) -> Result<Block, Error<ParseError>> {
-		debug!("Parsing tokens: {:?}", tokens);
 		if let Some(ast) = next_syntaxtree(tokens)? {
 			Ok(ast)
 		} else {
@@ -169,7 +176,6 @@ static mut RECURSION_LEVEL: usize = 0;
 pub fn next_syntaxtree<'a>(
 	mut tokens: &'a [TokenTree],
 ) -> Result<Option<Block>, Error<ParseError>> {
-	debug!("Parsing syntaxtree from: {:?}", tokens);
 	unsafe {
 		RECURSION_LEVEL = RECURSION_LEVEL + 1;
 		if RECURSION_LEVEL > 10 {
@@ -185,7 +191,6 @@ pub fn next_syntaxtree<'a>(
 		tokens = leftovers;
 	}
 	// Parse the final expression if there is one
-	debug!("Parsing final expression from {:?}", tokens);
 	if let Some((expr, leftovers)) = next_expression(tokens, Box::new(|_| false))? {
 		if !leftovers.is_empty() {
 			return Err(ParseError::UnexpectedToken.into()); // There were tokens after the final expression which there shouldn't be
@@ -193,7 +198,6 @@ pub fn next_syntaxtree<'a>(
 		stree.output = Some(expr);
 	}
 
-	debug!("Got syntaxtree {:?}", stree);
 
 	Ok(Some(stree))
 }
@@ -202,7 +206,6 @@ pub fn next_syntaxtree<'a>(
 pub fn next_statement<'a>(
 	in_tokens: &'a [TokenTree],
 ) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
-	debug!("Parsing statement from {:?}", in_tokens);
 	if let Some((expr, leftovers)) =
 		next_expression(in_tokens, Box::new(|token| token.is_semicolon()))?
 	{
@@ -220,24 +223,8 @@ pub fn next_expression<'a>(
 	in_tokens: &'a [TokenTree],
 	end_predicate: Box<FnMut(&TokenTree) -> bool>,
 ) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
-	debug!("Parsing expression from: {:?}", in_tokens);
 	if in_tokens.is_empty() {
 		return Ok(None);
-	}
-
-	let expression_takers: &[&ExpressionTaker<Args = ()>] = &[
-		&binding::BindingTaker,
-		&debug::DebugTaker,
-		&loopexpr::LoopTaker,
-		&ifexpr::IfTaker,
-		&breakexpr::BreakTaker,
-	];
-
-	for expression_taker in expression_takers {
-		let expr_opt = expression_taker.take_expression(in_tokens, ())?;
-		if expr_opt.is_some() {
-			return Ok(expr_opt);
-		}
 	}
 
 	if let Some((expression, leftovers)) =

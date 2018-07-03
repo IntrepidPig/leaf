@@ -17,7 +17,7 @@ impl ExpressionTaker for IfTaker {
 				} else {
 					return Err(ParseError::Other.into()) // Failed to parse the if condition expression
 				};
-				
+								
 				if !(leftovers.get(0) == Some(&TokenTree::Token(Token::Keyword(Keyword::Then)))) {
 					return Err(ParseError::Other.into()) // needed `then` keyword
 				}
@@ -29,7 +29,7 @@ impl ExpressionTaker for IfTaker {
 				} else {
 					return Err(ParseError::Other.into()) // Failed to parse the if condition expression
 				};
-				
+								
 				let (else_block, leftovers) = if leftovers.is_empty() {
 					(None, leftovers)
 				} else {
@@ -46,7 +46,7 @@ impl ExpressionTaker for IfTaker {
 						_ => return Err(ParseError::Other.into()) // needed else or nothing after then
 					}
 				};
-				
+								
 				if !leftovers.is_empty() {
 					return Err(ParseError::Other.into()) // Failed to parse all tokens in if
 				}

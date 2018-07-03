@@ -20,20 +20,13 @@ impl ExpressionTaker for OperationTaker {
 		tokens: &'a [TokenTree],
 		args: Self::Args,
 	) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
-		debug!("Parsing next expression from: {:?}", tokens);
 		if tokens.is_empty() {
 			return Ok(None);
 		}
 
 		// Get the tokens involved in the next expression
 		let (expr_tokens, leftovers) = split_at(tokens, args, false);
-
-		trace!(
-			"Expr tokens: {:?}\n\tleftovers: {:?}",
-			expr_tokens,
-			leftovers
-		);
-
+		
 		parse_operation(expr_tokens).map(|expr| Some((expr, leftovers)))
 	}
 }
@@ -80,7 +73,6 @@ mod parse {
 
 	/// Parse the entirety of the tokens passed as an expression. If not all the tokens are used up, then there was an error.
 	pub fn parse_operation(tokens: &[TokenTree]) -> Result<Expression, Error<ParseError>> {
-		debug!("Parsing expression from: {:?}", tokens);
 		let mut expr_items: Vec<ExpressionItem> = Vec::new();
 		let mut item_takers: &[&ItemTaker] = &[&PrefixTaker, &OperandTaker];
 		let mut tokens = tokens;
@@ -100,8 +92,6 @@ mod parse {
 
 			return Err(ParseError::Other.into());
 		}
-
-		trace!("Got operators and operands {:?}", expr_items);
 
 		// Simplifies the list of expression items into a single expression. Works recursively, step by step, with a lot of
 		// heap allocation.
@@ -146,6 +136,7 @@ mod parse {
 						// Simplify the tokens to the left and to the right of the binary operation
 						let lhs = &items[..priority_op];
 						let rhs = &items[priority_op + 1..];
+						println!("lhs: {:?}\nrhs:{:?}\n", lhs, rhs);
 						let lhs = simplify(lhs)?;
 						let rhs = simplify(rhs)?;
 						match binop {
@@ -256,7 +247,6 @@ mod parse {
 			>,
 			Error<ParseError>,
 		> {
-			debug!("Taking binary from: {:?}", tokens);
 			if let Some(token) = tokens.get(0) {
 				Ok(Some((
 					ExpressionItem::Operator(Operator::Binary(match token {
@@ -284,7 +274,7 @@ mod parse {
 	impl ItemTaker for OperandTaker {
 		fn next_item<'a>(
 			&self,
-			tokens: &'a [TokenTree],
+			in_tokens: &'a [TokenTree],
 		) -> Result<
 			Option<
 				(
@@ -295,43 +285,25 @@ mod parse {
 			>,
 			Error<ParseError>,
 		> {
-			debug!("Taking operand from: {:?}", tokens);
-			if let Some(token) = tokens.get(0) {
-				let mut remaining = &tokens[1..];
-				Ok(Some((
-					ExpressionItem::Operand(match token {
-						TokenTree::Token(Token::Name(ref name)) => {
-							Expression::Identifier(name.clone())
-						},
-						TokenTree::Token(Token::NumberLiteral(num)) => {
-							Expression::NumberLiteral(*num)
-						},
-						TokenTree::Token(Token::StringLiteral(ref string)) => {
-							Expression::StringLiteral(string.clone())
-						},
-						TokenTree::Brace(ref sub_tokens) => {
-							// Try to parse the block as a syntax tree
-							if let Some(block) = next_syntaxtree(sub_tokens)? {
-								Expression::Block(Box::new(block))
-							} else {
-								return Ok(None);
-							}
-						},
-						_ => {
-							if let Some(block) = next_syntaxtree(&tokens)? {
-								remaining = &tokens[tokens.len()..];
-								Expression::Block(Box::new(block))
-							} else {
-								return Ok(None);
-							}
-						},
-					}),
-					&[&BinaryTaker],
-					remaining,
-				)))
-			} else {
-				Ok(None)
+			let expression_takers: &[&ExpressionTaker<Args = ()>] = &[
+				&block::BlockTaker,
+				&binding::BindingTaker,
+				&debug::DebugTaker,
+				&loopexpr::LoopTaker,
+				&ifexpr::IfTaker,
+				&breakexpr::BreakTaker,
+				&literal::LiteralTaker,
+				&identifier::IdentifierTaker,
+			];
+			
+			for expression_taker in expression_takers {
+				let expr_opt = expression_taker.take_expression(in_tokens, ())?;
+				if let Some((expr, leftovers)) = expr_opt {
+					return Ok(Some((ExpressionItem::Operand(expr), &[&BinaryTaker], leftovers)));
+				}
 			}
+			
+			return Err(ParseError::Other.into()) // Failed to parse operand
 		}
 	}
 }

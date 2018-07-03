@@ -33,6 +33,7 @@ pub enum TokenTree {
 	Brace(Vec<TokenTree>),
 	Bracket(Vec<TokenTree>),
 	If(Vec<TokenTree>),
+	Loop(Vec<TokenTree>),
 }
 
 impl TokenTree {
@@ -89,6 +90,7 @@ impl ::std::error::Error for TreeifyError {}
 
 pub fn treeify(in_tokens: &[OldToken]) -> Result<Vec<TokenTree>, Error<TreeifyError>> {
 	let tokens = treeify_brackets(in_tokens)?;
+	let tokens = treeify_loops(&tokens)?;
 	let tokens = treeify_ifs(&tokens)?;
 
 	Ok(tokens)
@@ -167,11 +169,53 @@ fn treeify_ifs(in_tokens: &[TokenTree]) -> Result<Vec<TokenTree>, Error<TreeifyE
 				old_tokens = &old_tokens[1..];
 			},
 			TokenTree::Paren(sub_tokens) => {
-				tokens.push(TokenTree::Brace(treeify_ifs(sub_tokens)?));
+				tokens.push(TokenTree::Paren(treeify_ifs(sub_tokens)?));
 				old_tokens = &old_tokens[1..];
 			},
 			TokenTree::Bracket(sub_tokens) => {
-				tokens.push(TokenTree::Brace(treeify_ifs(sub_tokens)?));
+				tokens.push(TokenTree::Bracket(treeify_ifs(sub_tokens)?));
+				old_tokens = &old_tokens[1..];
+			},
+			TokenTree::Loop(sub_tokens) => {
+				tokens.push(TokenTree::Loop(treeify_ifs(sub_tokens)?));
+				old_tokens = &old_tokens[1..];
+			},
+			token => {
+				tokens.push(token.clone());
+				old_tokens = &old_tokens[1..];
+			},
+		}
+	}
+
+	Ok(tokens)
+}
+
+fn treeify_loops(in_tokens: &[TokenTree]) -> Result<Vec<TokenTree>, Error<TreeifyError>> {
+	let mut tokens: Vec<TokenTree> = Vec::new();
+	let mut old_tokens = in_tokens;
+
+	while !old_tokens.is_empty() {
+		match &old_tokens[0] {
+			TokenTree::Token(Token::Keyword(Keyword::Loop)) => {
+				let (sub, leftovers) = get_sub(old_tokens, |token| match token {
+					TokenTree::Token(Token::Keyword(Keyword::Loop)) => 1,
+					TokenTree::Token(Token::Keyword(Keyword::Back)) => -1,
+					_ => 0,
+				})?;
+				
+				tokens.push(TokenTree::Loop(treeify_loops(sub)?));
+				old_tokens = &leftovers[1..];
+			},
+			TokenTree::Brace(sub_tokens) => {
+				tokens.push(TokenTree::Brace(treeify_loops(sub_tokens)?));
+				old_tokens = &old_tokens[1..];
+			},
+			TokenTree::Paren(sub_tokens) => {
+				tokens.push(TokenTree::Brace(treeify_loops(sub_tokens)?));
+				old_tokens = &old_tokens[1..];
+			},
+			TokenTree::Bracket(sub_tokens) => {
+				tokens.push(TokenTree::Brace(treeify_loops(sub_tokens)?));
 				old_tokens = &old_tokens[1..];
 			},
 			token => {

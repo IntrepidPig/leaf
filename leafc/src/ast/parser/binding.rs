@@ -11,7 +11,6 @@ impl ExpressionTaker for BindingTaker {
 		in_tokens: &'a [TokenTree],
 		_args: Self::Args,
 	) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
-		debug!("Parsing binding from {:?}", in_tokens);
 		if in_tokens.is_empty() {
 			return Ok(None);
 		}
