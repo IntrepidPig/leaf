@@ -9,7 +9,7 @@ impl ExpressionTaker for BreakTaker {
 	fn take_expression<'a>(
 		&self,
 		in_tokens: &'a [TokenTree],
-		_args: Self::Args
+		_args: Self::Args,
 	) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
 		debug!("Parsing break from: {:?}", in_tokens);
 		if in_tokens.is_empty() {

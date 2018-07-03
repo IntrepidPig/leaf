@@ -196,12 +196,14 @@ impl CodeGenerator {
 					// This will push the result onto the stack
 					self.gen_from_expr(expr);
 					// Bind the variable to the current stack pointer
-					self.instructions.push(Instruction::Bind(binding.ident.to_owned()));
+					self.instructions
+						.push(Instruction::Bind(binding.ident.to_owned()));
 				} else {
 					// Push a nil value to the stack
 					self.instructions.push(Instruction::Push(Value { val: 0 }));
 					// Bind the variable to the nil value
-					self.instructions.push(Instruction::Bind(binding.ident.to_owned()));
+					self.instructions
+						.push(Instruction::Bind(binding.ident.to_owned()));
 					unimplemented!();
 					// Unimplemented because binding a variable to default is not supported right now
 				}

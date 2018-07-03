@@ -1,8 +1,8 @@
+extern crate clap;
+extern crate fern;
 extern crate leaf;
 extern crate leafc;
 extern crate log;
-extern crate fern;
-extern crate clap;
 
 use std::io::{self, Read};
 
@@ -13,17 +13,21 @@ fn main() {
 	let matches = clap::App::new("Leaf")
 		.author("IntrepidPig")
 		.about("Leaf bytecode VM")
-		.arg(clap::Arg::with_name("debug")
-			.short("d")
-			.long("debug")
-			.help("Print debugging info"))
-		.arg(clap::Arg::with_name("program")
-			.short("p")
-			.long("prog")
-			.help("The program to be run")
-			.takes_value(true))
+		.arg(
+			clap::Arg::with_name("debug")
+				.short("d")
+				.long("debug")
+				.help("Print debugging info"),
+		)
+		.arg(
+			clap::Arg::with_name("program")
+				.short("p")
+				.long("prog")
+				.help("The program to be run")
+				.takes_value(true),
+		)
 		.get_matches();
-	
+
 	let debug = matches.is_present("debug");
 
 	fern::Dispatch::new()
@@ -37,12 +41,8 @@ fn main() {
 					message
 				))
 			} else {
-				out.finish(format_args!(
-					"[{}] {}",
-					record.level(),
-					message
-				))
-			}			
+				out.finish(format_args!("[{}] {}", record.level(), message))
+			}
 		})
 		.level(if debug {
 			log::LevelFilter::Trace

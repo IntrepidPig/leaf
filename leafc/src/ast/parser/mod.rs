@@ -21,7 +21,11 @@ pub mod operation;
 pub trait ExpressionTaker {
 	type Args;
 
-	fn take_expression<'a>(&self, in_tokens: &'a [TokenTree], args: Self::Args) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>>;
+	fn take_expression<'a>(
+		&self,
+		in_tokens: &'a [TokenTree],
+		args: Self::Args,
+	) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>>;
 }
 
 mod structures {
@@ -38,7 +42,8 @@ mod structures {
 	}
 
 	/// A list of statements and an optional return expression
-	/// The output is the value that will be returned from the entire block if a value is set to the syntax tree
+	/// The output is the value that will be returned from the entire
+	/// block if a value is set to the syntax tree
 	/// TODO rename to Block
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub struct Block {
@@ -107,7 +112,8 @@ mod structures {
 		pub else_block: Option<Expression>,
 	}
 
-	/// A let binding. Contains the identifier being bound to, the type of the binding, the expression being bound, and whether is mutable
+	/// A let binding. Contains the identifier being bound to, the
+	// type of the binding, the expression being bound, and whether is mutable
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub struct Binding {
 		pub mutable: bool,
@@ -197,7 +203,9 @@ pub fn next_statement<'a>(
 	in_tokens: &'a [TokenTree],
 ) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
 	debug!("Parsing statement from {:?}", in_tokens);
-	if let Some((expr, leftovers)) = next_expression(in_tokens, Box::new(|token| token.is_semicolon()))? {
+	if let Some((expr, leftovers)) =
+		next_expression(in_tokens, Box::new(|token| token.is_semicolon()))?
+	{
 		if let Some(TokenTree::Token(Token::Symbol(TokenSymbol::Semicolon))) = leftovers.get(0) {
 			Ok(Some((expr, &leftovers[1..])))
 		} else {
@@ -228,17 +236,15 @@ pub fn next_expression<'a>(
 	for expression_taker in expression_takers {
 		let expr_opt = expression_taker.take_expression(in_tokens, ())?;
 		if expr_opt.is_some() {
-			return Ok(expr_opt)
+			return Ok(expr_opt);
 		}
 	}
 
 	if let Some((expression, leftovers)) =
 		operation::OperationTaker::new().take_expression(in_tokens, end_predicate)?
 	{
-		return Ok(Some((expression, leftovers)))
+		return Ok(Some((expression, leftovers)));
 	}
-	
+
 	Err(ParseError::Other.into()) // Could not parse the next expression
 }
-
-

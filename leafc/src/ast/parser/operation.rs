@@ -28,7 +28,11 @@ impl ExpressionTaker for OperationTaker {
 		// Get the tokens involved in the next expression
 		let (expr_tokens, leftovers) = split_at(tokens, args, false);
 
-		trace!("Expr tokens: {:?}\n\tleftovers: {:?}", expr_tokens, leftovers);
+		trace!(
+			"Expr tokens: {:?}\n\tleftovers: {:?}",
+			expr_tokens,
+			leftovers
+		);
 
 		parse_operation(expr_tokens).map(|expr| Some((expr, leftovers)))
 	}
@@ -193,7 +197,7 @@ mod parse {
 		let expr = simplify(&expr_items)?;
 
 		if !tokens.is_empty() {
-			return Err(ParseError::Other.into()) // Not all the tokens were used up
+			return Err(ParseError::Other.into()); // Not all the tokens were used up
 		}
 
 		Ok(expr)

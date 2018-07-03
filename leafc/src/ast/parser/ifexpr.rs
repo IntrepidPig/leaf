@@ -5,7 +5,11 @@ pub struct IfTaker;
 impl ExpressionTaker for IfTaker {
 	type Args = ();
 
-	fn take_expression<'a>(&self, in_tokens: &'a [TokenTree], _args: Self::Args) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
+	fn take_expression<'a>(
+		&self,
+		in_tokens: &'a [TokenTree],
+		_args: Self::Args,
+	) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
 		match in_tokens.get(0) {
 			Some(TokenTree::Token(Token::Keyword(Keyword::If))) => {
 				let (condition, sub_leftovers) = if let Some((condition, extra_leftovers)) =
@@ -13,7 +17,8 @@ impl ExpressionTaker for IfTaker {
 				{
 					match extra_leftovers.get(0) {
 						Some(TokenTree::Token(Token::Keyword(Keyword::Then))) => {},
-						_ => return Err(ParseError::Other.into()), // Missing a then keyword in the if
+						// Missing a then keyword in the if
+						_ => return Err(ParseError::Other.into()),
 					}
 
 					(condition, extra_leftovers)
@@ -59,7 +64,8 @@ impl ExpressionTaker for IfTaker {
 								return Err(ParseError::Other.into());
 							}
 						},
-						// There should be an expression after the else keyword and before the semicolon
+						// There should be an expression after the
+						// else keyword and before the semicolon
 						_ => return Err(ParseError::Other.into()),
 					}
 				} else {
@@ -78,8 +84,7 @@ impl ExpressionTaker for IfTaker {
 					sub_leftovers,
 				)))
 			},
-			_ => return Ok(None)
+			_ => return Ok(None),
 		}
 	}
 }
-

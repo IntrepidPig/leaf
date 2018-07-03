@@ -9,7 +9,7 @@ impl ExpressionTaker for BindingTaker {
 	fn take_expression<'a>(
 		&self,
 		in_tokens: &'a [TokenTree],
-		_args: Self::Args
+		_args: Self::Args,
 	) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
 		debug!("Parsing binding from {:?}", in_tokens);
 		if in_tokens.is_empty() {
@@ -57,8 +57,8 @@ impl ExpressionTaker for BindingTaker {
 					return Err(ParseError::Other.into()); // Failed to parse the expression in the let binding
 				};
 
-				Ok(Some((Expression::Binding(Box::new(
-					Binding {
+				Ok(Some((
+					Expression::Binding(Box::new(Binding {
 						mutable: false,
 						ident,
 						bind_type: type_annotation,
