@@ -11,69 +11,46 @@ impl ExpressionTaker for IfTaker {
 		_args: Self::Args,
 	) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
 		match in_tokens.get(0) {
-			Some(TokenTree::Token(Token::Keyword(Keyword::If))) => {
-				let (condition, sub_leftovers) = if let Some((condition, extra_leftovers)) =
-					next_expression(&in_tokens[1..], Box::new(|token| token.is_then()))?
-				{
-					match extra_leftovers.get(0) {
-						Some(TokenTree::Token(Token::Keyword(Keyword::Then))) => {},
-						// Missing a then keyword in the if
-						_ => return Err(ParseError::Other.into()),
-					}
-
-					(condition, extra_leftovers)
+			Some(TokenTree::If(tokens)) => {
+				let (condition, leftovers) = if let Some(res) = next_expression(tokens, Box::new(|token| token.is_then()))? {
+					res
 				} else {
-					return Err(ParseError::Other.into()); // The if statement had no condition
+					return Err(ParseError::Other.into()) // Failed to parse the if condition expression
 				};
-
-				let (body, sub_leftovers) = if let Some(token) = sub_leftovers.get(0) {
-					match token {
-						TokenTree::Token(Token::Keyword(Keyword::Then)) => {
-							if let Some((body, extra_leftovers)) = next_expression(
-								&sub_leftovers[1..],
-								Box::new(|token| token.is_else() || token.is_semicolon()),
-							)? {
-								(body, extra_leftovers)
+				
+				if !(leftovers.get(0) == Some(&TokenTree::Token(Token::Keyword(Keyword::Then)))) {
+					return Err(ParseError::Other.into()) // needed `then` keyword
+				}
+				
+				// TODO elseif
+				
+				let (body, leftovers) = if let Some(res) = next_expression(&leftovers[1..], Box::new(|token| token.is_else() || token.is_end()))? {
+					res
+				} else {
+					return Err(ParseError::Other.into()) // Failed to parse the if condition expression
+				};
+				
+				let (else_block, leftovers) = if leftovers.is_empty() {
+					(None, leftovers)
+				} else {
+					match leftovers.get(0) {
+						Some(TokenTree::Token(Token::Keyword(Keyword::Else))) => {
+							let (else_body, leftovers) = if let Some(res) = next_expression(&leftovers[1..], Box::new(|_| false))? {
+								res
 							} else {
-								// There was no condition block after the is statement
-								return Err(ParseError::Other.into());
-							}
+								return Err(ParseError::Other.into()) // Failed to parse the if condition expression
+							};
+							
+							(Some(else_body), leftovers)
 						},
-						// There was no then keyword after the condition
-						_ => return Err(ParseError::Other.into()),
+						_ => return Err(ParseError::Other.into()) // needed else or nothing after then
 					}
-				} else {
-					// There was no then keyword after the condition
-					return Err(ParseError::Other.into());
 				};
-
-				let (else_block, sub_leftovers) = if let Some(token) = sub_leftovers.get(0) {
-					match token {
-						TokenTree::Token(Token::Symbol(TokenSymbol::Semicolon)) => {
-							(None, sub_leftovers)
-						},
-						TokenTree::Token(Token::Keyword(Keyword::Else)) => {
-							if let Some((body, extra_leftovers)) = next_expression(
-								&sub_leftovers[1..],
-								Box::new(|token| token.is_semicolon()),
-							)? {
-								(Some(body), extra_leftovers)
-							} else {
-								// There should be an expression after the else keyword
-								// and before the semicolon
-								return Err(ParseError::Other.into());
-							}
-						},
-						// There should be an expression after the
-						// else keyword and before the semicolon
-						_ => return Err(ParseError::Other.into()),
-					}
-				} else {
-					(None, sub_leftovers)
-				};
-
-				// TODO support elif
-
+				
+				if !leftovers.is_empty() {
+					return Err(ParseError::Other.into()) // Failed to parse all tokens in if
+				}
+				
 				Ok(Some((
 					Expression::If(Box::new(If {
 						condition,
@@ -81,7 +58,7 @@ impl ExpressionTaker for IfTaker {
 						elif: None,
 						else_block,
 					})),
-					sub_leftovers,
+					&in_tokens[1..],
 				)))
 			},
 			_ => return Ok(None),

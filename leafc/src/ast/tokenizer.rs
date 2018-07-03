@@ -36,6 +36,8 @@ pub enum Keyword {
 	Loop,
 	Break,
 	Then,
+	End,
+	Back,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -89,6 +91,8 @@ impl<'a> Tokenizer<'a> {
 					"loop" => tokens.push(Token::Keyword(Keyword::Loop)),
 					"break" => tokens.push(Token::Keyword(Keyword::Break)),
 					"then" => tokens.push(Token::Keyword(Keyword::Then)),
+					"end" => tokens.push(Token::Keyword(Keyword::End)),
+					"back" => tokens.push(Token::Keyword(Keyword::Back)),
 					word => tokens.push(Token::Name(word.to_owned())),
 				},
 				Lexeme::Bracket(bracket, state) => {

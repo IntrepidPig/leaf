@@ -32,6 +32,7 @@ pub enum TokenTree {
 	Paren(Vec<TokenTree>),
 	Brace(Vec<TokenTree>),
 	Bracket(Vec<TokenTree>),
+	If(Vec<TokenTree>),
 }
 
 impl TokenTree {
@@ -55,7 +56,14 @@ impl TokenTree {
 			_ => false,
 		}
 	}
-
+	
+	pub fn is_end(&self) -> bool {
+		match self {
+			TokenTree::Token(Token::Keyword(Keyword::End)) => true,
+			_ => false,
+		}
+	}
+	
 	pub fn is_brace_expr(&self) -> bool {
 		match self {
 			TokenTree::Brace(_) => true,
@@ -79,21 +87,54 @@ impl fmt::Display for TreeifyError {
 
 impl ::std::error::Error for TreeifyError {}
 
-pub fn treeify(mut old_tokens: &[OldToken]) -> Result<Vec<TokenTree>, Error<TreeifyError>> {
+pub fn treeify(in_tokens: &[OldToken]) -> Result<Vec<TokenTree>, Error<TreeifyError>> {
+	let tokens = treeify_brackets(in_tokens)?;
+	let tokens = treeify_ifs(&tokens)?;
+
+	Ok(tokens)
+}
+
+fn treeify_brackets(in_tokens: &[OldToken]) -> Result<Vec<TokenTree>, Error<TreeifyError>> {
 	let mut tokens: Vec<TokenTree> = Vec::new();
+	let mut old_tokens = in_tokens;
 	while !old_tokens.is_empty() {
 		match &old_tokens[0] {
 			OldToken::Bracket(bracket, state) => {
 				if *state == BracketState::Close {
 					return Err(TreeifyError::IncorrectBrace.into());
 				}
-				let (sub, leftovers) = get_sub(old_tokens, *bracket)?;
+				let (sub, leftovers) = get_sub(old_tokens, |old_token| {
+					match old_token {
+						OldToken::Bracket(test_bracket, test_state) => {
+							if test_bracket == bracket {
+								match test_state {
+									BracketState::Open => 1,
+									BracketState::Close => -1,
+								}
+							} else {
+								0
+							}
+						},
+						_ => 0
+					}
+				})?;
 				match bracket {
-					Bracket::Curly => tokens.push(TokenTree::Brace(treeify(sub)?)),
-					Bracket::Paren => tokens.push(TokenTree::Paren(treeify(sub)?)),
-					Bracket::Square => tokens.push(TokenTree::Bracket(treeify(sub)?)),
+					Bracket::Curly => tokens.push(TokenTree::Brace(treeify_brackets(sub)?)),
+					Bracket::Paren => tokens.push(TokenTree::Paren(treeify_brackets(sub)?)),
+					Bracket::Square => tokens.push(TokenTree::Bracket(treeify_brackets(sub)?)),
 				}
-				old_tokens = leftovers;
+
+				match leftovers.get(0) {
+					Some(OldToken::Bracket(test_bracket, test_state)) => {
+						if !(test_bracket == bracket && *test_state == BracketState::Close) {
+							return Err(TreeifyError::UnclosedBrace.into()) // There was no close bracket
+						}
+					},
+					_ => {}
+				}
+
+				// cut off the close bracket
+				old_tokens = &leftovers[1..];
 			},
 			token => {
 				tokens.push(TokenTree::Token(Token::from_old_token(token.clone())?));
@@ -105,28 +146,56 @@ pub fn treeify(mut old_tokens: &[OldToken]) -> Result<Vec<TokenTree>, Error<Tree
 	Ok(tokens)
 }
 
-fn get_sub(
-	old_tokens: &[OldToken],
-	bracket: Bracket,
-) -> Result<(&[OldToken], &[OldToken]), Error<TreeifyError>> {
-	let mut count = 0;
-	for (i, token) in old_tokens.iter().enumerate() {
-		match token {
-			OldToken::Bracket(test_bracket, bracket_state) => {
-				if bracket == *test_bracket {
-					match bracket_state {
-						BracketState::Open => count += 1,
-						BracketState::Close => count -= 1,
-					}
-				}
-			},
-			_ => {},
-		}
+fn treeify_ifs(in_tokens: &[TokenTree]) -> Result<Vec<TokenTree>, Error<TreeifyError>> {
+	let mut tokens: Vec<TokenTree> = Vec::new();
+	let mut old_tokens = in_tokens;
 
-		if count == 0 {
-			return Ok((&old_tokens[1..i], &old_tokens[i + 1..]));
+	while !old_tokens.is_empty() {
+		match &old_tokens[0] {
+			TokenTree::Token(Token::Keyword(Keyword::If)) => {
+				let (sub, leftovers) = get_sub(old_tokens, |token| match token {
+					TokenTree::Token(Token::Keyword(Keyword::If)) => 1,
+					TokenTree::Token(Token::Keyword(Keyword::End)) => -1,
+					_ => 0,
+				})?;
+				
+				tokens.push(TokenTree::If(treeify_ifs(sub)?));
+				old_tokens = &leftovers[1..];
+			},
+			TokenTree::Brace(sub_tokens) => {
+				tokens.push(TokenTree::Brace(treeify_ifs(sub_tokens)?));
+				old_tokens = &old_tokens[1..];
+			},
+			TokenTree::Paren(sub_tokens) => {
+				tokens.push(TokenTree::Brace(treeify_ifs(sub_tokens)?));
+				old_tokens = &old_tokens[1..];
+			},
+			TokenTree::Bracket(sub_tokens) => {
+				tokens.push(TokenTree::Brace(treeify_ifs(sub_tokens)?));
+				old_tokens = &old_tokens[1..];
+			},
+			token => {
+				tokens.push(token.clone());
+				old_tokens = &old_tokens[1..];
+			},
 		}
 	}
 
-	Err(TreeifyError::UnclosedBrace.into())
+	Ok(tokens)
+}
+
+fn get_sub<T, F: FnMut(&T) -> i32>(
+	in_tokens: &[T],
+	mut predicate: F,
+) -> Result<(&[T], &[T]), Error<TreeifyError>> {
+	let mut count = 0;
+	for (i, token) in in_tokens.iter().enumerate() {
+		count += predicate(token);
+
+		if count == 0 {
+			return Ok((&in_tokens[1..i], &in_tokens[i..]));
+		}
+	}
+
+	Ok((in_tokens, &in_tokens[in_tokens.len()..]))
 }
