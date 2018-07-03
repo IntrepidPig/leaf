@@ -1,4 +1,5 @@
-use ast::parser::{BinaryOp, Binding, Block, Expression, If, Statement};
+use ast::parser::{Block, Expression, If};
+use ast::parser::operators::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Value {
@@ -64,7 +65,7 @@ impl CodeGenerator {
 		self.instructions.push(Instruction::Frame);
 		// Generate instructions for each statement in the block
 		for statement in &ast.block {
-			self.gen_from_stmnt(statement);
+			self.gen_from_expr(statement);
 		}
 		// Generate instructions for the block output (if there is one)
 		if let Some(ref output) = ast.output {
@@ -79,64 +80,6 @@ impl CodeGenerator {
 		self.instructions.push(Instruction::Return);
 		// Exit the stack frame
 		self.instructions.push(Instruction::Exit);
-	}
-
-	/// Generate the instructions for a statement
-	pub fn gen_from_stmnt(&mut self, stmnt: &Statement) {
-		match stmnt {
-			Statement::Binding(Binding {
-				ref ident,
-				val: expr,
-				..
-			}) => {
-				// If there's an expression
-				if let Some(expr) = expr {
-					// Generate the instructions from the expression
-					// This will push the result onto the stack
-					self.gen_from_expr(expr);
-					// Bind the variable to the current stack pointer
-					self.instructions.push(Instruction::Bind(ident.to_owned()));
-				} else {
-					// Push a nil value to the stack
-					self.instructions.push(Instruction::Push(Value { val: 0 }));
-					// Bind the variable to the nil value
-					self.instructions.push(Instruction::Bind(ident.to_owned()));
-					unimplemented!();
-					// Unimplemented because binding a variable to default is not supported right now
-				}
-			},
-			Statement::Debug(ref expr) => {
-				// Generate the expression instructions
-				self.gen_from_expr(expr);
-				// Debug the value at the top of the stack (pops it automatically)
-				self.instructions.push(Instruction::Debug)
-			},
-			Statement::Expression(ref expr) => {
-				// Generate instructions from expression
-				self.gen_from_expr(expr);
-				// Pop the unused result from the stack
-				self.instructions.push(Instruction::Pop);
-			},
-			Statement::Break(ref expr) => {
-				// If there's an associated expression then gen instructions for it, otherwise just push a nil
-				if let Some(expr) = expr {
-					self.gen_from_expr(expr);
-				} else {
-					self.instructions.push(Instruction::Push(Value { val: 0 }))
-				}
-				// Return the value being broken and exit the loop stack frame
-				self.instructions.push(Instruction::Return);
-				self.instructions.push(Instruction::Exit);
-
-				// Push a jump instrction with a 0 because we don't know where the loop ends yet
-				self.instructions.push(Instruction::Jump(0));
-				// Add the index of the jump instruction to the latest loop_break frame
-				self.loop_breaks
-					.last_mut()
-					.unwrap()
-					.push(self.instructions.len() - 1);
-			},
-		}
 	}
 
 	pub fn gen_from_loop(&mut self, body: &Expression) {
@@ -245,6 +188,48 @@ impl CodeGenerator {
 			Expression::If(ref if_stmnt) => {
 				// Gen the instructions for the if statement
 				self.gen_from_if(if_stmnt);
+			},
+			Expression::Binding(ref binding) => {
+				// If there's an expression
+				if let Some(ref expr) = binding.val {
+					// Generate the instructions from the expression
+					// This will push the result onto the stack
+					self.gen_from_expr(expr);
+					// Bind the variable to the current stack pointer
+					self.instructions.push(Instruction::Bind(binding.ident.to_owned()));
+				} else {
+					// Push a nil value to the stack
+					self.instructions.push(Instruction::Push(Value { val: 0 }));
+					// Bind the variable to the nil value
+					self.instructions.push(Instruction::Bind(binding.ident.to_owned()));
+					unimplemented!();
+					// Unimplemented because binding a variable to default is not supported right now
+				}
+			},
+			Expression::Debug(ref expr) => {
+				// Generate the expression instructions
+				self.gen_from_expr(expr);
+				// Debug the value at the top of the stack (pops it automatically)
+				self.instructions.push(Instruction::Debug)
+			},
+			Expression::Break(ref expr) => {
+				// If there's an associated expression then gen instructions for it, otherwise just push a nil
+				if let Some(expr) = expr {
+					self.gen_from_expr(expr);
+				} else {
+					self.instructions.push(Instruction::Push(Value { val: 0 }))
+				}
+				// Return the value being broken and exit the loop stack frame
+				self.instructions.push(Instruction::Return);
+				self.instructions.push(Instruction::Exit);
+
+				// Push a jump instrction with a 0 because we don't know where the loop ends yet
+				self.instructions.push(Instruction::Jump(0));
+				// Add the index of the jump instruction to the latest loop_break frame
+				self.loop_breaks
+					.last_mut()
+					.unwrap()
+					.push(self.instructions.len() - 1);
 			},
 			_ => unimplemented!(),
 		}
