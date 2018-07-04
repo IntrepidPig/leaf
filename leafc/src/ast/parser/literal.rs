@@ -23,6 +23,12 @@ impl ExpressionTaker for LiteralTaker {
 			Some(TokenTree::Token(Token::StringLiteral(ref string))) => {
 				Expression::StringLiteral(string.clone())
 			},
+			Some(TokenTree::Token(Token::Keyword(Keyword::True))) => {
+				Expression::BoolLiteral(true)
+			},
+			Some(TokenTree::Token(Token::Keyword(Keyword::False))) => {
+				Expression::BoolLiteral(false)
+			},
 			_ => return Ok(None)
 		}, &in_tokens[1..])))
 	}

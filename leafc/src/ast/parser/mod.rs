@@ -104,6 +104,7 @@ mod structures {
 		Block(Box<Block>),
 		StringLiteral(String),
 		NumberLiteral(u64),
+		BoolLiteral(bool),
 	}
 
 	#[derive(Debug, Clone, PartialEq, Eq)]

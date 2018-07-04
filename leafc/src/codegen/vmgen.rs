@@ -15,6 +15,7 @@ pub enum VarInfo {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Primitive {
+	Bool(bool),
 	U64(u64),
 }
 
@@ -36,9 +37,16 @@ impl Var {
 		}
 	}
 	
+	pub fn new_bool(val: bool) -> Self {
+		Var {
+			var_info: VarInfo::Primitive(Primitive::Bool(val))
+		}
+	}
+	
 	pub fn is_false(&self) -> bool {
 		match self.var_info {
 			VarInfo::Primitive(Primitive::U64(val)) => val == 0,
+			VarInfo::Primitive(Primitive::Bool(val)) => !val,
 			_ => panic!("Tried to check if value was false when it doesn't support it"),
 		}
 	}
@@ -287,6 +295,9 @@ impl CodeGenerator {
 					.push(self.instructions.len() - 1);
 				// Push a nil value since break is an expression and it's result will be popped
 				self.instructions.push(Instruction::Push(Var::null()))
+			},
+			Expression::BoolLiteral(val) => {
+				self.instructions.push(Instruction::Push(Var::new_bool(*val)))
 			},
 			_ => unimplemented!(),
 		}
