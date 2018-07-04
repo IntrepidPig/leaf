@@ -252,6 +252,7 @@ mod parse {
 						TokenTree::Token(Token::Symbol(symbol)) => match symbol {
 							TokenSymbol::Plus => BinaryOp::Add,
 							TokenSymbol::Assign => BinaryOp::Assign,
+							TokenSymbol::Equality => BinaryOp::Equality,
 							_ => return Ok(None),
 						},
 						_ => return Ok(None),

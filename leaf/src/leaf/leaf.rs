@@ -190,6 +190,13 @@ fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<(), ()>
 				stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.push(Var::new_u64(output));
 				ptr -= 1;
 			},
+			Instruction::Equal => {
+				let right = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
+				let left = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
+				let output = Var::new_bool(left == right);
+				stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.push(output);
+				ptr -= 1;
+			},
 			Instruction::Jump(target_instr_ptr) => {
 				instr_ptr = target_instr_ptr;
 				continue;

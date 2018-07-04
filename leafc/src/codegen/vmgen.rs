@@ -80,6 +80,8 @@ pub enum Instruction {
 	Jump(usize),
 	/// Jump to the location if the top of the stack is false
 	Check(usize),
+	/// Pop two values and push a boolean representing their equality
+	Equal,
 	/// Return the value at the top of the stack to the previous stack frame
 	Return,
 }
@@ -210,6 +212,7 @@ impl CodeGenerator {
 				// Perform the operation
 				match op {
 					BinaryOp::Add => self.instructions.push(Instruction::Add),
+					BinaryOp::Equality => self.instructions.push(Instruction::Equal),
 					BinaryOp::Assign => {
 						panic!("Assign binary operator found. This should have been converted to a standalone\
 						expression during the parsing phase, not a binary operation")
