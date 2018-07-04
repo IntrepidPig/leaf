@@ -49,18 +49,19 @@ impl Var {
 pub enum Instruction {
 	/// New stack frame
 	Frame,
+	/// New block frame
+	Block,
 	/// Exit the stack frame, dropping all the values it had
-	Exit,
-	/// Push a value to the stack
 	Push(Var),
 	/// Pop the top of the stack into the top of the previous stack frame
-	Return,
-	/// Bind a variable to the current stack pointer
-	Bind(String),
+	/// Exit the stack frame dropping all of the values present
+	Output,
+	/// Pop the top of the operand stack into the locals stack
+	Bind,
 	/// Load the value of a variable to the top of the stack
-	Load(String),
+	Load(usize),
 	/// Pop the top of the stack value into the address pointed to by a variable
-	Set(String),
+	Set(usize),
 	/// Pop the top of the stack into oblivion
 	Pop,
 	/// Pop the top two values on the stack and push their sum back
@@ -71,6 +72,8 @@ pub enum Instruction {
 	Jump(usize),
 	/// Jump to the location if the top of the stack is false
 	Check(usize),
+	/// Return the value at the top of the stack to the previous stack frame
+	Return,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -79,6 +82,7 @@ pub struct CodeGenerator {
 	loop_breaks: Vec<Vec<usize>>,
 	block_is_loop: bool,
 	if_jumps: Vec<usize>,
+	locals: Vec<Vec<String>>,
 }
 
 impl CodeGenerator {
@@ -88,10 +92,13 @@ impl CodeGenerator {
 			loop_breaks: Vec::new(),
 			block_is_loop: false,
 			if_jumps: Vec::new(),
+			locals: vec![Vec::new()],
 		}
 	}
 
 	pub fn gen_instructions(mut self, ast: Block) -> Vec<Instruction> {
+		self.instructions.push(Instruction::Frame);
+		self.instructions.push(Instruction::Block);
 		self.gen_from_block(&ast);
 
 		self.instructions
@@ -100,7 +107,7 @@ impl CodeGenerator {
 	/// Generate instructions for a block
 	pub fn gen_from_block(&mut self, ast: &Block) {
 		// Start a new stack frame
-		self.instructions.push(Instruction::Frame);
+		self.instructions.push(Instruction::Block);
 		// Generate instructions for each statement in the block
 		for statement in &ast.block {
 			self.gen_from_expr(statement);
@@ -117,9 +124,8 @@ impl CodeGenerator {
 			self.instructions.push(Instruction::Push(Var::null()));
 		}
 		// Return the value into the previous stack frame
-		self.instructions.push(Instruction::Return);
-		// Exit the stack frame
-		self.instructions.push(Instruction::Exit);
+		// and exit the current one
+		self.instructions.push(Instruction::Output);
 	}
 
 	pub fn gen_from_loop(&mut self, body: &Expression) {
@@ -185,7 +191,7 @@ impl CodeGenerator {
 			// Dereference variables
 			Expression::Identifier(ref ident) => {
 				// Push the value of the variable onto the top of the stack
-				self.instructions.push(Instruction::Load(ident.to_owned()))
+				self.instructions.push(Instruction::Load(self.locals.last().unwrap().iter().position(|test_name| test_name == ident).unwrap()))
 			},
 			// Evalute binary expressions
 			Expression::Binary { left, right, op } => {
@@ -206,12 +212,12 @@ impl CodeGenerator {
 			Expression::Assign(ref assignment) => {
 				// Load the value that used to be in the variable being assigned to
 				self.instructions
-					.push(Instruction::Load(assignment.ident.to_owned()));
+					.push(Instruction::Load(self.locals.last().unwrap().iter().position(|test_name| test_name == &assignment.ident).unwrap()));
 				// Push the result of the expr onto the stack
 				self.gen_from_expr(&assignment.expr);
 				// Move the result into the variable
 				self.instructions
-					.push(Instruction::Set(assignment.ident.to_owned()));
+					.push(Instruction::Set(self.locals.last().unwrap().iter().position(|test_name| test_name == &assignment.ident).unwrap()));
 				// And the old value will be left on the stack as the result of the expression
 			},
 			Expression::Loop(ref block) => {
@@ -237,17 +243,19 @@ impl CodeGenerator {
 					// Generate the instructions from the expression
 					// This will push the result onto the stack
 					self.gen_from_expr(expr);
-					// Bind the variable to the current stack pointer
+					// Bind the variable to the current local var location
 					self.instructions
-						.push(Instruction::Bind(binding.ident.to_owned()));
+						.push(Instruction::Bind);
+					// Push the variable name to the local var stack
+					self.locals.last_mut().unwrap().push(binding.ident.clone())
 				} else {
 					// Push a nil value to the stack
 					self.instructions.push(Instruction::Push(Var::null()));
 					// Bind the variable to the nil value
 					self.instructions
-						.push(Instruction::Bind(binding.ident.to_owned()));
-					unimplemented!();
-					// Unimplemented because binding a variable to default is not supported right now
+						.push(Instruction::Bind);
+					// Push the variable name to the local var stack
+					self.locals.last_mut().unwrap().push(binding.ident.clone());
 				}
 				// Push a nil value since let is an expression and it's result will be popped
 				self.instructions.push(Instruction::Push(Var::null()))
@@ -256,7 +264,9 @@ impl CodeGenerator {
 				// Generate the expression instructions
 				self.gen_from_expr(expr);
 				// Debug the value at the top of the stack (pops it automatically)
-				self.instructions.push(Instruction::Debug)
+				self.instructions.push(Instruction::Debug);
+				// Push a nil value since debug is an expression and it's result will be popped
+				self.instructions.push(Instruction::Push(Var::null()))
 			},
 			Expression::Break(ref expr) => {
 				// If there's an associated expression then gen instructions for it, otherwise just push a nil
@@ -266,8 +276,7 @@ impl CodeGenerator {
 					self.instructions.push(Instruction::Push(Var::null()))
 				}
 				// Return the value being broken and exit the loop stack frame
-				self.instructions.push(Instruction::Return);
-				self.instructions.push(Instruction::Exit);
+				self.instructions.push(Instruction::Output);
 
 				// Push a jump instrction with a 0 because we don't know where the loop ends yet
 				self.instructions.push(Instruction::Jump(0));
@@ -276,6 +285,8 @@ impl CodeGenerator {
 					.last_mut()
 					.unwrap()
 					.push(self.instructions.len() - 1);
+				// Push a nil value since break is an expression and it's result will be popped
+				self.instructions.push(Instruction::Push(Var::null()))
 			},
 			_ => unimplemented!(),
 		}

@@ -3,7 +3,7 @@ use std::path::Path;
 use ast;
 use codegen;
 
-fn load_file<P: AsRef<Path>>(path: P) -> String {
+fn _load_file<P: AsRef<Path>>(_path: P) -> String {
 	unimplemented!()
 }
 
