@@ -66,6 +66,8 @@ impl CodeGenerator {
 		// Generate instructions for each statement in the block
 		for statement in &ast.block {
 			self.gen_from_expr(statement);
+			// Pop the unused result of the expression
+			self.instructions.push(Instruction::Pop);
 		}
 		// Generate instructions for the block output (if there is one)
 		if let Some(ref output) = ast.output {
@@ -89,6 +91,8 @@ impl CodeGenerator {
 		self.loop_breaks.push(Vec::new());
 		// Gen the instructions for each statement
 		self.gen_from_expr(body);
+		// Pop the unused result
+		self.instructions.push(Instruction::Pop);
 		// Jump back to the beginning
 		self.instructions.push(Instruction::Jump(loop_start));
 	}
@@ -207,6 +211,8 @@ impl CodeGenerator {
 					unimplemented!();
 					// Unimplemented because binding a variable to default is not supported right now
 				}
+				// Push a nil value since let is an expression and it's result will be popped
+				self.instructions.push(Instruction::Push(Value { val: 0 }))
 			},
 			Expression::Debug(ref expr) => {
 				// Generate the expression instructions
