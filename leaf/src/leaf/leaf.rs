@@ -6,7 +6,7 @@ extern crate log;
 
 use std::io::{self, Read};
 
-use leafc::codegen::vmgen::{Instruction, Value};
+use leafc::codegen::vmgen::{Instruction, Var, VarInfo, Primitive};
 use std::collections::HashMap;
 
 fn main() {
@@ -78,7 +78,7 @@ fn main() {
 
 fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<(), ()> {
 	let mut ptr: usize = 0;
-	let mut stack: Vec<Vec<Value>> = vec![Vec::new()];
+	let mut stack: Vec<Vec<Var>> = vec![Vec::new()];
 	let mut vars: HashMap<String, usize> = HashMap::new();
 
 	let mut instr_ptr: usize = 0;
@@ -112,13 +112,13 @@ fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<(), ()>
 				ptr -= 1;
 			},
 			Instruction::Load(ref ident) => {
-				let val = deref_stack(&stack, *vars.get(ident).unwrap());
-				stack.last_mut().unwrap().push(val);
+				let var = deref_stack(&stack, *vars.get(ident).unwrap());
+				stack.last_mut().unwrap().push(var);
 				ptr += 1;
 			},
 			Instruction::Debug => {
-				let val = stack.last_mut().unwrap().pop().unwrap();
-				println!("\t => Value: {}", val.val);
+				let var = stack.last_mut().unwrap().pop().unwrap();
+				println!("\t => Var: {:?}", var);
 				ptr -= 1;
 			},
 			Instruction::Frame => {
@@ -130,20 +130,25 @@ fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<(), ()>
 				// TODO drop all items in stack
 			},
 			Instruction::Set(ref ident) => {
-				let val = stack.last_mut().unwrap().pop().unwrap();
-				*deref_stack_mut(&mut stack, *vars.get(ident).unwrap()) = val;
+				let var = stack.last_mut().unwrap().pop().unwrap();
+				*deref_stack_mut(&mut stack, *vars.get(ident).unwrap()) = var;
 				ptr -= 1;
 			},
 			Instruction::Return => {
-				let val = stack.last_mut().unwrap().pop().unwrap();
+				let var = stack.last_mut().unwrap().pop().unwrap();
 				let len = stack.len();
-				stack[len - 2].push(val);
+				stack[len - 2].push(var);
 			},
 			Instruction::Add => {
 				let right = stack.last_mut().unwrap().pop().unwrap();
 				let left = stack.last_mut().unwrap().pop().unwrap();
-				let output = left.val + right.val;
-				stack.last_mut().unwrap().push(Value { val: output });
+				let output = match (left.var_info, right.var_info) {
+					(VarInfo::Primitive(Primitive::U64(left)), VarInfo::Primitive(Primitive::U64(right))) => {
+						left + right
+					},
+					_ => panic!("Tried to add types that don't support it")
+				};
+				stack.last_mut().unwrap().push(Var::new_u64(output));
 				ptr -= 1;
 			},
 			Instruction::Jump(target_instr_ptr) => {
@@ -151,10 +156,10 @@ fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<(), ()>
 				continue;
 			},
 			Instruction::Check(target_instr_ptr) => {
-				let val = stack.last_mut().unwrap().pop().unwrap();
+				let var = stack.last_mut().unwrap().pop().unwrap();
 				ptr -= 1;
 				// If the value is false jump past the if block
-				if val.val == 0 {
+				if var.is_false() {
 					instr_ptr = target_instr_ptr;
 					continue;
 				}
@@ -174,8 +179,8 @@ fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<(), ()>
 	}
 
 	println!(
-		"Program output: {}",
-		stack.pop().unwrap().pop().unwrap().val
+		"Program output: {:?}",
+		stack.pop().unwrap().pop().unwrap()
 	);
 
 	Ok(())
@@ -192,7 +197,7 @@ fn print_instructions(instructions: &[Instruction]) {
 	}
 }
 
-fn deref_stack(stack: &Vec<Vec<Value>>, mut ptr: usize) -> Value {
+fn deref_stack(stack: &Vec<Vec<Var>>, mut ptr: usize) -> Var {
 	for frame in stack {
 		for var in frame {
 			ptr -= 1;
@@ -205,7 +210,7 @@ fn deref_stack(stack: &Vec<Vec<Value>>, mut ptr: usize) -> Value {
 	panic!("Index not found")
 }
 
-fn deref_stack_mut(stack: &mut Vec<Vec<Value>>, mut ptr: usize) -> &mut Value {
+fn deref_stack_mut(stack: &mut Vec<Vec<Var>>, mut ptr: usize) -> &mut Var {
 	for frame in stack.iter_mut() {
 		for var in frame.iter_mut() {
 			ptr -= 1;

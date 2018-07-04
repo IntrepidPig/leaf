@@ -2,8 +2,46 @@ use ast::parser::{Block, Expression, If};
 use ast::parser::operators::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Value {
-	pub val: u64,
+pub struct Var {
+	pub var_info: VarInfo,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VarInfo {
+	Null,
+	Primitive(Primitive),
+	Reference(Reference),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Primitive {
+	U64(u64),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Reference {
+	data: Vec<VarInfo>,
+}
+
+impl Var {
+	pub fn new_u64(val: u64) -> Self {
+		Var {
+			var_info: VarInfo::Primitive(Primitive::U64(val)),
+		}
+	}
+	
+	pub fn null() -> Self {
+		Var {
+			var_info: VarInfo::Null,
+		}
+	}
+	
+	pub fn is_false(&self) -> bool {
+		match self.var_info {
+			VarInfo::Primitive(Primitive::U64(val)) => val == 0,
+			_ => panic!("Tried to check if value was false when it doesn't support it"),
+		}
+	}
 }
 
 /// An instruction/opcode for the vm
@@ -14,7 +52,7 @@ pub enum Instruction {
 	/// Exit the stack frame, dropping all the values it had
 	Exit,
 	/// Push a value to the stack
-	Push(Value),
+	Push(Var),
 	/// Pop the top of the stack into the top of the previous stack frame
 	Return,
 	/// Bind a variable to the current stack pointer
@@ -76,7 +114,7 @@ impl CodeGenerator {
 		} else {
 			// Return a nil value
 			// This is necessary because if the block was a statement then it will always drop the result
-			self.instructions.push(Instruction::Push(Value { val: 0 }));
+			self.instructions.push(Instruction::Push(Var::null()));
 		}
 		// Return the value into the previous stack frame
 		self.instructions.push(Instruction::Return);
@@ -123,7 +161,7 @@ impl CodeGenerator {
 		if let Some(else_block) = &if_stmnt.else_block {
 			self.gen_from_expr(else_block);
 		} else {
-			self.instructions.push(Instruction::Push(Value { val: 0 }));
+			self.instructions.push(Instruction::Push(Var::null()));
 		}
 
 		// Fix the jump to after else locations
@@ -139,7 +177,7 @@ impl CodeGenerator {
 		match expr {
 			// Push literal values onto the stack
 			Expression::NumberLiteral(num) => self.instructions
-				.push(Instruction::Push(Value { val: *num })),
+				.push(Instruction::Push(Var::new_u64(*num))),
 			// Generate instructions for nested blocks
 			Expression::Block(ref ast) => {
 				self.gen_from_block(ast);
@@ -204,7 +242,7 @@ impl CodeGenerator {
 						.push(Instruction::Bind(binding.ident.to_owned()));
 				} else {
 					// Push a nil value to the stack
-					self.instructions.push(Instruction::Push(Value { val: 0 }));
+					self.instructions.push(Instruction::Push(Var::null()));
 					// Bind the variable to the nil value
 					self.instructions
 						.push(Instruction::Bind(binding.ident.to_owned()));
@@ -212,7 +250,7 @@ impl CodeGenerator {
 					// Unimplemented because binding a variable to default is not supported right now
 				}
 				// Push a nil value since let is an expression and it's result will be popped
-				self.instructions.push(Instruction::Push(Value { val: 0 }))
+				self.instructions.push(Instruction::Push(Var::null()))
 			},
 			Expression::Debug(ref expr) => {
 				// Generate the expression instructions
@@ -225,7 +263,7 @@ impl CodeGenerator {
 				if let Some(expr) = expr {
 					self.gen_from_expr(expr);
 				} else {
-					self.instructions.push(Instruction::Push(Value { val: 0 }))
+					self.instructions.push(Instruction::Push(Var::null()))
 				}
 				// Return the value being broken and exit the loop stack frame
 				self.instructions.push(Instruction::Return);
