@@ -248,5 +248,5 @@ fn get_sub<T, F: FnMut(&T) -> i32>(
 		}
 	}
 
-	Ok((in_tokens, &in_tokens[in_tokens.len()..]))
+	Err(TreeifyError::UnclosedBrace.into())
 }

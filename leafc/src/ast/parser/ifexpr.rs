@@ -19,7 +19,7 @@ impl ExpressionTaker for IfTaker {
 					return Err(ParseError::Other.into()) // needed `then` keyword
 				}
 				
-				let (body_tokens, leftovers) = operation::split_at(&leftovers[1..], Box::new(|token| token.is_else() || token.is_end()), false);
+				let (body_tokens, leftovers) = operation::split_at(&leftovers[1..], Box::new(|token| token.is_else()), false);
 				
 				// TODO elseif
 				let body = parse_block(body_tokens)?;
