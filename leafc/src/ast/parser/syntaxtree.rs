@@ -92,8 +92,7 @@ mod structures {
 			op: PostfixOp,
 		},
 		FunctionCall {
-			base: Option<Box<Expression>>,
-			function: String,
+			name: String,
 			args: Vec<Expression>,
 		},
 		Debug(Box<Expression>),

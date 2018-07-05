@@ -19,7 +19,6 @@ pub fn take_functiondef(in_tokens: &[TokenTree]) -> Result<Option<(Function, &[T
 		_ => return Err(ParseError::Other.into()) // needed a function name
 	};
 	
-	println!("TOkens: {:?}", tokens);
 	let args = match tokens.get(0) {
 		Some(TokenTree::Paren(ref args_tokens)) => {
 			tokens = &tokens[1..];

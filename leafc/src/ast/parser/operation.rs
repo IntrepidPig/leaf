@@ -292,6 +292,7 @@ mod parse {
 				&ifexpr::IfTaker,
 				&breakexpr::BreakTaker,
 				&literal::LiteralTaker,
+				&functioncall::FunctionCallTaker, // has to be before identifier
 				&identifier::IdentifierTaker,
 			];
 			

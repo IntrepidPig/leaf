@@ -1,0 +1,23 @@
+fn main() {
+	let a := 20;
+	let b := get_2000() + a;
+	count_to_3000() + b
+}
+
+fn get_2000() {
+	let a := 1000;
+	let b := 1000;
+	a + b
+}
+
+fn count_to_3000() {
+	let a := 0;
+	loop
+		if a == 3000 then {
+			break;
+		} else {
+			a := a + 1;
+		} end;
+	back;
+	a
+}

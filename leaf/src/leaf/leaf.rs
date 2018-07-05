@@ -79,13 +79,15 @@ fn main() {
 pub struct StackFrame {
 	locals: Vec<Var>,
 	block_frames: Vec<BlockFrame>,
+	return_to_ptr: usize,
 }
 
 impl StackFrame {
-	pub fn new() -> Self {
+	pub fn new(return_to_ptr: usize) -> Self {
 		StackFrame {
 			locals: Vec::new(),
 			block_frames: Vec::new(),
+			return_to_ptr,
 		}
 	}
 }
@@ -105,7 +107,9 @@ impl BlockFrame {
 
 fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<(), ()> {
 	let mut ptr: usize = 0;
-	let mut stack: Vec<StackFrame> = Vec::new();
+	// Create a stack with a main stack frame and block frame for the main function's outputs
+	let mut stack: Vec<StackFrame> = vec![StackFrame::new(0)];
+	stack[0].block_frames.push(BlockFrame::new());
 
 	let mut instr_ptr: usize = 0;
 	let mut iter: usize = 0;
@@ -152,8 +156,12 @@ fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<(), ()>
 				println!("\t => Var: {:?}", var);
 				ptr -= 1;
 			},
-			Instruction::Frame => {
-				stack.push(StackFrame::new());
+			Instruction::Call(ref index) => {
+				// Start a new stack frame
+				stack.push(StackFrame::new(instr_ptr));
+				// Jump to the index pointed to by the call instruction
+				instr_ptr = *index;
+				continue;
 			},
 			Instruction::Set(ref index) => {
 				let var = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
@@ -175,7 +183,8 @@ fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<(), ()>
 				for block_frame in &stack.last().unwrap().block_frames {
 					ptr -= block_frame.operands.len()
 				}
-				stack.pop().unwrap();
+				let old_frame = stack.pop().unwrap();
+				instr_ptr = old_frame.return_to_ptr;
 			}
 			Instruction::Add => {
 				let right = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();

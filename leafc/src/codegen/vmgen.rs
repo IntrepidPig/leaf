@@ -57,8 +57,8 @@ impl Var {
 /// An instruction/opcode for the vm
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Instruction {
-	/// New stack frame
-	Frame,
+	/// Call a function that starts at usize and create a new stack frame
+	Call(usize),
 	/// New block frame
 	Block,
 	/// Exit the stack frame, dropping all the values it had
@@ -115,11 +115,11 @@ impl CodeGenerator {
 	}
 
 	pub fn gen_instructions(&mut self, ast: &SyntaxTree) {
-		self.instructions.push(Instruction::Jump(0));
+		self.instructions.push(Instruction::Call(0));
 		self.function_jumps_todo.push((0, "main".to_owned()));
 		self.instructions.push(Instruction::Terminate);
 		for func in &ast.functions {
-			self.gen_from_func(&func, 1);
+			self.gen_from_func(&func);
 		}
 		
 		self.change_function_jumps();
@@ -128,24 +128,20 @@ impl CodeGenerator {
 	pub fn change_function_jumps(&mut self) {
 		for (location, name) in &self.function_jumps_todo {
 			match self.instructions.get_mut(*location).unwrap() {
-				Instruction::Jump(ref mut target) => *target = *self.function_locations.get(name).unwrap(),
+				Instruction::Call(ref mut target) => *target = *self.function_locations.get(name).unwrap(),
 				_ => panic!("Expected a jump to {} at index {}", name, location)
 			}
 		}
 	} 
 	
-	pub fn gen_from_func(&mut self, function: &Function, return_address: usize) {
+	pub fn gen_from_func(&mut self, function: &Function) {
 		self.function_locations.insert(function.name.clone(), self.instructions.len());
 		// start a new stack frame
-		self.instructions.push(Instruction::Frame);
-		self.instructions.push(Instruction::Block);
-		self.instructions.push(Instruction::Frame);
 		self.instructions.push(Instruction::Block);
 		// TODO bind arguments
 		self.gen_from_block(&function.body);
 		// exit stack frame, return value at the top of the stack
 		self.instructions.push(Instruction::Return);
-		self.instructions.push(Instruction::Jump(return_address));
 	}
 
 	/// Generate instructions for a block
@@ -336,6 +332,11 @@ impl CodeGenerator {
 			Expression::BoolLiteral(val) => {
 				self.instructions.push(Instruction::Push(Var::new_bool(*val)))
 			},
+			Expression::FunctionCall { name, args } => {
+				let function_call_index = self.instructions.len();
+				self.function_jumps_todo.push((function_call_index, name.clone()));
+				self.instructions.push(Instruction::Call(0));
+			}
 			_ => unimplemented!(),
 		}
 	}

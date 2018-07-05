@@ -11,6 +11,7 @@ pub mod literal;
 pub mod identifier;
 pub mod functiondef;
 pub mod typedef;
+pub mod functioncall;
 
 pub use ast::tokenizer::{Keyword, Symbol as TokenSymbol};
 pub use self::syntaxtree::*;
