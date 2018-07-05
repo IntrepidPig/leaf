@@ -57,8 +57,9 @@ impl Var {
 /// An instruction/opcode for the vm
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Instruction {
-	/// Call a function that starts at usize and create a new stack frame
-	Call(usize),
+	/// Call a function that starts at usize and create a new stack frame. Pop a
+	//. certain amount of values from the current stack frame into the next (arguments)
+	Call(usize, usize),
 	/// New block frame
 	Block,
 	/// Exit the stack frame, dropping all the values it had
@@ -115,7 +116,7 @@ impl CodeGenerator {
 	}
 
 	pub fn gen_instructions(&mut self, ast: &SyntaxTree) {
-		self.instructions.push(Instruction::Call(0));
+		self.instructions.push(Instruction::Call(0, 0));
 		self.function_jumps_todo.push((0, "main".to_owned()));
 		self.instructions.push(Instruction::Terminate);
 		for func in &ast.functions {
@@ -128,20 +129,26 @@ impl CodeGenerator {
 	pub fn change_function_jumps(&mut self) {
 		for (location, name) in &self.function_jumps_todo {
 			match self.instructions.get_mut(*location).unwrap() {
-				Instruction::Call(ref mut target) => *target = *self.function_locations.get(name).unwrap(),
+				Instruction::Call(ref mut target, _argc) => *target = *self.function_locations.get(name).unwrap(),
 				_ => panic!("Expected a jump to {} at index {}", name, location)
 			}
 		}
 	} 
 	
 	pub fn gen_from_func(&mut self, function: &Function) {
+		self.locals.push(Vec::new());
 		self.function_locations.insert(function.name.clone(), self.instructions.len());
 		// start a new stack frame
 		self.instructions.push(Instruction::Block);
+		// load all of the arguments
+		for arg in &function.args {
+			self.locals.last_mut().unwrap().push(arg.clone());
+		}
 		// TODO bind arguments
 		self.gen_from_block(&function.body);
 		// exit stack frame, return value at the top of the stack
 		self.instructions.push(Instruction::Return);
+		self.locals.pop();
 	}
 
 	/// Generate instructions for a block
@@ -333,9 +340,12 @@ impl CodeGenerator {
 				self.instructions.push(Instruction::Push(Var::new_bool(*val)))
 			},
 			Expression::FunctionCall { name, args } => {
+				for arg in args {
+					self.gen_from_expr(arg);
+				}
 				let function_call_index = self.instructions.len();
 				self.function_jumps_todo.push((function_call_index, name.clone()));
-				self.instructions.push(Instruction::Call(0));
+				self.instructions.push(Instruction::Call(0, args.len()));
 			}
 			_ => unimplemented!(),
 		}

@@ -71,6 +71,13 @@ impl TokenTree {
 			_ => false,
 		}
 	}
+	
+	pub fn is_comma(&self) -> bool {
+		match self {
+			TokenTree::Token(Token::Symbol(Symbol::Comma)) => true,
+			_ => false,
+		}
+	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

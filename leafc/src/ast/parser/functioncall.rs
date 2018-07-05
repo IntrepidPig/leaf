@@ -42,22 +42,13 @@ impl ExpressionTaker for FunctionCallTaker {
 
 fn parse_args(in_tokens: &[TokenTree]) -> Result<Vec<Expression>, Error<ParseError>> {
 	let mut each_args_tokens = Vec::new();
-	let mut last_end = 0;
-	for (i, token) in in_tokens.iter().enumerate() {
-		match token {
-			TokenTree::Token(Token::Symbol(TokenSymbol::Comma)) => {
-				each_args_tokens.push(&in_tokens[last_end..i]);
-				last_end = i + 1;
-			},
-			_ => {},
-		}
-	}
+	in_tokens.split(|token| token.is_comma()).map(|tokens| each_args_tokens.push(tokens)).collect::<()>();
 	
 	let mut args = Vec::new();
 	
 	for arg_tokens in each_args_tokens {
 		if let Some((expression, leftovers)) = next_expression(arg_tokens, Box::new(|_| false))? {
-			if leftovers.is_empty() {
+			if !leftovers.is_empty() {
 				return Err(ParseError::Other.into()) // didn't parse the entire argument expression tokens
 			}
 			

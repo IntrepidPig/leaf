@@ -121,7 +121,7 @@ fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<(), ()>
 
 		if debug {
 			iter += 1;
-			if iter > 50 {
+			if iter > 1000 {
 				println!("Reached maximum instruction execution");
 				return Ok(());
 			}
@@ -156,9 +156,14 @@ fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<(), ()>
 				println!("\t => Var: {:?}", var);
 				ptr -= 1;
 			},
-			Instruction::Call(ref index) => {
+			Instruction::Call(ref index, ref argc) => {
+				let mut new_frame = StackFrame::new(instr_ptr);
+				for _ in 0..*argc {
+					let arg_val = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
+					new_frame.locals.push(arg_val);
+				}
 				// Start a new stack frame
-				stack.push(StackFrame::new(instr_ptr));
+				stack.push(new_frame);				
 				// Jump to the index pointed to by the call instruction
 				instr_ptr = *index;
 				continue;
@@ -226,11 +231,7 @@ fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<(), ()>
 		instr_ptr += 1;
 
 		if debug {
-			println!(
-				"Stack: {:?}\n\
-				 Stack ptr: {:?}\n",
-				stack, ptr,
-			);
+			print_stack(&stack);
 		}
 	}
 
@@ -240,6 +241,24 @@ fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<(), ()>
 	);
 
 	Ok(())
+}
+
+fn print_stack(stack: &[StackFrame]) {
+	for (i, frame) in stack.iter().enumerate() {
+		println!("\tFrame {}", i);
+		println!("\t- Locals:");
+		for (i, local) in frame.locals.iter().enumerate() {
+			println!("\t\t{}: {:?}", i, local);
+		}
+		println!("\t- Blocks:");
+		for (i, block_frame) in frame.block_frames.iter().enumerate() {
+			println!("\t\t{}: Operands:", i);
+			for operand in &block_frame.operands {
+				println!("\t\t\t{:?}", operand);
+			}
+		}
+		println!("");
+	}
 }
 
 fn print_instructions(instructions: &[Instruction]) {
