@@ -29,7 +29,7 @@ fn main() {
 	let ast = leafc::ast::parser::parse(tokentree.as_slice()).unwrap();
 	println!("{:?}\n\t=>", ast);
 
-	let code_generator = leafc::codegen::vmgen::CodeGenerator::new();
-	let instructions = code_generator.gen_instructions(ast);
+	let mut code_generator = leafc::codegen::vmgen::CodeGenerator::new();
+	let instructions = code_generator.gen_instructions(&ast);
 	println!("{:#?}", instructions);
 }

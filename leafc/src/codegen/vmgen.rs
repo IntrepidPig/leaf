@@ -1,4 +1,6 @@
-use ast::parser::{Block, Expression, If};
+use std::collections::HashMap;
+
+use ast::parser::{Block, Expression, If, SyntaxTree, Function};
 use ast::parser::operators::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -84,18 +86,22 @@ pub enum Instruction {
 	Equal,
 	/// Return the value at the top of the stack to the previous stack frame
 	Return,
+	/// Stop execution of the program
+	Terminate
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CodeGenerator {
-	instructions: Vec<Instruction>,
+	pub instructions: Vec<Instruction>,
 	loop_breaks: Vec<Vec<usize>>,
 	block_is_loop: bool,
 	if_jumps: Vec<usize>,
 	locals: Vec<Vec<String>>,
+	function_locations: HashMap<String, usize>,
+	function_jumps_todo: Vec<(usize, String)>,
 }
 
-impl CodeGenerator {
+impl CodeGenerator {	
 	pub fn new() -> Self {
 		CodeGenerator {
 			instructions: Vec::new(),
@@ -103,15 +109,43 @@ impl CodeGenerator {
 			block_is_loop: false,
 			if_jumps: Vec::new(),
 			locals: vec![Vec::new()],
+			function_locations: HashMap::new(),
+			function_jumps_todo: Vec::new(),
 		}
 	}
 
-	pub fn gen_instructions(mut self, ast: Block) -> Vec<Instruction> {
+	pub fn gen_instructions(&mut self, ast: &SyntaxTree) {
+		self.instructions.push(Instruction::Jump(0));
+		self.function_jumps_todo.push((0, "main".to_owned()));
+		self.instructions.push(Instruction::Terminate);
+		for func in &ast.functions {
+			self.gen_from_func(&func, 1);
+		}
+		
+		self.change_function_jumps();
+	}
+	
+	pub fn change_function_jumps(&mut self) {
+		for (location, name) in &self.function_jumps_todo {
+			match self.instructions.get_mut(*location).unwrap() {
+				Instruction::Jump(ref mut target) => *target = *self.function_locations.get(name).unwrap(),
+				_ => panic!("Expected a jump to {} at index {}", name, location)
+			}
+		}
+	} 
+	
+	pub fn gen_from_func(&mut self, function: &Function, return_address: usize) {
+		self.function_locations.insert(function.name.clone(), self.instructions.len());
+		// start a new stack frame
 		self.instructions.push(Instruction::Frame);
 		self.instructions.push(Instruction::Block);
-		self.gen_from_block(&ast);
-
-		self.instructions
+		self.instructions.push(Instruction::Frame);
+		self.instructions.push(Instruction::Block);
+		// TODO bind arguments
+		self.gen_from_block(&function.body);
+		// exit stack frame, return value at the top of the stack
+		self.instructions.push(Instruction::Return);
+		self.instructions.push(Instruction::Jump(return_address));
 	}
 
 	/// Generate instructions for a block

@@ -40,6 +40,7 @@ pub enum Keyword {
 	Back,
 	True,
 	False,
+	Type,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -97,6 +98,7 @@ impl<'a> Tokenizer<'a> {
 					"back" => tokens.push(Token::Keyword(Keyword::Back)),
 					"true" => tokens.push(Token::Keyword(Keyword::True)),
 					"false" => tokens.push(Token::Keyword(Keyword::False)),
+					"type" => tokens.push(Token::Keyword(Keyword::Type)),
 					word => tokens.push(Token::Name(word.to_owned())),
 				},
 				Lexeme::Bracket(bracket, state) => {

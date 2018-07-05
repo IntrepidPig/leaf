@@ -266,7 +266,6 @@ mod parse {
 		}
 	}
 
-	/// TODO allow break statements to be operands I guess... so if 1 then break;` works
 	/// Tries to get an operand
 	/// The operand can be either a literal, an identifier, or a block (which will be classified as a single operand)
 	#[derive(Debug)]

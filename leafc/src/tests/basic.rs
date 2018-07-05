@@ -22,7 +22,7 @@ fn basic_tests() {
 		let tokens = tokenizer.tokenize().unwrap();
 		let tokentree = ast::treeify::treeify(&tokens.tokens).unwrap();
 		let ast = ast::parser::parse(tokentree.as_slice()).unwrap();
-		let code_generator = codegen::vmgen::CodeGenerator::new();
-		let _instructions = code_generator.gen_instructions(ast);
+		let mut code_generator = codegen::vmgen::CodeGenerator::new();
+		let _instructions = code_generator.gen_instructions(&ast);
 	}
 }

@@ -211,11 +211,11 @@ fn treeify_loops(in_tokens: &[TokenTree]) -> Result<Vec<TokenTree>, Error<Treeif
 				old_tokens = &old_tokens[1..];
 			},
 			TokenTree::Paren(sub_tokens) => {
-				tokens.push(TokenTree::Brace(treeify_loops(sub_tokens)?));
+				tokens.push(TokenTree::Paren(treeify_loops(sub_tokens)?));
 				old_tokens = &old_tokens[1..];
 			},
 			TokenTree::Bracket(sub_tokens) => {
-				tokens.push(TokenTree::Brace(treeify_loops(sub_tokens)?));
+				tokens.push(TokenTree::Bracket(treeify_loops(sub_tokens)?));
 				old_tokens = &old_tokens[1..];
 			},
 			token => {

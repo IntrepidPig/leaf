@@ -7,7 +7,6 @@ extern crate log;
 use std::io::{self, Read};
 
 use leafc::codegen::vmgen::{Instruction, Var, VarInfo, Primitive};
-use std::collections::HashMap;
 
 fn main() {
 	let matches = clap::App::new("Leaf")
@@ -70,10 +69,10 @@ fn main() {
 	println!("{:?}\n\t=>", tokentree);
 	let ast = leafc::ast::parser::parse(tokentree.as_slice()).unwrap();
 	println!("{:?}\n\t=>", ast);
-	let code_generator = leafc::codegen::vmgen::CodeGenerator::new();
-	let instructions = code_generator.gen_instructions(ast);
-	print_instructions(&instructions);
-	run_instructions(&instructions, debug).unwrap();
+	let mut code_generator = leafc::codegen::vmgen::CodeGenerator::new();
+	code_generator.gen_instructions(&ast);
+	print_instructions(&code_generator.instructions);
+	run_instructions(&code_generator.instructions, debug).unwrap();
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -210,6 +209,9 @@ fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<(), ()>
 					continue;
 				}
 			},
+			Instruction::Terminate => {
+				break;
+			},
 		}
 
 		instr_ptr += 1;
@@ -240,30 +242,4 @@ fn print_instructions(instructions: &[Instruction]) {
 		}
 		println!("{}: {:?}", i_str, instr);
 	}
-}
-
-fn deref_stack(stack: &Vec<Vec<Var>>, mut ptr: usize) -> Var {
-	for frame in stack {
-		for var in frame {
-			ptr -= 1;
-			if ptr == 0 {
-				return var.clone();
-			}
-		}
-	}
-
-	panic!("Index not found")
-}
-
-fn deref_stack_mut(stack: &mut Vec<Vec<Var>>, mut ptr: usize) -> &mut Var {
-	for frame in stack.iter_mut() {
-		for var in frame.iter_mut() {
-			ptr -= 1;
-			if ptr == 0 {
-				return var;
-			}
-		}
-	}
-
-	panic!("Index not found")
 }
