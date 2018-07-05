@@ -31,7 +31,7 @@ impl ExpressionTaker for OperationTaker {
 	}
 }
 
-fn split_at(
+pub fn split_at(
 	tokens: &[TokenTree],
 	mut condition: Box<FnMut(&TokenTree) -> bool>,
 	exclusive: bool,

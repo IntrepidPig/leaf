@@ -15,17 +15,17 @@ fn get_2000() {
 fn count_to_3000() {
 	let f := 0;
 	loop
-		if f == 3000 then {
+		if f == 3000 then
 			break;
-		} else {
+		else
 			f := f + 1000;
-		} end;
+		end;
 	back;
 	f
 }
 
 fn add_42(x) {
-	x + 42
+	sum(x, 42)
 }
 
 fn sum(a, b) {

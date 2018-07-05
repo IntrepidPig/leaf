@@ -12,51 +12,37 @@ impl ExpressionTaker for IfTaker {
 	) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
 		match in_tokens.get(0) {
 			Some(TokenTree::If(tokens)) => {
-				let (condition, leftovers) = if let Some(res) = next_expression(tokens, Box::new(|token| token.is_then()))? {
-					res
-				} else {
-					return Err(ParseError::Other.into()) // Failed to parse the if condition expression
-				};
+				let (until_then, leftovers) = operation::split_at(tokens, Box::new(|token| token.is_then()), false);
+				let condition = parse_block(until_then)?;
 								
 				if !(leftovers.get(0) == Some(&TokenTree::Token(Token::Keyword(Keyword::Then)))) {
 					return Err(ParseError::Other.into()) // needed `then` keyword
 				}
 				
+				let (body_tokens, leftovers) = operation::split_at(&leftovers[1..], Box::new(|token| token.is_else() || token.is_end()), false);
+				
 				// TODO elseif
-				// TODO parse body and else body like syntaxtrees
-				let (body, leftovers) = if let Some(res) = next_expression(&leftovers[1..], Box::new(|token| token.is_else() || token.is_end()))? {
-					res
-				} else {
-					return Err(ParseError::Other.into()) // Failed to parse the if condition expression
-				};
+				let body = parse_block(body_tokens)?;
 								
-				let (else_block, leftovers) = if leftovers.is_empty() {
-					(None, leftovers)
+				let else_block = if leftovers.is_empty() {
+					None
 				} else {
 					match leftovers.get(0) {
 						Some(TokenTree::Token(Token::Keyword(Keyword::Else))) => {
-							let (else_body, leftovers) = if let Some(res) = next_expression(&leftovers[1..], Box::new(|_| false))? {
-								res
-							} else {
-								return Err(ParseError::Other.into()) // Failed to parse the if condition expression
-							};
+							let else_body = parse_block(&leftovers[1..])?;
 							
-							(Some(else_body), leftovers)
+							Some(else_body)
 						},
 						_ => return Err(ParseError::Other.into()) // needed else or nothing after then
 					}
 				};
-								
-				if !leftovers.is_empty() {
-					return Err(ParseError::Other.into()) // Failed to parse all tokens in if
-				}
 				
 				Ok(Some((
 					Expression::If(Box::new(If {
-						condition,
-						body,
+						condition: Expression::Block(Box::new(condition)),
+						body: Expression::Block(Box::new(body)),
 						elif: None,
-						else_block,
+						else_block: else_block.map(|b| Expression::Block(Box::new(b))),
 					})),
 					&in_tokens[1..],
 				)))

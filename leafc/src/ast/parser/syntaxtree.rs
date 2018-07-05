@@ -166,10 +166,10 @@ static mut RECURSION_LEVEL: usize = 0;
 /// TODO don't return option
 pub fn parse_block<'a>(
 	mut tokens: &'a [TokenTree],
-) -> Result<Option<Block>, Error<ParseError>> {
+) -> Result<Block, Error<ParseError>> {
 	unsafe {
 		RECURSION_LEVEL = RECURSION_LEVEL + 1;
-		if RECURSION_LEVEL > 10 {
+		if RECURSION_LEVEL > 20 {
 			return Err(ParseError::Other.into()); // Too much nesting DEBUG purposes only
 		}
 	}
@@ -190,7 +190,7 @@ pub fn parse_block<'a>(
 	}
 
 
-	Ok(Some(block))
+	Ok(block)
 }
 
 /// Gets the next statement requiring a terminating semicolon

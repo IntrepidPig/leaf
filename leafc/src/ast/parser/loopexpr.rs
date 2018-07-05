@@ -18,11 +18,7 @@ impl ExpressionTaker for LoopTaker {
 	) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
 		match in_tokens.get(0) {
 			Some(TokenTree::Loop(tokens)) => {
-				let expr = if let Some(res) = parse_block(tokens)? {
-					res
-				} else {
-					return Err(ParseError::Other.into()) // Failed to parse loop expression body
-				};
+				let expr = parse_block(tokens)?;
 				
 				if expr.output.is_some() {
 					return Err(ParseError::Other.into()) // Loop blocks can't have an output

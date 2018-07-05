@@ -17,13 +17,10 @@ impl ExpressionTaker for BlockTaker {
 		}
 		match in_tokens[0] {
 			TokenTree::Brace(ref tokens) => {
-				if let Some(ast) = parse_block(tokens)? {
-					return Ok(Some((Expression::Block(Box::new(ast)), &in_tokens[1..])));
-				} else {
-					return Err(ParseError::UnexpectedToken.into());
-				}
+				let ast = parse_block(tokens)?;
+				Ok(Some((Expression::Block(Box::new(ast)), &in_tokens[1..])))
 			},
-			_ => return Ok(None),
+			_ => Ok(None),
 		}
 	}
 }
