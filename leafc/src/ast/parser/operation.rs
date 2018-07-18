@@ -152,6 +152,14 @@ mod parse {
 									_ => Err(ParseError::Other.into()), // The left hand side wasn't an identifier
 								}
 							},
+							BinaryOp::Dot => {
+								match rhs {
+									Expression::Identifier(ref ident) => {
+										Ok(Expression::FieldAccess(Box::new(lhs), ident.clone()))
+									},
+									_ => Err(ParseError::Other.into()) // Right hand side wasn't an identifier
+								}
+							}
 							binop => Ok(Expression::Binary {
 								left: Box::new(lhs),
 								right: Box::new(rhs),
@@ -253,6 +261,7 @@ mod parse {
 							TokenSymbol::Plus => BinaryOp::Add,
 							TokenSymbol::Assign => BinaryOp::Assign,
 							TokenSymbol::Equality => BinaryOp::Equality,
+							TokenSymbol::Dot => BinaryOp::Dot,
 							_ => return Ok(None),
 						},
 						_ => return Ok(None),

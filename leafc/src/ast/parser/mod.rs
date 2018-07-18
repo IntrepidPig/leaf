@@ -12,6 +12,7 @@ pub mod identifier;
 pub mod functiondef;
 pub mod typedef;
 pub mod functioncall;
+pub mod separated;
 
 pub use ast::tokenizer::{Keyword, Symbol as TokenSymbol};
 pub use self::syntaxtree::*;
@@ -28,6 +29,10 @@ pub fn parse(in_tokens: &[TokenTree]) -> Result<SyntaxTree, Error<ParseError>> {
 		if let Some((func, leftovers)) = functiondef::take_functiondef(tokens)? {
 			tokens = leftovers;
 			stree.functions.push(func);
+			continue;
+		} else if let Some((typedef, leftovers)) = typedef::take_typedef(tokens)? {
+			tokens = leftovers;
+			stree.types.push(typedef);
 			continue;
 		}
 		

@@ -51,6 +51,7 @@ impl BinaryOp {
 	pub fn left_associative(self) -> bool {
 		match self {
 			BinaryOp::Assign => false,
+			BinaryOp::Dot => true,
 			_ => true,
 		}
 	}

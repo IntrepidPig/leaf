@@ -58,23 +58,16 @@ pub fn take_functiondef(in_tokens: &[TokenTree]) -> Result<Option<(Function, &[T
 }
 
 fn parse_args(in_tokens: &[TokenTree]) -> Result<Vec<String>, Error<ParseError>> {
-	let mut each_args_tokens = Vec::new();
-	in_tokens.split(|token| token.is_comma()).map(|tokens| each_args_tokens.push(tokens)).collect::<()>();
-	
 	let mut args = Vec::new();
-	
-	for tokens in each_args_tokens {
-		if tokens.is_empty() {
-			continue;
-		}
-		
-		match tokens.get(0) {
-			Some(TokenTree::Token(Token::Name(ref name))) => {
+	for arg_tokens in separated::parse_separated(in_tokens, |token| token.is_comma())? {
+		match arg_tokens {
+			&[TokenTree::Token(Token::Name(ref name))] => {
 				args.push(name.clone())
 			},
-			_ => return Err(ParseError::Other.into()) // got an argument that wasn't a name
+			&[] => {},
+			_ => return Err(ParseError::Other.into()) // Got an argument that wasn't a name
 		}
 	}
 	
-	Ok(args)
+	Ok(args)	
 }

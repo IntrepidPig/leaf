@@ -106,6 +106,7 @@ mod structures {
 		StringLiteral(String),
 		NumberLiteral(u64),
 		BoolLiteral(bool),
+		FieldAccess(Box<Expression>, String),
 	}
 
 	#[derive(Debug, Clone, PartialEq, Eq)]
