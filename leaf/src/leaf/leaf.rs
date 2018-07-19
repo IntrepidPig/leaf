@@ -6,7 +6,7 @@ extern crate log;
 
 use std::io::{self, Read};
 
-use leafc::codegen::vmgen::{Instruction, Var, VarInfo, Primitive};
+use leafc::codegen::vmgen::{Instruction, Var, VarInfo, Primitive, Reference};
 
 fn main() {
 	let matches = clap::App::new("Leaf")
@@ -222,6 +222,25 @@ fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<(), ()>
 					instr_ptr = target_instr_ptr;
 					continue;
 				}
+			},
+			Instruction::Retrieve(ref idx) => {
+				let var = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
+				ptr -= 1;
+				match var.var_info {
+					VarInfo::Reference(ref reference) => {
+						if let Some(field) = reference.fields.get(*idx) {
+							stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.push(field.clone());
+						}
+					},
+					_ => panic!("Field doesn't exist")
+				}
+			},
+			Instruction::Ref(ref amt) => {
+				let mut buf = Vec::new();
+				for _ in 0..*amt {
+					buf.insert(0, stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap());
+				}
+				stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.push(Var::new_ref(Reference::new(buf)));
 			},
 			Instruction::Terminate => {
 				break;

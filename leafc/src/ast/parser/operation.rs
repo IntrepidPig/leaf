@@ -294,7 +294,6 @@ mod parse {
 			Error<ParseError>,
 		> {
 			let expression_takers: &[&ExpressionTaker<Args = ()>] = &[
-				&block::BlockTaker,
 				&binding::BindingTaker,
 				&debug::DebugTaker,
 				&loopexpr::LoopTaker,
@@ -302,7 +301,9 @@ mod parse {
 				&breakexpr::BreakTaker,
 				&literal::LiteralTaker,
 				&functioncall::FunctionCallTaker, // has to be before identifier
+				&instantiation::InstantiationTaker, // has to be before block and identifier
 				&identifier::IdentifierTaker,
+				&block::BlockTaker,
 			];
 			
 			for expression_taker in expression_takers {

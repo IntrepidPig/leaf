@@ -78,6 +78,7 @@ mod structures {
 	/// Can be a literal, an operations, or a block that contains more expressions
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub enum Expression {
+		Unit,
 		Binary {
 			left: Box<Expression>,
 			right: Box<Expression>,
@@ -107,6 +108,22 @@ mod structures {
 		NumberLiteral(u64),
 		BoolLiteral(bool),
 		FieldAccess(Box<Expression>, String),
+		Instantiation(String, Vec<Expression>),
+	}
+	
+	impl Expression {
+		pub fn get_type(&self) -> String {
+			match self {
+				Expression::StringLiteral(_) => "str".to_owned(),
+				Expression::NumberLiteral(_) => "int".to_owned(),
+				Expression::Instantiation(ref name, _) => name.clone(),
+				Expression::Block(ref block) => block.output.as_ref().unwrap_or(&Expression::Unit).get_type(),
+				Expression::Unit => "unit".to_owned(),
+				_ => {
+					panic!("Tried to get type for unsupported expression: {:?}", self)
+				},
+			}
+		}
 	}
 
 	#[derive(Debug, Clone, PartialEq, Eq)]

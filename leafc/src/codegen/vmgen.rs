@@ -23,7 +23,15 @@ pub enum Primitive {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Reference {
-	data: Vec<VarInfo>,
+	pub fields: Vec<Var>,
+}
+
+impl Reference {
+	pub fn new(fields: Vec<Var>) -> Self {
+		Reference {
+			fields
+		}
+	}
 }
 
 impl Var {
@@ -42,6 +50,12 @@ impl Var {
 	pub fn new_bool(val: bool) -> Self {
 		Var {
 			var_info: VarInfo::Primitive(Primitive::Bool(val))
+		}
+	}
+	
+	pub fn new_ref(reference: Reference) -> Self {
+		Var {
+			var_info: VarInfo::Reference(reference)
 		}
 	}
 	
@@ -85,8 +99,12 @@ pub enum Instruction {
 	Check(usize),
 	/// Pop two values and push a boolean representing their equality
 	Equal,
+	/// Get the indexed field of a value
+	Retrieve(usize),
 	/// Return the value at the top of the stack to the previous stack frame
 	Return,
+	/// Pop the amount of values on the stack and push a reference to them all
+	Ref(usize),
 	/// Stop execution of the program
 	Terminate
 }
@@ -100,6 +118,12 @@ pub struct CodeGenerator {
 	locals: Vec<Vec<String>>,
 	function_locations: HashMap<String, usize>,
 	function_jumps_todo: Vec<(usize, String)>,
+	types: HashMap<String, TypeGen>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TypeGen {
+	fields: Vec<String>,
 }
 
 impl CodeGenerator {	
@@ -112,10 +136,15 @@ impl CodeGenerator {
 			locals: vec![Vec::new()],
 			function_locations: HashMap::new(),
 			function_jumps_todo: Vec::new(),
+			types: HashMap::new(),
 		}
 	}
 
 	pub fn gen_instructions(&mut self, ast: &SyntaxTree) {
+		for typedef in &ast.types {
+			self.types.insert(typedef.name.clone(), TypeGen { fields: typedef.members.clone() });
+		}
+		
 		self.instructions.push(Instruction::Call(0, 0));
 		self.function_jumps_todo.push((0, "main".to_owned()));
 		self.instructions.push(Instruction::Terminate);
@@ -346,7 +375,24 @@ impl CodeGenerator {
 				let function_call_index = self.instructions.len();
 				self.function_jumps_todo.push((function_call_index, name.clone()));
 				self.instructions.push(Instruction::Call(0, args.len()));
-			}
+			},
+			Expression::FieldAccess(ref expr, ref fieldname) => {
+				self.gen_from_expr(expr);
+				let exprtype = expr.get_type();
+				let typedef = self.types.get(&exprtype).expect("Type not found in list of typedefs");
+				let typeindex = typedef.fields.iter().position(|field| field == fieldname).expect("Type does not have this field");
+				self.instructions.push(Instruction::Retrieve(typeindex));
+			},
+			Expression::Instantiation(ref typename, ref fields) => {
+				let typedef = self.types.get(typename).expect("Type with that name not found").clone();
+				if fields.len() != typedef.fields.len() {
+					panic!("Incorrect amount of fields provided for type")
+				}
+				for i in 0..fields.len() {
+					self.gen_from_expr(&fields[i]);
+				}
+				self.instructions.push(Instruction::Ref(fields.len()))
+			},
 			_ => unimplemented!(),
 		}
 	}
