@@ -123,7 +123,7 @@ pub struct CodeGenerator {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TypeGen {
-	fields: Vec<String>,
+	fields: Vec<(String, String)>,
 }
 
 impl CodeGenerator {	
@@ -171,7 +171,7 @@ impl CodeGenerator {
 		self.instructions.push(Instruction::Block);
 		// load all of the arguments
 		for arg in &function.args {
-			self.locals.last_mut().unwrap().push(arg.clone());
+			self.locals.last_mut().unwrap().push(arg.0.clone());
 		}
 		// TODO bind arguments
 		self.gen_from_block(&function.body);
@@ -380,7 +380,7 @@ impl CodeGenerator {
 				self.gen_from_expr(expr);
 				let exprtype = expr.get_type();
 				let typedef = self.types.get(&exprtype).expect("Type not found in list of typedefs");
-				let typeindex = typedef.fields.iter().position(|field| field == fieldname).expect("Type does not have this field");
+				let typeindex = typedef.fields.iter().position(|field| &field.0 == fieldname).expect("Type does not have this field");
 				self.instructions.push(Instruction::Retrieve(typeindex));
 			},
 			Expression::Instantiation(ref typename, ref fields) => {

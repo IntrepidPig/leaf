@@ -22,7 +22,11 @@ pub fn take_functiondef(in_tokens: &[TokenTree]) -> Result<Option<(Function, &[T
 	let args = match tokens.get(0) {
 		Some(TokenTree::Paren(ref args_tokens)) => {
 			tokens = &tokens[1..];
-			parse_args(args_tokens)?
+			if !args_tokens.is_empty() {
+				parse_args(args_tokens)?
+			} else {
+				Vec::new()
+			}
 		},
 		_ => return Err(ParseError::Other.into()) // needed parens with arguments inside
 	};
@@ -57,16 +61,29 @@ pub fn take_functiondef(in_tokens: &[TokenTree]) -> Result<Option<(Function, &[T
 	}, tokens)))
 }
 
-fn parse_args(in_tokens: &[TokenTree]) -> Result<Vec<String>, Error<ParseError>> {
+fn parse_args(in_tokens: &[TokenTree]) -> Result<Vec<(String, String)>, Error<ParseError>> {
 	let mut args = Vec::new();
 	for arg_tokens in separated::parse_separated(in_tokens, |token| token.is_comma())? {
-		match arg_tokens {
-			&[TokenTree::Token(Token::Name(ref name))] => {
-				args.push(name.clone())
+		let name = match arg_tokens.get(0) {
+			Some(TokenTree::Token(Token::Name(ref name))) => {
+				name.clone()
 			},
-			&[] => {},
+			_ => return Err(ParseError::Other.into()) // Got an argument that wasn't a name
+		};
+		
+		match arg_tokens.get(1) {
+			Some(TokenTree::Token(Token::Symbol(TokenSymbol::Colon))) => { },
 			_ => return Err(ParseError::Other.into()) // Got an argument that wasn't a name
 		}
+		
+		let typename = match arg_tokens.get(2) {
+			Some(TokenTree::Token(Token::Name(ref name))) => {
+				name.clone()
+			},
+			_ => return Err(ParseError::Other.into()) // Got an argument that wasn't a name
+		};
+		
+		args.push((name, typename));
 	}
 	
 	Ok(args)	

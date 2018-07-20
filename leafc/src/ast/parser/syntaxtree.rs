@@ -69,7 +69,7 @@ mod structures {
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub struct Function {
 		pub name: String,
-		pub args: Vec<String>,
+		pub args: Vec<(String, String)>,
 		pub return_type: Option<String>,
 		pub body: Block,
 	}
@@ -124,6 +124,29 @@ mod structures {
 				},
 			}
 		}
+		
+		pub fn traverse_expressions<F: FnMut(&Expression)>(&self, f: &mut F) {
+			f(&self);
+			match self {
+				Expression::Binary { left, right, .. } => {
+					left.traverse_expressions(f);
+					right.traverse_expressions(f);
+				},
+				Expression::Debug(ref expr) => {
+					expr.traverse_expressions(f);
+				},
+				Expression::Binding(ref binding) => {
+					binding.val.as_ref().map(|val| val.traverse_expressions(f));
+				},
+				Expression::Block(ref block) => {
+					block.traverse_expressions(f);
+				},
+				Expression::FieldAccess(ref lhs, _) => {
+					lhs.traverse_expressions(f);
+				},
+				_ => {},
+			}
+		}
 	}
 
 	#[derive(Debug, Clone, PartialEq, Eq)]
@@ -137,7 +160,7 @@ mod structures {
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub struct Type {
 		pub name: String,
-		pub members: Vec<String>,
+		pub members: Vec<(String, String)>,
 	}
 
 	/// A let binding. Contains the identifier being bound to, the
@@ -155,6 +178,12 @@ mod structures {
 			Block {
 				block: Vec::new(),
 				output: None,
+			}
+		}
+		
+		pub fn traverse_expressions<F: FnMut(&Expression)>(&self, f: &mut F) {
+			for expression in &self.block {
+				f(expression)
 			}
 		}
 	}

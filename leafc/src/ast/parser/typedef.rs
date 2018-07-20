@@ -23,12 +23,23 @@ pub fn take_typedef(in_tokens: &[TokenTree]) -> Result<Option<(Type, &[TokenTree
 	match tokens.get(0) {
 		Some(TokenTree::Brace(ref tokens)) => {
 			for field_tokens in separated::parse_separated(tokens, |token| token.is_comma())? {
-				match field_tokens {
-					&[TokenTree::Token(Token::Name(ref name))] => {
-						fields.push(name.clone());
+				let name = match field_tokens.get(0) {
+					Some(TokenTree::Token(Token::Name(ref name))) => {
+						name.clone()
 					},
 					_ => return Err(ParseError::Other.into()) // Got a field that wasn't a name
+				};
+				match field_tokens.get(1) {
+					Some(TokenTree::Token(Token::Symbol(TokenSymbol::Colon))) => {},
+					_ => return Err(ParseError::Other.into()) // Field name didn't have a colon after it
 				}
+				let typename = match field_tokens.get(2) {
+					Some(TokenTree::Token(Token::Name(ref name))) => {
+						name.clone()
+					},
+					_ => return Err(ParseError::Other.into()) // Field didn't specify a type
+				};
+				fields.push((name.clone(), typename.clone()))
 			}
 		},
 		_ => return Err(ParseError::Other.into()) // needed a a block with fields

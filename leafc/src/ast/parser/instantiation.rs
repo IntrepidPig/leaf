@@ -31,7 +31,7 @@ impl ExpressionTaker for InstantiationTaker {
 		match tokens.get(0) {
 			Some(TokenTree::Brace(ref tokens)) => {
 				for expression_tokens in separated::parse_separated(tokens, |token| token.is_comma())? {
-					let (expr, leftovers) = if let Some(expr) = next_expression(expression_tokens, Box::new(|_| false))? {
+					let (expr, _leftovers) = if let Some(expr) = next_expression(expression_tokens, Box::new(|_| false))? {
 						expr
 					} else {
 						return Err(ParseError::Other.into()) // Expected an expression in the instantiation

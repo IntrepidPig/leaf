@@ -68,7 +68,10 @@ fn main() {
 	let tokentree = leafc::ast::treeify::treeify(&tokens.tokens).unwrap();
 	println!("{:?}\n\t=>", tokentree);
 	let ast = leafc::ast::parser::parse(tokentree.as_slice()).unwrap();
-	println!("{:?}\n\t=>", ast);
+	println!("{:#?}\n\t=>", ast);
+	let mut hir_generator = leafc::hir::HIRGenerator::new();
+	let hir = hir_generator.ast_to_hir(&ast);
+	println!("{:#?}\n\t=>", hir);
 	let mut code_generator = leafc::codegen::vmgen::CodeGenerator::new();
 	code_generator.gen_instructions(&ast);
 	print_instructions(&code_generator.instructions);

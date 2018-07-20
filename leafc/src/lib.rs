@@ -8,6 +8,7 @@ use std::path::Path;
 pub mod ast;
 pub mod codegen;
 pub mod failure;
+pub mod hir;
 #[cfg(test)]
 mod tests;
 
