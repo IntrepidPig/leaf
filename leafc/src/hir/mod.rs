@@ -115,8 +115,8 @@ pub struct Binding {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Block {
-	statements: Vec<Expression>,
-	output: Option<Expression>,
+	pub statements: Vec<Expression>,
+	pub output: Option<Expression>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

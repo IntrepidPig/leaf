@@ -73,7 +73,7 @@ fn main() {
 	let hir = hir_generator.ast_to_hir(&ast);
 	println!("{:#?}\n\t=>", hir);
 	let mut code_generator = leafc::codegen::vmgen::CodeGenerator::new();
-	code_generator.gen_instructions(&ast);
+	code_generator.gen_instructions(&hir);
 	print_instructions(&code_generator.instructions);
 	run_instructions(&code_generator.instructions, debug).unwrap();
 }

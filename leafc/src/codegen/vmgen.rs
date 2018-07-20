@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ast::parser::{Block, Expression, If, SyntaxTree, Function};
+use hir::*;
 use ast::parser::operators::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -118,12 +118,7 @@ pub struct CodeGenerator {
 	locals: Vec<Vec<String>>,
 	function_locations: HashMap<String, usize>,
 	function_jumps_todo: Vec<(usize, String)>,
-	types: HashMap<String, TypeGen>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TypeGen {
-	fields: Vec<(String, String)>,
+	types: HashMap<String, TypeDefinition>,
 }
 
 impl CodeGenerator {	
@@ -140,15 +135,17 @@ impl CodeGenerator {
 		}
 	}
 
-	pub fn gen_instructions(&mut self, ast: &SyntaxTree) {
-		for typedef in &ast.types {
-			self.types.insert(typedef.name.clone(), TypeGen { fields: typedef.members.clone() });
+	pub fn gen_instructions(&mut self, hir: &HIR) {
+		let module = &hir.modules[0];
+		
+		for typedef in &module.types {
+			self.types.insert(typedef.name.clone(), typedef.clone());
 		}
 		
 		self.instructions.push(Instruction::Call(0, 0));
 		self.function_jumps_todo.push((0, "main".to_owned()));
 		self.instructions.push(Instruction::Terminate);
-		for func in &ast.functions {
+		for func in &module.functions {
 			self.gen_from_func(&func);
 		}
 		
@@ -164,7 +161,7 @@ impl CodeGenerator {
 		}
 	} 
 	
-	pub fn gen_from_func(&mut self, function: &Function) {
+	pub fn gen_from_func(&mut self, function: &FunctionDefinition) {
 		self.locals.push(Vec::new());
 		self.function_locations.insert(function.name.clone(), self.instructions.len());
 		// start a new stack frame
@@ -174,24 +171,24 @@ impl CodeGenerator {
 			self.locals.last_mut().unwrap().push(arg.0.clone());
 		}
 		// TODO bind arguments
-		self.gen_from_block(&function.body);
+		self.gen_from_expr(&function.body);
 		// exit stack frame, return value at the top of the stack
 		self.instructions.push(Instruction::Return);
 		self.locals.pop();
 	}
 
 	/// Generate instructions for a block
-	pub fn gen_from_block(&mut self, ast: &Block) {
+	pub fn gen_from_block(&mut self, block: &Block) {
 		// Start a new stack frame
 		self.instructions.push(Instruction::Block);
 		// Generate instructions for each statement in the block
-		for statement in &ast.block {
+		for statement in &block.statements {
 			self.gen_from_expr(statement);
 			// Pop the unused result of the expression
 			self.instructions.push(Instruction::Pop);
 		}
 		// Generate instructions for the block output (if there is one)
-		if let Some(ref output) = ast.output {
+		if let Some(ref output) = block.output {
 			// Load the value of the exression onto the stack
 			self.gen_from_expr(output);
 		} else {
@@ -241,7 +238,7 @@ impl CodeGenerator {
 
 		// Generate stuff for the else block if it exists, otherwise just generate nil value
 		if let Some(else_block) = &if_stmnt.else_block {
-			self.gen_from_expr(else_block);
+			self.gen_from_expr(&else_block);
 		} else {
 			self.instructions.push(Instruction::Push(Var::null()));
 		}
@@ -256,27 +253,27 @@ impl CodeGenerator {
 
 	/// Generate instructions from an expression
 	pub fn gen_from_expr(&mut self, expr: &Expression) {
-		match expr {
+		match expr.expr {
 			// Push literal values onto the stack
-			Expression::NumberLiteral(num) => self.instructions
-				.push(Instruction::Push(Var::new_u64(*num))),
+			ExpressionType::IntLiteral(num) => self.instructions
+				.push(Instruction::Push(Var::new_u64(num))),
 			// Generate instructions for nested blocks
-			Expression::Block(ref ast) => {
+			ExpressionType::Block(ref ast) => {
 				self.gen_from_block(ast);
 			},
 			// Dereference variables
-			Expression::Identifier(ref ident) => {
+			ExpressionType::Identifier(ref ident) => {
 				// Push the value of the variable onto the top of the stack
 				self.instructions.push(Instruction::Load(self.locals.last().unwrap().iter().position(|test_name| test_name == ident).unwrap()))
 			},
 			// Evalute binary expressions
-			Expression::Binary { left, right, op } => {
+			ExpressionType::Binary(ref binary) => {
 				// Push the value of the left hand side to the stack
-				self.gen_from_expr(left);
+				self.gen_from_expr(&binary.left);
 				// Push the value of the right hand side to the stack
-				self.gen_from_expr(right);
+				self.gen_from_expr(&binary.right);
 				// Perform the operation
-				match op {
+				match binary.op {
 					BinaryOp::Add => self.instructions.push(Instruction::Add),
 					BinaryOp::Equality => self.instructions.push(Instruction::Equal),
 					BinaryOp::Assign => {
@@ -286,7 +283,7 @@ impl CodeGenerator {
 					_ => unimplemented!()
 				};
 			},
-			Expression::Assign(ref assignment) => {
+			ExpressionType::Assignment(ref assignment) => {
 				// Load the value that used to be in the variable being assigned to
 				self.instructions
 					.push(Instruction::Load(self.locals.last().unwrap().iter().position(|test_name| test_name == &assignment.ident).unwrap()));
@@ -297,7 +294,7 @@ impl CodeGenerator {
 					.push(Instruction::Set(self.locals.last().unwrap().iter().position(|test_name| test_name == &assignment.ident).unwrap()));
 				// And the old value will be left on the stack as the result of the expression
 			},
-			Expression::Loop(ref block) => {
+			ExpressionType::Loop(ref block) => {
 				// Push the instructions for the block
 				self.gen_from_loop(block);
 				// The place after the loop
@@ -310,13 +307,13 @@ impl CodeGenerator {
 					}
 				}
 			},
-			Expression::If(ref if_stmnt) => {
+			ExpressionType::If(ref if_stmnt) => {
 				// Gen the instructions for the if statement
 				self.gen_from_if(if_stmnt);
 			},
-			Expression::Binding(ref binding) => {
+			ExpressionType::Binding(ref binding) => {
 				// If there's an expression
-				if let Some(ref expr) = binding.val {
+				if let Some(ref expr) = binding.expr {
 					// Generate the instructions from the expression
 					// This will push the result onto the stack
 					self.gen_from_expr(expr);
@@ -337,7 +334,7 @@ impl CodeGenerator {
 				// Push a nil value since let is an expression and it's result will be popped
 				self.instructions.push(Instruction::Push(Var::null()))
 			},
-			Expression::Debug(ref expr) => {
+			ExpressionType::Debug(ref expr) => {
 				// Generate the expression instructions
 				self.gen_from_expr(expr);
 				// Debug the value at the top of the stack (pops it automatically)
@@ -345,7 +342,7 @@ impl CodeGenerator {
 				// Push a nil value since debug is an expression and it's result will be popped
 				self.instructions.push(Instruction::Push(Var::null()))
 			},
-			Expression::Break(ref expr) => {
+			ExpressionType::Break(ref expr) => {
 				// If there's an associated expression then gen instructions for it, otherwise just push a nil
 				if let Some(expr) = expr {
 					self.gen_from_expr(expr);
@@ -365,25 +362,25 @@ impl CodeGenerator {
 				// Push a nil value since break is an expression and it's result will be popped
 				self.instructions.push(Instruction::Push(Var::null()))
 			},
-			Expression::BoolLiteral(val) => {
-				self.instructions.push(Instruction::Push(Var::new_bool(*val)))
+			ExpressionType::BoolLiteral(val) => {
+				self.instructions.push(Instruction::Push(Var::new_bool(val)))
 			},
-			Expression::FunctionCall { name, args } => {
-				for arg in args {
+			ExpressionType::FunctionCall(ref call) => {
+				for arg in &call.args {
 					self.gen_from_expr(arg);
 				}
 				let function_call_index = self.instructions.len();
-				self.function_jumps_todo.push((function_call_index, name.clone()));
-				self.instructions.push(Instruction::Call(0, args.len()));
+				self.function_jumps_todo.push((function_call_index, call.name.clone()));
+				self.instructions.push(Instruction::Call(0, call.args.len()));
 			},
-			Expression::FieldAccess(ref expr, ref fieldname) => {
+			ExpressionType::FieldAccess(ref expr, ref fieldname) => {
 				self.gen_from_expr(expr);
-				let exprtype = expr.get_type();
-				let typedef = self.types.get(&exprtype).expect("Type not found in list of typedefs");
+				let exprtype = &expr.expr_out;
+				let typedef = self.types.get(&exprtype.name).expect("Type not found in list of typedefs");
 				let typeindex = typedef.fields.iter().position(|field| &field.0 == fieldname).expect("Type does not have this field");
 				self.instructions.push(Instruction::Retrieve(typeindex));
 			},
-			Expression::Instantiation(ref typename, ref fields) => {
+			ExpressionType::Instantiation(ref typename, ref fields) => {
 				let typedef = self.types.get(typename).expect("Type with that name not found").clone();
 				if fields.len() != typedef.fields.len() {
 					panic!("Incorrect amount of fields provided for type")
