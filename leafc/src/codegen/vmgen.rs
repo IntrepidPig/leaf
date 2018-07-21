@@ -10,7 +10,7 @@ pub struct Var {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VarInfo {
-	Null,
+	Root,
 	Primitive(Primitive),
 	Reference(Reference),
 }
@@ -41,9 +41,9 @@ impl Var {
 		}
 	}
 	
-	pub fn null() -> Self {
+	pub fn root() -> Self {
 		Var {
-			var_info: VarInfo::Null,
+			var_info: VarInfo::Root,
 		}
 	}
 	
@@ -194,7 +194,7 @@ impl CodeGenerator {
 		} else {
 			// Return a nil value
 			// This is necessary because if the block was a statement then it will always drop the result
-			self.instructions.push(Instruction::Push(Var::null()));
+			self.instructions.push(Instruction::Push(Var::root()));
 		}
 		// Return the value into the previous stack frame
 		// and exit the current one
@@ -240,7 +240,7 @@ impl CodeGenerator {
 		if let Some(else_block) = &if_stmnt.else_block {
 			self.gen_from_expr(&else_block);
 		} else {
-			self.instructions.push(Instruction::Push(Var::null()));
+			self.instructions.push(Instruction::Push(Var::root()));
 		}
 
 		// Fix the jump to after else locations
@@ -324,7 +324,7 @@ impl CodeGenerator {
 					self.locals.last_mut().unwrap().push(binding.ident.clone())
 				} else {
 					// Push a nil value to the stack
-					self.instructions.push(Instruction::Push(Var::null()));
+					self.instructions.push(Instruction::Push(Var::root()));
 					// Bind the variable to the nil value
 					self.instructions
 						.push(Instruction::Bind);
@@ -332,7 +332,7 @@ impl CodeGenerator {
 					self.locals.last_mut().unwrap().push(binding.ident.clone());
 				}
 				// Push a nil value since let is an expression and it's result will be popped
-				self.instructions.push(Instruction::Push(Var::null()))
+				self.instructions.push(Instruction::Push(Var::root()))
 			},
 			ExpressionType::Debug(ref expr) => {
 				// Generate the expression instructions
@@ -340,14 +340,14 @@ impl CodeGenerator {
 				// Debug the value at the top of the stack (pops it automatically)
 				self.instructions.push(Instruction::Debug);
 				// Push a nil value since debug is an expression and it's result will be popped
-				self.instructions.push(Instruction::Push(Var::null()))
+				self.instructions.push(Instruction::Push(Var::root()))
 			},
 			ExpressionType::Break(ref expr) => {
 				// If there's an associated expression then gen instructions for it, otherwise just push a nil
 				if let Some(expr) = expr {
 					self.gen_from_expr(expr);
 				} else {
-					self.instructions.push(Instruction::Push(Var::null()))
+					self.instructions.push(Instruction::Push(Var::root()))
 				}
 				// Return the value being broken and exit the loop stack frame
 				self.instructions.push(Instruction::Output);
@@ -360,7 +360,7 @@ impl CodeGenerator {
 					.unwrap()
 					.push(self.instructions.len() - 1);
 				// Push a nil value since break is an expression and it's result will be popped
-				self.instructions.push(Instruction::Push(Var::null()))
+				self.instructions.push(Instruction::Push(Var::root()))
 			},
 			ExpressionType::BoolLiteral(val) => {
 				self.instructions.push(Instruction::Push(Var::new_bool(val)))
@@ -380,17 +380,30 @@ impl CodeGenerator {
 				let typeindex = typedef.fields.iter().position(|field| &field.0 == fieldname).expect("Type does not have this field");
 				self.instructions.push(Instruction::Retrieve(typeindex));
 			},
-			ExpressionType::Instantiation(ref typename, ref fields) => {
-				let typedef = self.types.get(typename).expect("Type with that name not found").clone();
-				if fields.len() != typedef.fields.len() {
+			ExpressionType::Instantiation(ref instantiation) => {
+				let typedef = self.types.get(&instantiation.typename.name).expect("Type with that name not found").clone();
+				if instantiation.fields.len() != typedef.fields.len() {
 					panic!("Incorrect amount of fields provided for type")
 				}
-				for i in 0..fields.len() {
-					self.gen_from_expr(&fields[i]);
+				for i in 0..instantiation.fields.len() {
+					self.gen_from_expr(&instantiation.fields[i].1);
 				}
-				self.instructions.push(Instruction::Ref(fields.len()))
+				self.instructions.push(Instruction::Ref(instantiation.fields.len()))
 			},
-			_ => unimplemented!(),
+			ExpressionType::Root => self.instructions.push(Instruction::Push(Var::root())),
+			ExpressionType::StringLiteral(_) => unimplemented!(),
+			ExpressionType::Postfix(ref postfix) => {
+				self.gen_from_expr(&postfix.left);
+				match postfix.op {
+					_ => unimplemented!()
+				}
+			},
+			ExpressionType::Prefix(ref prefix) => {
+				self.gen_from_expr(&prefix.right);
+				match prefix.op {
+					_ => unimplemented!()
+				}
+			},
 		}
 	}
 }

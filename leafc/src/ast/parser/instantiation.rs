@@ -30,14 +30,26 @@ impl ExpressionTaker for InstantiationTaker {
 		
 		match tokens.get(0) {
 			Some(TokenTree::Brace(ref tokens)) => {
-				for expression_tokens in separated::parse_separated(tokens, |token| token.is_comma())? {
-					let (expr, _leftovers) = if let Some(expr) = next_expression(expression_tokens, Box::new(|_| false))? {
+				for field_tokens in separated::parse_separated(tokens, |token| token.is_comma())? {
+					let name = match field_tokens.get(0) {
+						Some(TokenTree::Token(Token::Name(ref ident))) => {
+							ident.clone()
+						},
+						_ => return Err(ParseError::Other.into()) // instantiation needed field name
+					};
+					
+					match field_tokens.get(1) {
+						Some(TokenTree::Token(Token::Symbol(TokenSymbol::Colon))) => {},
+						_ => return Err(ParseError::Other.into()) // Needed colon after field name
+					}
+					
+					let (expr, _leftovers) = if let Some(expr) = next_expression(&field_tokens[2..], Box::new(|_| false))? {
 						expr
 					} else {
 						return Err(ParseError::Other.into()) // Expected an expression in the instantiation
 					};
 					
-					values.push(expr);
+					values.push((name, expr));
 				}
 			},
 			_ => return Ok(None), // debug

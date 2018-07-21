@@ -108,7 +108,7 @@ mod structures {
 		NumberLiteral(u64),
 		BoolLiteral(bool),
 		FieldAccess(Box<Expression>, String),
-		Instantiation(String, Vec<Expression>),
+		Instantiation(String, Vec<(String, Expression)>),
 	}
 	
 	impl Expression {
@@ -260,7 +260,7 @@ pub fn next_statement<'a>(
 pub fn next_expression<'a>(
 	in_tokens: &'a [TokenTree],
 	end_predicate: Box<FnMut(&TokenTree) -> bool>,
-) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
+) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {	
 	if in_tokens.is_empty() {
 		return Ok(None);
 	}

@@ -69,7 +69,13 @@ pub enum ExpressionType {
 	BoolLiteral(bool),
 	Block(Box<Block>),
 	FieldAccess(Box<Expression>, String),
-	Instantiation(String, Vec<Expression>),
+	Instantiation(Instantiation),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Instantiation {
+	pub typename: TypeIdentifier,
+	pub fields: Vec<(String, Expression)>
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -138,6 +144,7 @@ pub struct HIR {
 }
 
 pub struct HIRGenerator {
+	types: HashMap<String, TypeDefinition>,
 	function_defs_returns: HashMap<String, TypeIdentifier>,
 	bindings_stack: Vec<HashMap<String, TypeIdentifier>>,
 }
@@ -145,6 +152,7 @@ pub struct HIRGenerator {
 impl HIRGenerator {
 	pub fn new() -> Self {
 		HIRGenerator {
+			types: HashMap::new(),
 			function_defs_returns: HashMap::new(),
 			bindings_stack: Vec::new(),
 		}
@@ -166,6 +174,9 @@ impl HIRGenerator {
 				})).collect()
 			})
 		}
+		for typedef in &typedefs {
+			self.types.insert(typedef.name.clone(), typedef.clone());
+		}
 		
 		for function in &ast.functions {
 			self.function_defs_returns.insert(function.name.clone(), function.return_type.clone().map(|name| TypeIdentifier {
@@ -180,6 +191,9 @@ impl HIRGenerator {
 			let args: Vec<(String, TypeIdentifier)> = function.args.iter().map(|(name, typename)| (name.clone(), TypeIdentifier {
 				name: typename.clone(),
 			})).collect();
+			for arg in &args {
+				self.bindings_stack.last_mut().unwrap().insert(arg.0.clone(), arg.1.clone());
+			}
 			let expr = self.block_to_expression(&function.body);
 			let body = Expression {
 				expr_out: self.get_expr_type(&expr),
@@ -301,11 +315,16 @@ impl HIRGenerator {
 			parser::Expression::BoolLiteral(ref b) => {
 				ExpressionType::BoolLiteral(*b)
 			},
-			parser::Expression::Instantiation(ref name, ref instantiation) => {
-				unimplemented!()
+			parser::Expression::Instantiation(ref name, ref fields) => {
+				ExpressionType::Instantiation(Instantiation {
+					typename: TypeIdentifier {
+						name: name.clone(),
+					},
+					fields: fields.iter().map(|field| (field.0.clone(), self.ast_expr_to_hir_expr(&field.1))).collect()
+				})
 			},
 			parser::Expression::FieldAccess(ref base, ref field) => {
-				unimplemented!()
+				ExpressionType::FieldAccess(Box::new(self.ast_expr_to_hir_expr(base)), field.clone())
 			},
 		}
 	}
@@ -393,11 +412,14 @@ impl HIRGenerator {
 			ExpressionType::StringLiteral(_) => TypeIdentifier {
 				name: "String".to_string(),
 			},
-			ExpressionType::FieldAccess(_, _) => {
-				unimplemented!()
+			ExpressionType::FieldAccess(ref base, ref ident) => {
+				let typedef = self.types.get(&base.expr_out.name).expect("No type with that name found");
+				
+				let field = typedef.fields.iter().find(|typedef| typedef == typedef).expect("Type does not have that field");
+				field.1.clone()
 			},
-			ExpressionType::Instantiation(_, _) => {
-				unimplemented!()
+			ExpressionType::Instantiation(ref instantiation) => {
+				instantiation.typename.clone()
 			},
 		}
 	}
@@ -421,7 +443,7 @@ pub fn traverse_expressions<F: FnMut(&Expression)>(expression: &Expression, f: &
 	f(expression);
 	match &expression.expr {
 		ExpressionType::Root => {
-			
+			// no action necessary
 		},
 		ExpressionType::Binary(ref binary) => {
 			f(&binary.left);
@@ -480,8 +502,8 @@ pub fn traverse_expressions<F: FnMut(&Expression)>(expression: &Expression, f: &
 		ExpressionType::FieldAccess(ref base, _) => {
 			f(base);
 		},
-		ExpressionType::Instantiation(_, ref values) => {
-			for expr in values {
+		ExpressionType::Instantiation(ref instantiation) => {
+			for (_, expr) in &instantiation.fields {
 				f(expr);
 			}
 		},
