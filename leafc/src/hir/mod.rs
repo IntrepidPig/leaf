@@ -27,6 +27,15 @@ impl TypeIdentifier {
 			name: "Root".to_string(),
 		}
 	}
+	
+	pub fn is_primitive(&self) -> bool {
+		match self.name.as_str() {
+			"Int" => true,
+			"Bool" => true,
+			"Root" => true,
+			_ => false,
+		}
+	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -262,11 +271,17 @@ impl HIRGenerator {
 			parser::Expression::NumberLiteral(val) => ExpressionType::IntLiteral(*val),
 			parser::Expression::Identifier(ref ident) => ExpressionType::Identifier(ident.clone()),
 			parser::Expression::Binary { left, right, op } => {
-				ExpressionType::Binary(Box::new(Binary {
-					left: self.ast_expr_to_hir_expr(left),
-					right: self.ast_expr_to_hir_expr(right),
-					op: *op,
-				}))
+				let left = self.ast_expr_to_hir_expr(left);
+				let right = self.ast_expr_to_hir_expr(right);
+				if left.expr_out.is_primitive() && right.expr_out.is_primitive() {
+					ExpressionType::Binary(Box::new(Binary {
+						left,
+						right,
+						op: *op,
+					}))
+				} else {
+					unimplemented!()
+				}
 			},
 			parser::Expression::Prefix { right, op } => {
 				ExpressionType::Prefix(Box::new(Prefix {
