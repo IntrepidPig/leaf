@@ -5,6 +5,9 @@ extern crate leafc;
 extern crate log;
 
 use std::io::{self, Read};
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::ffi::OsStr;
 
 use leafc::codegen::vmgen::{Instruction, Var, VarInfo, Primitive, Reference};
 
@@ -16,19 +19,27 @@ fn main() {
 			clap::Arg::with_name("debug")
 				.short("d")
 				.long("debug")
-				.help("Print debugging info"),
+				.help("Print debugging info")
 		)
 		.arg(
-			clap::Arg::with_name("program")
-				.short("p")
-				.long("prog")
-				.help("The program to be run")
-				.takes_value(true),
+			clap::Arg::with_name("includes")
+				.short("I")
+				.long("include")
+				.help("Includes another leaf source file as a module available in the current file")
+				.takes_value(true)
+				.multiple(true)
+		)
+		.arg(
+			clap::Arg::with_name("FILE")
+				.takes_value(true)
+				.required(true)
+				.value_name("FILE")
+				.help("The leaf file to compile. '-' for stdin")
 		)
 		.get_matches();
-
+	
 	let debug = matches.is_present("debug");
-
+	
 	fern::Dispatch::new()
 		.format(|out, message, record| {
 			if let (Some(file), Some(line)) = (record.file(), record.line()) {
@@ -51,24 +62,29 @@ fn main() {
 		.chain(std::io::stdout())
 		.apply()
 		.expect("Failed to initialize logger");
-
-	let input = if let Some(program) = matches.value_of("program") {
-		program.to_owned()
+	
+	let includes: Vec<(String, &Path)> = if let Some(includes) = matches.values_of_os("includes"){
+		includes.into_iter().map(|include| {
+			let include_path = Path::new(include);
+			let include_file_name = include_path.file_name().unwrap().to_str().unwrap();
+			let include_name = include_file_name.split(".").next().unwrap();
+			(include_name.to_owned(), include_path)
+		}).collect()
 	} else {
+		Vec::new()
+	};
+	let input_file = matches.value_of_os("FILE").unwrap();
+	
+	let ast = if input_file == "-" {
 		let mut input = String::new();
 		io::stdin().read_to_string(&mut input).unwrap();
-		input
+		leafc::ast::create_ast_with_includes(&input, &includes).unwrap()
+	} else {
+		let mut input = String::new();
+		let mut file = fs::File::open(&input_file).unwrap();
+		file.read_to_string(&mut input).unwrap();
+		leafc::ast::create_ast(&input).unwrap()
 	};
-	println!("'\n{}\n'\n\t=>", input);
-	let lexed = leafc::ast::lexer::lex(&input).unwrap();
-	println!("{:?}\n\t=>", lexed);
-	let mut tokenizer = leafc::ast::tokenizer::Tokenizer::new(lexed);
-	let tokens = tokenizer.tokenize().unwrap();
-	println!("{:?}\n\t=>", tokens);
-	let tokentree = leafc::ast::treeify::treeify(&tokens.tokens).unwrap();
-	println!("{:?}\n\t=>", tokentree);
-	let ast = leafc::ast::parser::parse(tokentree.as_slice()).unwrap();
-	println!("{:#?}\n\t=>", ast);
 	let mut hir_generator = leafc::hir::HIRGenerator::new();
 	let hir = hir_generator.ast_to_hir(&ast);
 	println!("{:#?}\n\t=>", hir);
@@ -201,7 +217,7 @@ fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<(), ()>
 					(VarInfo::Primitive(Primitive::U64(left)), VarInfo::Primitive(Primitive::U64(right))) => {
 						left + right
 					},
-					_ => panic!("Tried to add types that don't support it")
+					_ => panic!("Tried to add types that don't support it") // This is ok now because the conversion to hir changes operators to use the add method when they're not primitives
 				};
 				stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.push(Var::new_u64(output));
 				ptr -= 1;

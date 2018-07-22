@@ -34,16 +34,33 @@ mod structures {
 	}
 	
 	#[derive(Debug, Clone, PartialEq, Eq)]
+	pub struct Module {
+		name: String,
+		body: SyntaxTree,
+	}
+	
+	impl Module {
+		pub fn new(name: String, body: SyntaxTree) -> Self {
+			Module {
+				name,
+				body,
+			}
+		}
+	}
+	
+	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub struct SyntaxTree {
 		pub types: Vec<Type>,
 		pub functions: Vec<Function>,
+		pub modules: Vec<Module>,
 	}
 	
 	impl SyntaxTree {
-		pub fn new(types: Vec<Type>, functions: Vec<Function>) -> Self {
+		pub fn new(types: Vec<Type>, functions: Vec<Function>, modules: Vec<Module>) -> Self {
 			SyntaxTree {
 				types,
 				functions,
+				modules,
 			}
 		}
 	}

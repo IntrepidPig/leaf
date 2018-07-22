@@ -3,8 +3,8 @@ use std::{error::Error as StdError, fmt::{self, Debug, Display, Formatter}};
 use backtrace::Backtrace;
 
 pub struct Error<T: Failure> {
-	error: T,
-	bt: Backtrace,
+	pub error: T,
+	pub bt: Backtrace,
 }
 
 impl<T: StdError> Error<T> {
@@ -46,8 +46,8 @@ where
 }
 
 pub struct GenericError {
-	error: Box<Failure>,
-	bt: Backtrace,
+	pub error: Box<Failure>,
+	pub bt: Backtrace,
 }
 
 impl GenericError {

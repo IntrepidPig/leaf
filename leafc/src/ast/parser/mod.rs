@@ -23,7 +23,7 @@ pub use failure::Error;
 
 /// Parse a block from the tokens (will use all of the tokens or error)
 pub fn parse(in_tokens: &[TokenTree]) -> Result<SyntaxTree, Error<ParseError>> {
-	let mut stree = SyntaxTree::new(Vec::new(), Vec::new());
+	let mut stree = SyntaxTree::new(Vec::new(), Vec::new(), Vec::new());
 	let mut tokens = in_tokens;
 	
 	while !tokens.is_empty() {

@@ -13,5 +13,5 @@ pub mod hir;
 mod tests;
 
 pub fn leafc<P: AsRef<Path>>(path: P) {
-	let _ast = ast::create_ast(path);
+	let _ast = ast::create_ast_from_file(path, &[]);
 }
