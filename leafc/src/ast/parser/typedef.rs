@@ -34,13 +34,13 @@ pub fn take_typedef(in_tokens: &[TokenTree]) -> Result<Option<(Type, &[TokenTree
 					Some(TokenTree::Token(Token::Symbol(TokenSymbol::Colon))) => {},
 					_ => return Err(ParseError::Other.into()) // Field name didn't have a colon after it
 				}
-				
+								
 				let (typename, leftovers) = if let Some(res) = next_type(&field_tokens[2..])? {
 					res
 				} else {
 					return Err(ParseError::Other.into()) // Field didn't specify a type
 				};
-				
+								
 				if !leftovers.is_empty() {
 					return Err(ParseError::Other.into()) // Didn't parse field type correctly
 				}

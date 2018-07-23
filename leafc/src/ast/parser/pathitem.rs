@@ -21,7 +21,7 @@ pub fn next_type<'a>(
 	Ok(Some((PathItem {
 		module_path: modpath,
 		item: typename,
-	}, &tokens[1..])))
+	}, &leftovers[1..])))
 }
 
 pub fn next_path<'a>(
