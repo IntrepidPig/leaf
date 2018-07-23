@@ -9,7 +9,7 @@ use std::fs::File;
 use std::io::Read;
 use failure;
 
-use self::parser::{SyntaxTree, Module, Identifier, PathItem, ModulePath};
+use self::parser::{SyntaxTree, Module, Identifier};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ast {
@@ -72,7 +72,7 @@ pub fn create_ast_with_includes(input: &str, includes: &[(String, &Path)]) -> Re
 	let mut modules = Vec::new();
 	for include in includes {
 		let include_st = create_ast_from_file(&include.1, &[]).unwrap(); // TODO support includes with includes? maybe should only be solved by libraries
-		modules.push(Module::new(Identifier::from_string(include.0.clone()), include_st));
+		modules.push((Identifier::from_string(include.0.clone()), Module::new(include_st)));
 	}
 	let mut st = create_ast(input).unwrap();
 	st.modules = modules;

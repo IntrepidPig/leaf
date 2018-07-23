@@ -1,6 +1,8 @@
-- Implement assignment
 - Implement other math operations
 - Implement requirement of braces to define order of operations
-- Implement type system
-- Implement defining own types
-- omg there's so much more work
+- Compiler checks
+	- Type checking
+	- Symbol checking
+	- Field existence checking
+- Compile a list of type definitions
+- "Syscalls" / intrinsics

@@ -1,6 +1,6 @@
 extern crate leafc;
 
-static INPUT_TEST: &'static str = r###"
+/* static INPUT_TEST: &'static str = r###"
 let a = 21;
 {
 	let b = 360;
@@ -9,7 +9,7 @@ let a = 21;
 let c = 2;
 debug a;
 debug c;
-"###;
+"###; */
 
 fn main() {
 	/*let input = INPUT_TEST;

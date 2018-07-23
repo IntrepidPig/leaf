@@ -136,42 +136,32 @@ impl<'a> CodeGenerator<'a> {
 			locals: vec![Vec::new()],
 			function_locations: HashMap::new(),
 			function_jumps_todo: Vec::new(),
-			module_path: ModulePath::new(false, vec![Identifier::from_str("root")]),
+			module_path: ModulePath::new(false, Vec::new()),
 		}
 	}
 	
 	pub fn find_typedef(&self, path: PathItem<TypeName>) -> Option<TypeDefinition> {
 		let mut typedef = None;
-		let mut current_path = ModulePath::new(false, Vec::new());
-		self.root_mod.traverse(&mut |module: &Module| {
-			current_path.path.push(module.name.clone());
-			
+		self.root_mod.traverse(&mut |current_path: &ModulePath, module: &Module| {			
 			for test_typedef in &module.types {
-				if test_typedef.name == path.item && current_path == path.module_path {
+				if test_typedef.name == path.item && current_path == &path.module_path {
 					typedef = Some(test_typedef.clone());
 				}
 			}
-			
-			current_path.path.pop().unwrap();
-		});
+		}, &mut ModulePath::new(false, Vec::new()));
 		
 		typedef
 	}
 	
 	pub fn find_function(&self, path: PathItem<Identifier>) -> Option<FunctionDefinition> {
 		let mut functiondef = None;
-		let mut current_path = ModulePath::new(false, vec![Identifier::from_str("root")]);
-		self.root_mod.traverse(&mut |module: &Module| {
-			current_path.path.push(module.name.clone());
-			
+		self.root_mod.traverse(&mut |current_path: &ModulePath, module: &Module| {
 			for test_function in &module.functions {
-				if test_function.name == path.item && current_path == path.module_path {
+				if test_function.name == path.item && current_path == &path.module_path {
 					functiondef = Some(test_function.clone());
 				}
 			}
-			
-			current_path.path.pop().unwrap();
-		});
+		}, &mut ModulePath::new(false, Vec::new()));
 		
 		functiondef
 	}

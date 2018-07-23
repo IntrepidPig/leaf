@@ -1,37 +1,54 @@
-use std::collections::HashMap;
+//! Code related to generation of HIR (High-level Intermediate Representation). Use HIRGenerator to
+//! generate HIR from an AST.
 
+use std::collections::HashMap;
 use ast::parser::{self, SyntaxTree, BinaryOp, PrefixOp, PostfixOp, Identifier, ModulePath, PathItem, TypeName};
 
+/// A function definition
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionDefinition {
+	/// The name of the function
 	pub name: Identifier,
+	/// The named arguments of the function
 	pub args: Vec<(Identifier, PathItem<TypeName>)>,
+	/// The return type of the function
 	pub return_type: PathItem<TypeName>,
-	pub body: Expression, // should always be block?
+	/// The body of the function. Currently it is only possible for it to be a block but in the future
+	/// other expressions may be valid function bodies as well.
+	pub body: Expression,
 }
 
+/// A function call (not a method call)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionCall {
+	/// The path to the function being called
 	pub name: PathItem<Identifier>,
+	/// The arguments passed to the function
 	pub args: Vec<Expression>,
 }
 
 impl PathItem<TypeName> {
+	/// Gets a PathItem that refers to `::core::Root`
 	pub fn root() -> Self {
 		PathItem {
 			module_path: ModulePath {
 				relative: false,
-				path: vec![Identifier::from_str("root"), Identifier::from_string("core".to_string())],
+				path: vec![Identifier::from_string("core".to_string())],
 			},
 			item: TypeName::from_ident(Identifier::from_string("Root".to_owned()))
 		}
 	}
 	
+	/// Checks if the `PathItem` refers to a primitive type in `::core`
+	/// Returns true for:
+	/// - `::core::Int`
+	/// - `::core::Bool`
+	/// - `::core::Root`
 	pub fn is_primitive(&self) -> bool {
 		let int = PathItem {
 			module_path: ModulePath {
 				relative: false,
-				path: vec![Identifier::from_str("root"), Identifier::from_string("core".to_string())],
+				path: vec![Identifier::from_string("core".to_string())],
 			},
 			item: TypeName::from_ident(Identifier::from_string("Int".to_owned()))
 		};
@@ -39,7 +56,7 @@ impl PathItem<TypeName> {
 		let boolean = PathItem {
 			module_path: ModulePath {
 				relative: false,
-				path: vec![Identifier::from_str("root"), Identifier::from_string("core".to_string())],
+				path: vec![Identifier::from_string("core".to_string())],
 			},
 			item: TypeName::from_ident(Identifier::from_string("Bool".to_owned()))
 		};
@@ -47,24 +64,25 @@ impl PathItem<TypeName> {
 		let root = PathItem {
 			module_path: ModulePath {
 				relative: false,
-				path: vec![Identifier::from_str("root"), Identifier::from_string("core".to_string())],
+				path: vec![Identifier::from_string("core".to_string())],
 			},
 			item: TypeName::from_ident(Identifier::from_string("Root".to_owned()))
 		};
 		
 		match self {
-			root => true,
-			int => true,
-			boolean => true,
+			_ if *self == root => true,
+			_ if *self == int => true,
+			_ if *self == boolean => true,
 			_ => false,
 		}
 	}
 	
+	/// Returns a PathItem that refers to a type in `::core`
 	fn core_type(name: &str) -> PathItem<TypeName> {
 		PathItem {
 			module_path: ModulePath {
 				relative: false,
-				path: vec![Identifier::from_str("root"), Identifier::from_string("core".to_string())],
+				path: vec![Identifier::from_string("core".to_string())],
 			},
 			item: TypeName::from_ident(Identifier::from_string(name.to_owned()))
 		}
@@ -72,17 +90,19 @@ impl PathItem<TypeName> {
 }
 
 impl<T> PathItem<T> {
+	/// Returns a `PathItem` that refers to the specified element in the root
 	pub fn root_item(t: T) -> Self {
 		PathItem {
 			module_path: ModulePath {
 				relative: false,
-				path: vec![Identifier::from_str("root")]
+				path: Vec::new(),
 			},
 			item: t,
 		}
 	}
 }
 
+/// A type definition
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TypeDefinition {
 	pub name: TypeName,
@@ -98,6 +118,7 @@ impl From<parser::Type> for TypeDefinition {
 	}
 }
 
+/// An expression. Has the expression itself, as well as the return type of the expression.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Expression {
 	pub expr: ExpressionType,
@@ -105,6 +126,7 @@ pub struct Expression {
 }
 
 impl Expression {
+	/// Returns an expression that evaluates to the `Root` primitive
 	pub fn root() -> Self {
 		Expression {
 			expr: ExpressionType::Root,
@@ -113,117 +135,188 @@ impl Expression {
 	}
 }
 
+/// A type of expression
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExpressionType {
+	/// The root type
 	Root,
+	/// A binary operation
 	Binary(Box<Binary>),
+	/// A prefix operation
 	Prefix(Box<Prefix>),
+	/// A postfix operation
 	Postfix(Box<Postfix>),
+	/// A function call
 	FunctionCall(FunctionCall),
+	/// A debug expression
 	Debug(Box<Expression>),
+	/// A break expression with an optional value
 	Break(Option<Box<Expression>>),
+	/// A variable binding
 	Binding(Box<Binding>),
+	/// A (re)assignment
 	Assignment(Box<Assignment>),
+	/// A loop expression
 	Loop(Box<Expression>),
+	/// An if statement
 	If(Box<If>),
+	/// An identifier (variable name)
 	Identifier(Identifier),
+	/// A string literal
 	StringLiteral(String),
+	/// An integer literal
 	IntLiteral(u64),
+	/// A boolean literal
 	BoolLiteral(bool),
+	/// A block of expressions and an optional output
 	Block(Box<Block>),
+	/// A field access of a type. Contains the base expression and the field being accessed respectively
 	FieldAccess(Box<Expression>, Identifier),
+	/// An instantiation of a type
 	Instantiation(Instantiation),
 }
 
+/// An instantiation of a type
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Instantiation {
+	/// The type being instantiated
 	pub typename: PathItem<TypeName>,
+	/// The fields given to the type
 	pub fields: Vec<(Identifier, Expression)>
 }
 
+/// An if expression
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct If {
+	/// The condition of the if expression
 	pub condition: Expression,
+	/// The body of the if expression
 	pub body: Expression,
 	pub elif: Option<Box<If>>,
+	/// The body of the else block
 	pub else_block: Option<Expression>,
 }
 
+/// A (re)assignment
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Assignment {
+	/// The variable being assigned to
 	pub ident: Identifier,
+	/// The value to assign to the variable
 	pub expr: Expression,
 }
 
+/// A binary operation
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Binary {
+	/// The left hand side
 	pub left: Expression,
+	/// The right hand side
 	pub right: Expression,
+	/// The operator
 	pub op: BinaryOp,
 }
 
+/// A prefix operation
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Prefix {
+	/// The operand (on the right of the operator)
 	pub right: Expression,
+	/// The operator
 	pub op: PrefixOp,
 }
 
+/// A postfix operation
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Postfix {
+	/// The left hand side (on the left of the operator)
 	pub left: Expression,
+	/// The operator
 	pub op: PostfixOp,
 }
 
+/// A binding
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Binding {
+	/// The name of the binding
 	pub ident: Identifier,
+	/// THe mutability of the binding
 	pub mutable: bool,
+	/// The type of the variable being bound
 	pub bind_type: PathItem<TypeName>,
+	/// The expression the variable is being bound to
 	pub expr: Option<Expression>,
 }
 
+/// A block expression
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Block {
+	/// The statements in the block
 	pub statements: Vec<Expression>,
+	/// The optional output of the expression (will be `Root` otherwise)
 	pub output: Option<Expression>,
 }
 
+/// A module of code. Contains type definitions, function definitions, and more modules.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Module {
-	pub name: Identifier,
-	pub modules: Vec<Module>,
+	/// The modules within this modules
+	pub modules: Vec<(Identifier, Module)>,
+	/// The type definitions within this module
 	pub types: Vec<TypeDefinition>,
+	/// The function definitions within this module
 	pub functions: Vec<FunctionDefinition>,
 }
 
 impl Module {
-	pub fn traverse_mut<F: FnMut(&mut Module)>(&mut self, f: &mut F) {
-		f(self);
-		for module in &mut self.modules {
-			module.traverse_mut(f);
+	// TODO for traversing pass the current module path as an argument, to avoid having to keep track manually
+	/// Traverse this module and the modules within it mutably. Performs `f` on each module including
+	/// the current one.
+	pub fn traverse_mut<F: FnMut(&ModulePath, &mut Module)>(&mut self, f: &mut F, start_path: &mut ModulePath) {
+		f(start_path, self);
+		for (name, module) in &mut self.modules {
+			start_path.path.push(name.clone());
+			module.traverse_mut(f, start_path);
+			start_path.path.pop().unwrap();
 		}
 	}
 	
-	pub fn traverse<F: FnMut(&Module)>(&self, f: &mut F) {
-		f(&self);
-		for module in &self.modules {
-			module.traverse(f);
+	/// Traverse this module and the modules within it immutably. Performs `f` on each module including
+	/// the current one.
+	pub fn traverse<F: FnMut(&ModulePath, &Module)>(&self, f: &mut F, start_path: &mut ModulePath) {
+		f(start_path, &self);
+		for (name, module) in &self.modules {
+			start_path.path.push(name.clone());
+			module.traverse(f, start_path);
+			start_path.path.pop().unwrap();
 		}
 	}
 }
 
+/// A High-level Intermediate Representation of a Leaf program. HIR will have a type for all expressions that
+/// is the type they output, and it will have all reference to items that can be in seperate modules resolved
+/// to absolute paths from the root of the crate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HIR {
 	pub modules: Vec<Module>,
 }
 
+/// A struct that will generate HIR from an AST, resolving all `PathItem`s to absolute ones and giving
+/// all expressions a type in the process.
 pub struct HIRGenerator {
+	/// A map of all types in the application referenced by their absolute module path to avoid conflict
 	types: HashMap<PathItem<TypeName>, TypeDefinition>,
+	/// A map of the return types of all function definitions referenced by their absolute module path to
+	/// avoid conflict.
 	function_defs_returns: HashMap<PathItem<Identifier>, PathItem<TypeName>>,
+	/// A list of maps of currently available variable bindings.
+	// Is currently implemented as a stack to allow for nested function definitions, but that isn't
+	// supported by the parser yet.
 	bindings_stack: Vec<HashMap<Identifier, PathItem<TypeName>>>,
 }
 
 impl HIRGenerator {
+	/// Creates a new `HIRGenerator`
 	pub fn new() -> Self {
 		HIRGenerator {
 			types: HashMap::new(),
@@ -232,67 +325,92 @@ impl HIRGenerator {
 		}
 	}
 	
+	/// Convert a `SyntaxTree` to `HIR`. Make sure that the `SyntaxTree` has all the modules it
+	/// references in it's list of modules.
 	pub fn ast_to_hir(&mut self, ast: SyntaxTree) -> HIR {
+		// Create the root module from the SyntaxTree given.
+		// TODO change this to not require the name root
 		let mut root_module = parser::Module {
-			name: Identifier::from_str("root"),
 			body: ast,
 		};
 		
-		self.resolve_paths(&mut root_module);
+		// Resolve all paths of the syntax tree to absolute paths with this module
+		// as the root.
+		self.resolve_paths(&mut root_module, &mut ModulePath::new(false, Vec::new()));
 		
 		HIR {
-			modules: vec![self.ast_module_to_hir_module(&root_module)]
+			modules: vec![self.ast_module_to_hir_module(&root_module, &mut ModulePath::new(false, Vec::new()))]
 		}
 	}
 	
-	pub fn resolve_paths(&mut self, module: &mut parser::Module) {
-		fn resolve_path(current: &ModulePath, to_resolve: &mut ModulePath) {
-			if to_resolve.relative {
+	/// Resolve all paths in a module to absolute paths with this module as a root.
+	pub fn resolve_paths(&mut self, module: &mut parser::Module, module_path: &mut ModulePath) {
+		//
+		// Appends `to_resolve` to current module path, if `to_resolve` isn't already absolute
+		fn resolve_path<T: Eq + Clone>(current: &ModulePath, uses: &Vec<PathItem<T>>, to_resolve: &mut PathItem<T>) {
+			if to_resolve.module_path.relative {
+				for u in uses {
+					if u.item == to_resolve.item {
+						*to_resolve = u.clone();
+						return;
+					}
+				}
+				
+				// The type is relative and not used, it must be part of this module
 				let mut new_path = current.clone();
-				new_path.path.append(&mut to_resolve.path);
-				to_resolve.relative = false;
-				*to_resolve = new_path;
+				new_path.path.append(&mut to_resolve.module_path.path);
+				to_resolve.module_path = new_path;
 			}
 		}
 		
-		let mut current_path = ModulePath::new(false, Vec::new());
-		module.traverse_mut(&mut |module: &mut parser::Module| {
-			current_path.path.push(module.name.clone());
-			for function in &mut module.body.functions {
-				for (arg_name, arg_type) in &mut function.args {
-					resolve_path(&current_path, &mut arg_type.module_path);
+		// Resolve all paths to types and functions to absolute paths
+		module.traverse_mut(&mut |current_path: &ModulePath, module: &mut parser::Module| {
+			let types = &mut module.body.types;
+			let functions = &mut module.body.functions;
+			let uses = &module.body.uses;
+				
+			// Resolve all the paths in each function of this module
+			for function in functions {
+				// Resolve the types of the arguments of the function
+				for (_arg_name, arg_type) in &mut function.args {
+					resolve_path(&current_path, uses, arg_type);
 				}
 				
-				function.return_type.as_mut().map(|return_type| resolve_path(&current_path, &mut return_type.module_path));
+				// Resolve the return type of the function
+				function.return_type.as_mut().map(|return_type| resolve_path(&current_path, uses, return_type));
 				
+				// Resolve all of the function calls and instantiations in this function
 				function.body.traverse_expressions_mut(&mut |expr: &mut parser::Expression| {
 					match expr {
 						parser::Expression::Instantiation(ref mut name, _) => {
-							resolve_path(&current_path, &mut name.module_path);
+							resolve_path(&current_path, &uses, name);
 						},
-						parser::Expression::FunctionCall { ref mut name, .. } => {
-							resolve_path(&current_path, &mut name.module_path);
+						parser::Expression::FunctionCall { .. } => {
+							// TODO! allow using functions
+							//resolve_path(&current_path, &module.body.uses, name);
 						},
 						_ => {},
 					}
-				})
+				});
 			}
 			
-			for typedef in &mut module.body.types {
-				for (member_name, member_type) in &mut typedef.members {
-					resolve_path(&current_path, &mut member_type.module_path);
+			// Resolve all of the types of fields in each type definition of this module
+			for typedef in types {
+				for (_member_name, member_type) in &mut typedef.members {
+					resolve_path(&current_path, &module.body.uses, member_type);
 				}
 			}
-			
-			current_path.path.pop().unwrap();
-		});
+		}, module_path);
 	}
 	
-	pub fn ast_module_to_hir_module(&mut self, module: &parser::Module) -> Module {
-		let mut current_path = ModulePath::new(false, Vec::new());
-		module.traverse(&mut |module: &parser::Module| {
-			current_path.path.push(module.name.clone());
-			
+	/// Convert an AST module to an HIR module. Assumes all paths are resolved as absolute, and will fail
+	/// if they aren't.
+	// TODO instead we should resolve paths on the fly in this function
+	pub fn ast_module_to_hir_module(&mut self, module: &parser::Module, module_path: &mut ModulePath) -> Module {		
+		// Add all type definitions to the global list of type definitions with it's full path
+		// Add all functions to the global list of function return types with it's full path
+		module.traverse(&mut |current_path: &ModulePath, module: &parser::Module| {
+			// Typedefs
 			for typedef in &module.body.types {
 				self.types.insert({
 					PathItem {
@@ -302,6 +420,7 @@ impl HIRGenerator {
 				}, typedef.clone().into());
 			}
 			
+			// Functions
 			for function in &module.body.functions {
 				self.function_defs_returns.insert({
 					PathItem {
@@ -310,63 +429,74 @@ impl HIRGenerator {
 					}
 				}, function.return_type.clone().unwrap_or(PathItem::<TypeName>::root()));
 			}
-			
-			current_path.path.pop().unwrap();
-		});
+		}, module_path);
 		
+		// Convert all AST function definitions to HIR function definitions
 		let mut functiondefs = Vec::new();
-		for function in &module.body.functions {
-			self.bindings_stack.push(HashMap::new());
-			let name = function.name.clone();
-			let args: Vec<(Identifier, PathItem<TypeName>)> = function.args.iter().map(|(name, typename)| (name.clone(), typename.clone())).collect();
-			for arg in &args {
-				self.bindings_stack.last_mut().unwrap().insert(arg.0.clone(), arg.1.clone());
-			}
-			let expr = self.block_to_expression(&function.body);
-			let body = Expression {
-				expr_out: self.get_expr_type(&expr),
-				expr,
-			};
-			let return_type = match (&function.return_type, &body.expr_out) {
-				(None, b_return) => {
-					// TODO fail if b_return isn't root
-					b_return.clone()
-				},
-				(Some(f_return), b_return) => {
-					if f_return == b_return {
-						b_return.clone()
-					} else {
-						panic!("Mismatched return types")
-					}
-				},
-			};
-			
-			functiondefs.push({
-				FunctionDefinition {
-					name,
-					args,
-					body,
-					return_type,
+		module.traverse(&mut |_: &ModulePath, module: &parser::Module| {
+			for function in &module.body.functions {
+				// TODO! account for blocks
+				// Push a new list of bindings on the binding stack
+				self.bindings_stack.push(HashMap::new());
+				let name = function.name.clone();
+				
+				// Add the function arguments to the binding list
+				let args = function.args.clone();
+				for arg in &args {
+					self.bindings_stack.last_mut().unwrap().insert(arg.0.clone(), arg.1.clone());
 				}
-			});
-			self.bindings_stack.pop();
-		}
+				
+				// Get the return type and ensure it matches the block output, or just use the block output as the return type
+				let expr = self.block_to_expression(&function.body);
+				let body = Expression {
+					expr_out: self.get_expr_type(&expr),
+					expr,
+				};
+				let return_type = match (&function.return_type, &body.expr_out) {
+					(None, b_return) => {
+						// TODO fail if b_return isn't root
+						b_return.clone()
+					},
+					(Some(f_return), b_return) => {
+						if f_return == b_return {
+							b_return.clone()
+						} else {
+							panic!("Mismatched return types")
+						}
+					},
+				};
+				
+				functiondefs.push({
+					FunctionDefinition {
+						name,
+						args,
+						body,
+						return_type,
+					}
+				});
+				self.bindings_stack.pop();
+			}
+		}, module_path);
 		
+		// TODO!! traverse modules
+		// Put all typedefs in global typedef list
 		let typedefs = module.body.types.iter().map(|typedef| typedef.clone().into()).collect();
 		
 		let mut modules = Vec::new();
-		for module in &module.body.modules {
-			modules.push(self.ast_module_to_hir_module(module));
+		for (name, module) in &module.body.modules {
+			module_path.path.push(name.clone());
+			modules.push((name.clone(), self.ast_module_to_hir_module(module, module_path)));
+			module_path.path.pop().unwrap();
 		}
 		
 		Module {
-			name: module.name.clone(),
 			modules,
 			types: typedefs,
 			functions: functiondefs,
 		}
 	}
 	
+	// Convert an ast expression to an HIR expression
 	pub fn ast_expr_to_hir_expr(&mut self, expr: &parser::Expression) -> Expression {
 		let expr = self.ast_expr_to_exprtype(expr);
 		Expression {
@@ -375,6 +505,8 @@ impl HIRGenerator {
 		}
 	}
 	
+	// TODO rename ExpressionType to ExpressionKind
+	// Convert an ast expression to an HIR ExpressionType
 	pub fn ast_expr_to_exprtype(&mut self, expr: &parser::Expression) -> ExpressionType {
 		match expr {
 			parser::Expression::Block(ref block) => {
@@ -405,6 +537,8 @@ impl HIRGenerator {
 						op: *op,
 					}))
 				} else {
+					println!("{:?}\n{:?}\n{:?}", left, right, op);
+					// TODO operation traits
 					unimplemented!()
 				}
 			},
@@ -485,10 +619,10 @@ impl HIRGenerator {
 				}
 				bind_type.unwrap()
 			},
-			ExpressionType::Prefix(ref prefix) => {
+			ExpressionType::Prefix(ref _prefix) => {
 				unimplemented!()
 			},
-			ExpressionType::Postfix(ref postfix) => {
+			ExpressionType::Postfix(ref _postfix) => {
 				unimplemented!()
 			},
 			ExpressionType::Binary(ref binary) => {
@@ -545,9 +679,11 @@ impl HIRGenerator {
 			},
 			ExpressionType::StringLiteral(_) => PathItem::<TypeName>::core_type("String"),
 			ExpressionType::FieldAccess(ref base, ref ident) => {
+				// Find the type of the base in the global types list
 				let typedef = self.types.get(&base.expr_out).expect("No type with that name found");
 				
-				let field = typedef.fields.iter().find(|typedef| typedef == typedef).expect("Type does not have that field");
+				// Find the field referred to and return it's type
+				let field = typedef.fields.iter().find(|field| ident == &field.0).expect("Type does not have that field");
 				field.1.clone()
 			},
 			ExpressionType::Instantiation(ref instantiation) => {

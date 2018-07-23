@@ -10,9 +10,11 @@ pub fn next_type<'a>(
 	} else {
 		return Ok(None)
 	};
+	tokens = leftovers;
 	
 	let typename = match leftovers.get(0) {
 		Some(TokenTree::Token(Token::Name(ref name))) => {
+			tokens = &tokens[1..];
 			TypeName::from_ident(Identifier::from_str(name))
 		},
 		_ => return Ok(None)
@@ -21,7 +23,7 @@ pub fn next_type<'a>(
 	Ok(Some((PathItem {
 		module_path: modpath,
 		item: typename,
-	}, &leftovers[1..])))
+	}, &tokens)))
 }
 
 pub fn next_path<'a>(

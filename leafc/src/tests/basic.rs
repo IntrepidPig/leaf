@@ -1,4 +1,4 @@
-use std::path::Path;
+/* use std::path::Path;
 
 use ast;
 use codegen;
@@ -17,12 +17,6 @@ fn basic_tests() {
 	];
 	
 	for test in tests.into_iter() {
-		let lexed = ast::lexer::lex(&test).unwrap();
-		let mut tokenizer = ast::tokenizer::Tokenizer::new(lexed);
-		let tokens = tokenizer.tokenize().unwrap();
-		let tokentree = ast::treeify::treeify(&tokens.tokens).unwrap();
-		let ast = ast::parser::parse(tokentree.as_slice()).unwrap();
-		let mut code_generator = codegen::vmgen::CodeGenerator::new();
 		let _instructions = code_generator.gen_instructions(&ast);
 	}
-}
+} */

@@ -88,6 +88,10 @@ fn parse_args(in_tokens: &[TokenTree]) -> Result<Vec<(Identifier, PathItem<TypeN
 			return Err(ParseError::Other.into()) // Didn't get type after argument
 		};
 		
+		if !leftovers.is_empty() {
+			return Err(ParseError::Other.into()) // There were leftover tokens after the parameter type
+		}
+		
 		args.push((name, typename));
 	}
 	

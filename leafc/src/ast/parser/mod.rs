@@ -15,6 +15,7 @@ pub mod functioncall;
 pub mod separated;
 pub mod instantiation;
 pub mod pathitem;
+pub mod uses;
 
 pub use ast::tokenizer::{Keyword, Symbol as TokenSymbol};
 pub use self::syntaxtree::*;
@@ -25,7 +26,7 @@ pub use failure::Error;
 
 /// Parse a block from the tokens (will use all of the tokens or error)
 pub fn parse(in_tokens: &[TokenTree]) -> Result<SyntaxTree, Error<ParseError>> {
-	let mut stree = SyntaxTree::new(Vec::new(), Vec::new(), Vec::new());
+	let mut stree = SyntaxTree::new(Vec::new(), Vec::new(), Vec::new(), Vec::new());
 	let mut tokens = in_tokens;
 	
 	while !tokens.is_empty() {
@@ -37,7 +38,13 @@ pub fn parse(in_tokens: &[TokenTree]) -> Result<SyntaxTree, Error<ParseError>> {
 			tokens = leftovers;
 			stree.types.push(typedef);
 			continue;
+		} else if let Some((u, leftovers)) = uses::take_use(tokens)? {
+			tokens = leftovers;
+			stree.uses.push(u);
+			continue;
 		}
+		
+		// TODO! parse uses and modules
 		
 		return Err(ParseError::Other.into()) // Didn't get a function or a typedef in the root
 	}

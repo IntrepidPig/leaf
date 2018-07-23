@@ -35,22 +35,25 @@ mod structures {
 	
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub struct Module {
-		pub name: Identifier,
 		pub body: SyntaxTree,
 	}
 	
 	impl Module {
-		pub fn traverse_mut<F: FnMut(&mut Module)>(&mut self, f: &mut F) {
-			f(self);
-			for module in &mut self.body.modules {
-				f(module);
+		pub fn traverse_mut<F: FnMut(&ModulePath, &mut Module)>(&mut self, f: &mut F, start_path: &mut ModulePath) {
+			f(&start_path, self);
+			for (name, module) in &mut self.body.modules {
+				start_path.path.push(name.clone());
+				module.traverse_mut(f, start_path);
+				start_path.path.pop().unwrap();
 			}
 		}
 		
-		pub fn traverse<F: FnMut(&Module)>(&self, f: &mut F) {
-			f(self);
-			for module in &self.body.modules {
-				f(module);
+		pub fn traverse<F: FnMut(&ModulePath, &Module)>(&self, f: &mut F, start_path: &mut ModulePath) {
+			f(&start_path, self);
+			for (name, module) in &self.body.modules {
+				start_path.path.push(name.clone());
+				module.traverse(f, start_path);
+				start_path.path.pop().unwrap();
 			}
 		}
 	}
@@ -96,9 +99,8 @@ mod structures {
 	}
 	
 	impl Module {
-		pub fn new(name: Identifier, body: SyntaxTree) -> Self {
+		pub fn new(body: SyntaxTree) -> Self {
 			Module {
-				name,
 				body,
 			}
 		}
@@ -121,14 +123,16 @@ mod structures {
 	
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub struct SyntaxTree {
+		pub uses: Vec<PathItem<TypeName>>,
 		pub types: Vec<Type>,
 		pub functions: Vec<Function>,
-		pub modules: Vec<Module>,
+		pub modules: Vec<(Identifier, Module)>,
 	}
 	
 	impl SyntaxTree {
-		pub fn new(types: Vec<Type>, functions: Vec<Function>, modules: Vec<Module>) -> Self {
+		pub fn new(uses: Vec<PathItem<TypeName>>, types: Vec<Type>, functions: Vec<Function>, modules: Vec<(Identifier, Module)>) -> Self {
 			SyntaxTree {
+				uses,
 				types,
 				functions,
 				modules,
@@ -200,30 +204,7 @@ mod structures {
 		
 	}
 	
-	impl Expression {
-		pub fn get_type(&self) -> PathItem<TypeName> {
-			panic!("You shouldn't do this");
-			match self {
-				Expression::StringLiteral(_) => PathItem {
-					module_path: ModulePath::new(false, vec![Identifier::from_string("core".to_string())]),
-					item: TypeName::from_ident(Identifier::from_string("String".to_owned())),
-				},
-				Expression::NumberLiteral(_) => PathItem {
-					module_path: ModulePath::new(false, vec![Identifier::from_string("core".to_string())]),
-					item: TypeName::from_ident(Identifier::from_string("Int".to_owned())),
-				},
-				Expression::Instantiation(ref name, _) => name.clone(),
-				Expression::Block(ref block) => block.output.as_ref().unwrap_or(&Expression::Root).get_type(),
-				Expression::Root => PathItem {
-					module_path: ModulePath::new(false, vec![Identifier::from_string("core".to_string())]),
-					item: TypeName::from_ident(Identifier::from_string("Root".to_owned()))
-				},
-				_ => {
-					panic!("Tried to get type for unsupported expression: {:?}", self)
-				},
-			}
-		}
-		
+	impl Expression {		
 		pub fn traverse_expressions_mut<F: FnMut(&mut Expression)>(&mut self, f: &mut F) {
 			f(self);
 			match self {
@@ -238,7 +219,7 @@ mod structures {
 				Expression::Postfix { left, .. } => {
 					left.traverse_expressions_mut(f);
 				},
-				Expression::FunctionCall { name, args: ref mut args, } => {
+				Expression::FunctionCall { name: _, args, } => {
 					for arg in args {
 						arg.traverse_expressions_mut(f);
 					}
