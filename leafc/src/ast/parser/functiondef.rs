@@ -14,7 +14,7 @@ pub fn take_functiondef(in_tokens: &[TokenTree]) -> Result<Option<(Function, &[T
 	let name = match tokens.get(0) {
 		Some(TokenTree::Token(Token::Name(ref name))) => {
 			tokens = &tokens[1..];
-			name.clone()
+			Identifier::from_str(name)
 		},
 		_ => return Err(ParseError::Other.into()) // needed a function name
 	};
@@ -32,9 +32,15 @@ pub fn take_functiondef(in_tokens: &[TokenTree]) -> Result<Option<(Function, &[T
 	};
 	
 	let return_type = match tokens.get(0) {
-		Some(TokenTree::Token(Token::Name(ref name))) => {
+		Some(TokenTree::Token(Token::Symbol(TokenSymbol::Colon))) => {
 			tokens = &tokens[1..];
-			Some(name.clone())
+			let (typename, leftovers) = if let Some(res) = next_type(tokens)? {
+				res
+			} else {
+				return Err(ParseError::Other.into()); // Expected a type after the colon
+			};
+			tokens = leftovers;
+			Some(typename)
 		},
 		_ => None,
 	};
@@ -61,26 +67,25 @@ pub fn take_functiondef(in_tokens: &[TokenTree]) -> Result<Option<(Function, &[T
 	}, tokens)))
 }
 
-fn parse_args(in_tokens: &[TokenTree]) -> Result<Vec<(String, String)>, Error<ParseError>> {
+fn parse_args(in_tokens: &[TokenTree]) -> Result<Vec<(Identifier, PathItem<TypeName>)>, Error<ParseError>> {
 	let mut args = Vec::new();
 	for arg_tokens in separated::parse_separated(in_tokens, |token| token.is_comma())? {
 		let name = match arg_tokens.get(0) {
 			Some(TokenTree::Token(Token::Name(ref name))) => {
-				name.clone()
+				Identifier::from_str(name)
 			},
 			_ => return Err(ParseError::Other.into()) // Got an argument that wasn't a name
 		};
 		
 		match arg_tokens.get(1) {
 			Some(TokenTree::Token(Token::Symbol(TokenSymbol::Colon))) => { },
-			_ => return Err(ParseError::Other.into()) // Got an argument that wasn't a name
+			_ => return Err(ParseError::Other.into()) // Argument name needed colon after it
 		}
 		
-		let typename = match arg_tokens.get(2) {
-			Some(TokenTree::Token(Token::Name(ref name))) => {
-				name.clone()
-			},
-			_ => return Err(ParseError::Other.into()) // Got an argument that wasn't a name
+		let (typename, leftovers) = if let Some(res) = next_type(&arg_tokens[2..])? {
+			res
+		} else {
+			return Err(ParseError::Other.into()) // Didn't get type after argument
 		};
 		
 		args.push((name, typename));

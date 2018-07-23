@@ -41,6 +41,9 @@ pub enum Keyword {
 	True,
 	False,
 	Type,
+	Module,
+	Use,
+	Mutable,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,6 +62,7 @@ pub enum Symbol {
 	Question,
 	Exclamation,
 	Plus,
+	Namespace,
 }
 
 #[derive(Debug, Clone)]
@@ -99,6 +103,9 @@ impl<'a> Tokenizer<'a> {
 					"true" => tokens.push(Token::Keyword(Keyword::True)),
 					"false" => tokens.push(Token::Keyword(Keyword::False)),
 					"type" => tokens.push(Token::Keyword(Keyword::Type)),
+					"mod" => tokens.push(Token::Keyword(Keyword::Module)),
+					"use" => tokens.push(Token::Keyword(Keyword::Use)),
+					"mut" => tokens.push(Token::Keyword(Keyword::Mutable)),
 					word => tokens.push(Token::Name(word.to_owned())),
 				},
 				Lexeme::Bracket(bracket, state) => {
@@ -152,6 +159,9 @@ impl<'a> Tokenizer<'a> {
 				},
 				Lexeme::Plus => {
 					tokens.push(Token::Symbol(Symbol::Plus));
+				},
+				Lexeme::Namespace => {
+					tokens.push(Token::Symbol(Symbol::Namespace));
 				},
 				Lexeme::Whitespace { .. } => {}, // whitespace isn't syntax python
 			}

@@ -16,57 +16,67 @@ impl ExpressionTaker for BindingTaker {
 		}
 
 		let mut tokens = in_tokens;
-
-		match tokens[0] {
-			// If the first token is `let` then it's a let binding
-			TokenTree::Token(Token::Keyword(Keyword::Let)) => {
-				// Get the identifier (which should always be the second token)
-				let ident = if let TokenTree::Token(Token::Name(ref name)) = tokens[1] {
-					name.to_owned()
-				} else {
-					return Err(ParseError::Other.into()); // expected an identifier/pattern
-				};
-
-				// If there's a type annotation, parse it
-				// Set offset to how many tokens the type annotation occupied
-				let mut offset = 0;
-				let mut type_annotation: Option<String> =
-					if let TokenTree::Token(Token::Symbol(TokenSymbol::Colon)) = tokens[2] {
-						// if there's a type annotation
-						// change token offset
-						unimplemented!()
-					} else {
-						None
-					};
-
-				// Make sure there's an assign symbol after the identifier or type annotation
-				if let TokenTree::Token(Token::Symbol(TokenSymbol::Assign)) = tokens[2 + offset] {
-				} else {
-					return Err(ParseError::Other.into()); // There should have been an assign symbol
-				}
-
-				// Parse the expression part of the binding
-				let expr = if let Some((expr, leftovers)) = next_expression(
-					&tokens[2 + offset + 1..],
-					Box::new(|token| token.is_semicolon()),
-				)? {
-					tokens = leftovers;
-					expr
-				} else {
-					return Err(ParseError::Other.into()); // Failed to parse the expression in the let binding
-				};
-
-				Ok(Some((
-					Expression::Binding(Box::new(Binding {
-						mutable: false,
-						ident,
-						bind_type: type_annotation,
-						val: Some(expr),
-					})),
-					tokens,
-				)))
+		
+		match tokens.get(0) {
+			Some(TokenTree::Token(Token::Keyword(Keyword::Let))) => {
+				tokens = &tokens[1..];
 			},
-			_ => Ok(None),
+			_ => return Ok(None),
 		}
+		
+		let mutable = match tokens.get(0) {
+			Some(TokenTree::Token(Token::Keyword(Keyword::Mutable))) => {
+				tokens = &tokens[1..];
+				true
+			},
+			_ => false,
+		};
+		
+		let ident = match tokens.get(0) {
+			Some(TokenTree::Token(Token::Name(ref name))) => {
+				Identifier::from_str(name)
+			},
+			_ => return Err(ParseError::Other.into()) // expected an identifier after let
+		};
+		tokens = &tokens[1..];
+		
+		let bindtype = match tokens.get(0) {
+			Some(TokenTree::Token(Token::Symbol(TokenSymbol::Colon))) => {
+				tokens = &tokens[1..];
+				let (typename, leftovers) = if let Some(res) = next_type(tokens)? {
+					res
+				} else {
+					return Err(ParseError::Other.into()) // expected a type after let binding colon
+				};
+				tokens = leftovers;
+				Some(typename)
+			},
+			_ => None,
+		};
+		
+		match tokens.get(0) {
+			Some(TokenTree::Token(Token::Symbol(TokenSymbol::Assign))) => { 
+				tokens = &tokens[1..];
+			},
+			_ => return Err(ParseError::Other.into()) // expected assign symbol in let binding
+		}
+		
+		let (bindexpr, leftovers) = if let Some(res) = next_expression(tokens, Box::new(|token| token.is_semicolon()))? {
+			res
+		} else {
+			return Err(ParseError::Other.into()); // expected an expression after the assign symbol
+		};
+		
+		tokens = leftovers;
+
+		Ok(Some((
+			Expression::Binding(Box::new(Binding {
+				mutable,
+				ident,
+				bind_type: bindtype,
+				val: Some(bindexpr),
+			})),
+			tokens,
+		)))
 	}
 }

@@ -1,60 +1,114 @@
 use std::collections::HashMap;
 
-use ast::parser::{self, SyntaxTree, BinaryOp, PrefixOp, PostfixOp};
+use ast::parser::{self, SyntaxTree, BinaryOp, PrefixOp, PostfixOp, Identifier, ModulePath, PathItem, TypeName};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionDefinition {
-	pub name: String,
-	pub args: Vec<(String, TypeIdentifier)>,
-	pub return_type: TypeIdentifier,
+	pub name: Identifier,
+	pub args: Vec<(Identifier, PathItem<TypeName>)>,
+	pub return_type: PathItem<TypeName>,
 	pub body: Expression, // should always be block?
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionCall {
-	pub name: String,
+	pub name: PathItem<Identifier>,
 	pub args: Vec<Expression>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TypeIdentifier {
-	pub name: String,
-}
-
-impl TypeIdentifier {
+impl PathItem<TypeName> {
 	pub fn root() -> Self {
-		TypeIdentifier {
-			name: "Root".to_string(),
+		PathItem {
+			module_path: ModulePath {
+				relative: false,
+				path: vec![Identifier::from_str("root"), Identifier::from_string("core".to_string())],
+			},
+			item: TypeName::from_ident(Identifier::from_string("Root".to_owned()))
 		}
 	}
 	
 	pub fn is_primitive(&self) -> bool {
-		match self.name.as_str() {
-			"Int" => true,
-			"Bool" => true,
-			"Root" => true,
+		let int = PathItem {
+			module_path: ModulePath {
+				relative: false,
+				path: vec![Identifier::from_str("root"), Identifier::from_string("core".to_string())],
+			},
+			item: TypeName::from_ident(Identifier::from_string("Int".to_owned()))
+		};
+		
+		let boolean = PathItem {
+			module_path: ModulePath {
+				relative: false,
+				path: vec![Identifier::from_str("root"), Identifier::from_string("core".to_string())],
+			},
+			item: TypeName::from_ident(Identifier::from_string("Bool".to_owned()))
+		};
+		
+		let root = PathItem {
+			module_path: ModulePath {
+				relative: false,
+				path: vec![Identifier::from_str("root"), Identifier::from_string("core".to_string())],
+			},
+			item: TypeName::from_ident(Identifier::from_string("Root".to_owned()))
+		};
+		
+		match self {
+			root => true,
+			int => true,
+			boolean => true,
 			_ => false,
+		}
+	}
+	
+	fn core_type(name: &str) -> PathItem<TypeName> {
+		PathItem {
+			module_path: ModulePath {
+				relative: false,
+				path: vec![Identifier::from_str("root"), Identifier::from_string("core".to_string())],
+			},
+			item: TypeName::from_ident(Identifier::from_string(name.to_owned()))
+		}
+	}
+}
+
+impl<T> PathItem<T> {
+	pub fn root_item(t: T) -> Self {
+		PathItem {
+			module_path: ModulePath {
+				relative: false,
+				path: vec![Identifier::from_str("root")]
+			},
+			item: t,
 		}
 	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TypeDefinition {
-	pub name: String,
-	pub fields: Vec<(String, TypeIdentifier)>,
+	pub name: TypeName,
+	pub fields: Vec<(Identifier, PathItem<TypeName>)>,
+}
+
+impl From<parser::Type> for TypeDefinition {
+	fn from(t: parser::Type) -> Self {
+		TypeDefinition {
+			name: t.name,
+			fields: t.members,
+		}
+	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Expression {
 	pub expr: ExpressionType,
-	pub expr_out: TypeIdentifier,
+	pub expr_out: PathItem<TypeName>,
 }
 
 impl Expression {
 	pub fn root() -> Self {
 		Expression {
 			expr: ExpressionType::Root,
-			expr_out: TypeIdentifier::root(),
+			expr_out: PathItem::<TypeName>::root(),
 		}
 	}
 }
@@ -72,19 +126,19 @@ pub enum ExpressionType {
 	Assignment(Box<Assignment>),
 	Loop(Box<Expression>),
 	If(Box<If>),
-	Identifier(String),
+	Identifier(Identifier),
 	StringLiteral(String),
 	IntLiteral(u64),
 	BoolLiteral(bool),
 	Block(Box<Block>),
-	FieldAccess(Box<Expression>, String),
+	FieldAccess(Box<Expression>, Identifier),
 	Instantiation(Instantiation),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Instantiation {
-	pub typename: TypeIdentifier,
-	pub fields: Vec<(String, Expression)>
+	pub typename: PathItem<TypeName>,
+	pub fields: Vec<(Identifier, Expression)>
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -97,7 +151,7 @@ pub struct If {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Assignment {
-	pub ident: String,
+	pub ident: Identifier,
 	pub expr: Expression,
 }
 
@@ -122,9 +176,9 @@ pub struct Postfix {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Binding {
-	pub ident: String,
+	pub ident: Identifier,
 	pub mutable: bool,
-	pub bind_type: TypeIdentifier,
+	pub bind_type: PathItem<TypeName>,
 	pub expr: Option<Expression>,
 }
 
@@ -135,16 +189,27 @@ pub struct Block {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Path {
-	pub modules: Vec<String>,
-	pub item: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Module {
+	pub name: Identifier,
 	pub modules: Vec<Module>,
 	pub types: Vec<TypeDefinition>,
 	pub functions: Vec<FunctionDefinition>,
+}
+
+impl Module {
+	pub fn traverse_mut<F: FnMut(&mut Module)>(&mut self, f: &mut F) {
+		f(self);
+		for module in &mut self.modules {
+			module.traverse_mut(f);
+		}
+	}
+	
+	pub fn traverse<F: FnMut(&Module)>(&self, f: &mut F) {
+		f(&self);
+		for module in &self.modules {
+			module.traverse(f);
+		}
+	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -153,9 +218,9 @@ pub struct HIR {
 }
 
 pub struct HIRGenerator {
-	types: HashMap<String, TypeDefinition>,
-	function_defs_returns: HashMap<String, TypeIdentifier>,
-	bindings_stack: Vec<HashMap<String, TypeIdentifier>>,
+	types: HashMap<PathItem<TypeName>, TypeDefinition>,
+	function_defs_returns: HashMap<PathItem<Identifier>, PathItem<TypeName>>,
+	bindings_stack: Vec<HashMap<Identifier, PathItem<TypeName>>>,
 }
 
 impl HIRGenerator {
@@ -167,39 +232,93 @@ impl HIRGenerator {
 		}
 	}
 	
-	pub fn ast_to_hir(&mut self, ast: &SyntaxTree) -> HIR {
+	pub fn ast_to_hir(&mut self, ast: SyntaxTree) -> HIR {
+		let mut root_module = parser::Module {
+			name: Identifier::from_str("root"),
+			body: ast,
+		};
+		
+		self.resolve_paths(&mut root_module);
+		
 		HIR {
-			modules: vec![self.ast_to_module(ast)]
+			modules: vec![self.ast_module_to_hir_module(&root_module)]
 		}
 	}
 	
-	pub fn ast_to_module(&mut self, ast: &SyntaxTree) -> Module {
-		let mut typedefs = Vec::new();
-		for typedef in &ast.types {
-			typedefs.push(TypeDefinition {
-				name: typedef.name.clone(),
-				fields: typedef.members.iter().map(|(fieldname, typename)| (fieldname.clone(), TypeIdentifier {
-					name: typename.clone()
-				})).collect()
-			})
-		}
-		for typedef in &typedefs {
-			self.types.insert(typedef.name.clone(), typedef.clone());
+	pub fn resolve_paths(&mut self, module: &mut parser::Module) {
+		fn resolve_path(current: &ModulePath, to_resolve: &mut ModulePath) {
+			if to_resolve.relative {
+				let mut new_path = current.clone();
+				new_path.path.append(&mut to_resolve.path);
+				to_resolve.relative = false;
+				*to_resolve = new_path;
+			}
 		}
 		
-		for function in &ast.functions {
-			self.function_defs_returns.insert(function.name.clone(), function.return_type.clone().map(|name| TypeIdentifier {
-				name,
-			}).unwrap_or(TypeIdentifier::root()));
-		}
+		let mut current_path = ModulePath::new(false, Vec::new());
+		module.traverse_mut(&mut |module: &mut parser::Module| {
+			current_path.path.push(module.name.clone());
+			for function in &mut module.body.functions {
+				for (arg_name, arg_type) in &mut function.args {
+					resolve_path(&current_path, &mut arg_type.module_path);
+				}
+				
+				function.return_type.as_mut().map(|return_type| resolve_path(&current_path, &mut return_type.module_path));
+				
+				function.body.traverse_expressions_mut(&mut |expr: &mut parser::Expression| {
+					match expr {
+						parser::Expression::Instantiation(ref mut name, _) => {
+							resolve_path(&current_path, &mut name.module_path);
+						},
+						parser::Expression::FunctionCall { ref mut name, .. } => {
+							resolve_path(&current_path, &mut name.module_path);
+						},
+						_ => {},
+					}
+				})
+			}
+			
+			for typedef in &mut module.body.types {
+				for (member_name, member_type) in &mut typedef.members {
+					resolve_path(&current_path, &mut member_type.module_path);
+				}
+			}
+			
+			current_path.path.pop().unwrap();
+		});
+	}
+	
+	pub fn ast_module_to_hir_module(&mut self, module: &parser::Module) -> Module {
+		let mut current_path = ModulePath::new(false, Vec::new());
+		module.traverse(&mut |module: &parser::Module| {
+			current_path.path.push(module.name.clone());
+			
+			for typedef in &module.body.types {
+				self.types.insert({
+					PathItem {
+						module_path: current_path.clone(),
+						item: typedef.name.clone(),
+					}
+				}, typedef.clone().into());
+			}
+			
+			for function in &module.body.functions {
+				self.function_defs_returns.insert({
+					PathItem {
+						module_path: current_path.clone(),
+						item: function.name.clone(),
+					}
+				}, function.return_type.clone().unwrap_or(PathItem::<TypeName>::root()));
+			}
+			
+			current_path.path.pop().unwrap();
+		});
 		
 		let mut functiondefs = Vec::new();
-		for function in &ast.functions {
+		for function in &module.body.functions {
 			self.bindings_stack.push(HashMap::new());
 			let name = function.name.clone();
-			let args: Vec<(String, TypeIdentifier)> = function.args.iter().map(|(name, typename)| (name.clone(), TypeIdentifier {
-				name: typename.clone(),
-			})).collect();
+			let args: Vec<(Identifier, PathItem<TypeName>)> = function.args.iter().map(|(name, typename)| (name.clone(), typename.clone())).collect();
 			for arg in &args {
 				self.bindings_stack.last_mut().unwrap().insert(arg.0.clone(), arg.1.clone());
 			}
@@ -214,10 +333,8 @@ impl HIRGenerator {
 					b_return.clone()
 				},
 				(Some(f_return), b_return) => {
-					if f_return == &b_return.name {
-						TypeIdentifier {
-							name: f_return.clone()
-						}
+					if f_return == b_return {
+						b_return.clone()
 					} else {
 						panic!("Mismatched return types")
 					}
@@ -235,8 +352,16 @@ impl HIRGenerator {
 			self.bindings_stack.pop();
 		}
 		
+		let typedefs = module.body.types.iter().map(|typedef| typedef.clone().into()).collect();
+		
+		let mut modules = Vec::new();
+		for module in &module.body.modules {
+			modules.push(self.ast_module_to_hir_module(module));
+		}
+		
 		Module {
-			modules: Vec::new(), // TODO
+			name: module.name.clone(),
+			modules,
 			types: typedefs,
 			functions: functiondefs,
 		}
@@ -267,7 +392,7 @@ impl HIRGenerator {
 					expr: Some(expr),
 				}))
 			},
-			parser::Expression::Unit => ExpressionType::Root,
+			parser::Expression::Root => ExpressionType::Root,
 			parser::Expression::NumberLiteral(val) => ExpressionType::IntLiteral(*val),
 			parser::Expression::Identifier(ref ident) => ExpressionType::Identifier(ident.clone()),
 			parser::Expression::Binary { left, right, op } => {
@@ -332,9 +457,7 @@ impl HIRGenerator {
 			},
 			parser::Expression::Instantiation(ref name, ref fields) => {
 				ExpressionType::Instantiation(Instantiation {
-					typename: TypeIdentifier {
-						name: name.clone(),
-					},
+					typename: name.clone(),
 					fields: fields.iter().map(|field| (field.0.clone(), self.ast_expr_to_hir_expr(&field.1))).collect()
 				})
 			},
@@ -344,14 +467,12 @@ impl HIRGenerator {
 		}
 	}
 	
-	pub fn get_expr_type(&mut self, expr: &ExpressionType) -> TypeIdentifier {
+	pub fn get_expr_type(&mut self, expr: &ExpressionType) -> PathItem<TypeName> {
 		match expr {
-			ExpressionType::Block(ref block) => block.output.as_ref().map(|expr| expr.expr_out.clone()).unwrap_or(TypeIdentifier::root()),
-			ExpressionType::Root => TypeIdentifier::root(),
-			ExpressionType::Binding(_) => TypeIdentifier::root(),
-			ExpressionType::IntLiteral(_) => TypeIdentifier {
-				name: "Int".to_string(),
-			},
+			ExpressionType::Block(ref block) => block.output.as_ref().map(|expr| expr.expr_out.clone()).unwrap_or(PathItem::<TypeName>::root()),
+			ExpressionType::Root => PathItem::<TypeName>::root(),
+			ExpressionType::Binding(_) => PathItem::<TypeName>::root(),
+			ExpressionType::IntLiteral(_) => PathItem::<TypeName>::core_type("Int"),
 			ExpressionType::Identifier(ref ident) => {
 				let mut bind_type = None;
 				for bind_frame in &self.bindings_stack {
@@ -360,7 +481,7 @@ impl HIRGenerator {
 						break;
 					}
 					
-					panic!("Variable '{}' not bound", ident)
+					panic!("Variable '{:?}' not bound", ident)
 				}
 				bind_type.unwrap()
 			},
@@ -375,27 +496,25 @@ impl HIRGenerator {
 				binary.left.expr_out.clone()
 			},
 			ExpressionType::BoolLiteral(_) => {
-				TypeIdentifier {
-					name: "Bool".to_string(),
-				}
+				PathItem::<TypeName>::core_type("Bool")
 			},
 			ExpressionType::Assignment(ref assignment) => {
 				self.get_expr_type(&ExpressionType::Identifier(assignment.ident.clone()))
 			},
 			ExpressionType::Break(ref break_expr) => {
-				break_expr.clone().map(|expr| expr.expr_out).unwrap_or(TypeIdentifier::root())
+				break_expr.clone().map(|expr| expr.expr_out).unwrap_or(PathItem::<TypeName>::root())
 			},
-			ExpressionType::Debug(_) => TypeIdentifier::root(),
+			ExpressionType::Debug(_) => PathItem::<TypeName>::root(),
 			ExpressionType::FunctionCall(ref call) => {
 				self.function_defs_returns.get(&call.name).cloned().unwrap()
 			},
 			ExpressionType::Loop(ref expr) => {
-				let mut break_type: Option<TypeIdentifier> = None;
-				traverse_expressions(expr, &mut |test_expr: &Expression| {
+				let mut break_type: Option<PathItem<TypeName>> = None;
+				expr.traverse(&mut |test_expr: &Expression| {
 					// TODO handle break labels and nested loops
 					match test_expr.expr {
 						ExpressionType::Break(ref break_expr) => {
-							let test_break_type = break_expr.as_ref().map(|expr| expr.expr_out.clone()).unwrap_or(TypeIdentifier::root()).clone();
+							let test_break_type = break_expr.as_ref().map(|expr| expr.expr_out.clone()).unwrap_or(PathItem::<TypeName>::root()).clone();
 							if let Some(old_break_type) = break_type.clone() {
 								if old_break_type != test_break_type {
 									panic!("Multiple break types in loop")
@@ -409,7 +528,7 @@ impl HIRGenerator {
 				});
 				
 				// TODO change this to diverging like rusts !
-				break_type.unwrap_or(TypeIdentifier::root())
+				break_type.unwrap_or(PathItem::<TypeName>::root())
 			},
 			ExpressionType::If(ref if_expr) => {
 				let body_type = if_expr.body.expr_out.clone();
@@ -424,11 +543,9 @@ impl HIRGenerator {
 				}
 				// TODO check elifs
 			},
-			ExpressionType::StringLiteral(_) => TypeIdentifier {
-				name: "String".to_string(),
-			},
+			ExpressionType::StringLiteral(_) => PathItem::<TypeName>::core_type("String"),
 			ExpressionType::FieldAccess(ref base, ref ident) => {
-				let typedef = self.types.get(&base.expr_out.name).expect("No type with that name found");
+				let typedef = self.types.get(&base.expr_out).expect("No type with that name found");
 				
 				let field = typedef.fields.iter().find(|typedef| typedef == typedef).expect("Type does not have that field");
 				field.1.clone()
@@ -451,76 +568,78 @@ impl HIRGenerator {
 			statements: statements,
 			output: out
 		}))
-	}	
+	}
 }
 
-pub fn traverse_expressions<F: FnMut(&Expression)>(expression: &Expression, f: &mut F) {
-	f(expression);
-	match &expression.expr {
-		ExpressionType::Root => {
-			// no action necessary
-		},
-		ExpressionType::Binary(ref binary) => {
-			f(&binary.left);
-			f(&binary.right);
-		},
-		ExpressionType::Prefix(ref prefix) => {
-			f(&prefix.right);
-		},
-		ExpressionType::Postfix(ref postfix) => {
-			f(&postfix.left);
-		},
-		ExpressionType::FunctionCall(ref call) => {
-			for arg in &call.args {
-				f(arg);
-			}
-		},
-		ExpressionType::Debug(ref expr) => {
-			f(expr);
-		},
-		ExpressionType::Break(ref expr_opt) => {
-			expr_opt.as_ref().map(|expr| f(expr));
-		},
-		ExpressionType::Binding(ref binding) => {
-			binding.expr.as_ref().map(|expr| f(expr));
-		},
-		ExpressionType::Assignment(ref assignment) => {
-			f(&assignment.expr);
-		},
-		ExpressionType::Loop(ref expr) => {
-			f(expr);
-		},
-		ExpressionType::If(ref if_expr) => {
-			f(&if_expr.condition);
-			f(&if_expr.body);
-			// TODO elif
-			if_expr.else_block.as_ref().map(|expr| f(expr));
-		},
-		ExpressionType::Identifier(_) => {
-			// no action necesssary
-		},
-		ExpressionType::StringLiteral(_) => {
-			// no action necesssary
-		},
-		ExpressionType::IntLiteral(_) => {
-			// no action necesssary
-		},
-		ExpressionType::BoolLiteral(_) => {
-			// no action necesssary
-		},
-		ExpressionType::Block(ref block) => {
-			for statement in &block.statements {
-				f(statement);
-			}
-			block.output.as_ref().map(|expr| f(expr));
-		},
-		ExpressionType::FieldAccess(ref base, _) => {
-			f(base);
-		},
-		ExpressionType::Instantiation(ref instantiation) => {
-			for (_, expr) in &instantiation.fields {
+impl Expression {
+	pub fn traverse<F: FnMut(&Expression)>(&self, f: &mut F) {
+		f(self);
+		match &self.expr {
+			ExpressionType::Root => {
+				// no action necessary
+			},
+			ExpressionType::Binary(ref binary) => {
+				binary.left.traverse(f);
+				binary.right.traverse(f);
+			},
+			ExpressionType::Prefix(ref prefix) => {
+				prefix.right.traverse(f);
+			},
+			ExpressionType::Postfix(ref postfix) => {
+				postfix.left.traverse(f);
+			},
+			ExpressionType::FunctionCall(ref call) => {
+				for arg in &call.args {
+					f(arg);
+				}
+			},
+			ExpressionType::Debug(ref expr) => {
 				f(expr);
-			}
-		},
+			},
+			ExpressionType::Break(ref expr_opt) => {
+				expr_opt.as_ref().map(|expr| f(expr));
+			},
+			ExpressionType::Binding(ref binding) => {
+				binding.expr.as_ref().map(|expr| f(expr));
+			},
+			ExpressionType::Assignment(ref assignment) => {
+				assignment.expr.traverse(f);
+			},
+			ExpressionType::Loop(ref expr) => {
+				expr.traverse(f);
+			},
+			ExpressionType::If(ref if_expr) => {
+				if_expr.condition.traverse(f);
+				if_expr.body.traverse(f);
+				// TODO elif
+				if_expr.else_block.as_ref().map(|expr| expr.traverse(f));
+			},
+			ExpressionType::Identifier(_) => {
+				// no action necesssary
+			},
+			ExpressionType::StringLiteral(_) => {
+				// no action necesssary
+			},
+			ExpressionType::IntLiteral(_) => {
+				// no action necesssary
+			},
+			ExpressionType::BoolLiteral(_) => {
+				// no action necesssary
+			},
+			ExpressionType::Block(ref block) => {
+				for statement in &block.statements {
+					statement.traverse(f);
+				}
+				block.output.as_ref().map(|expr| expr.traverse(f));
+			},
+			ExpressionType::FieldAccess(ref base, _) => {
+				base.traverse(f);
+			},
+			ExpressionType::Instantiation(ref instantiation) => {
+				for (_, expr) in &instantiation.fields {
+					expr.traverse(f);
+				}
+			},
+		}
 	}
 }

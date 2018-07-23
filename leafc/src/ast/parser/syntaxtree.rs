@@ -35,15 +35,86 @@ mod structures {
 	
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub struct Module {
-		name: String,
-		body: SyntaxTree,
+		pub name: Identifier,
+		pub body: SyntaxTree,
 	}
 	
 	impl Module {
-		pub fn new(name: String, body: SyntaxTree) -> Self {
+		pub fn traverse_mut<F: FnMut(&mut Module)>(&mut self, f: &mut F) {
+			f(self);
+			for module in &mut self.body.modules {
+				f(module);
+			}
+		}
+		
+		pub fn traverse<F: FnMut(&Module)>(&self, f: &mut F) {
+			f(self);
+			for module in &self.body.modules {
+				f(module);
+			}
+		}
+	}
+	
+	#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+	pub struct Identifier {
+		name: String,
+	}
+	
+	impl Identifier {
+		pub fn from_string(string: String) -> Self {
+			// TODO validate identifier string and return result
+			Identifier {
+				name: string,
+			}
+		}
+		
+		pub fn from_str(string: &str) -> Self {
+			// TODO validate identifier string
+			Identifier {
+				name: string.to_owned(),
+			}
+		}
+	}
+	
+	#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+	pub struct TypeName {
+		pub name: Identifier,
+	}
+	
+	impl TypeName {
+		pub fn from_ident(identifier: Identifier) -> Self {
+			TypeName {
+				name: identifier,
+			}
+		}
+	}
+	
+	#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+	pub struct PathItem<T> {
+		pub module_path: ModulePath,
+		pub item: T,
+	}
+	
+	impl Module {
+		pub fn new(name: Identifier, body: SyntaxTree) -> Self {
 			Module {
 				name,
 				body,
+			}
+		}
+	}
+	
+	#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+	pub struct ModulePath {
+		pub relative: bool,
+		pub path: Vec<Identifier>,
+	}
+	
+	impl ModulePath {
+		pub fn new(relative: bool, path: Vec<Identifier>) -> Self {
+			ModulePath {
+				relative,
+				path
 			}
 		}
 	}
@@ -78,16 +149,16 @@ mod structures {
 	/// Contains the left hand side
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub struct Assignment {
-		pub ident: String,
+		pub ident: Identifier,
 		pub expr: Expression,
 	}
 
 	/// A function definition
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub struct Function {
-		pub name: String,
-		pub args: Vec<(String, String)>,
-		pub return_type: Option<String>,
+		pub name: Identifier,
+		pub args: Vec<(Identifier, PathItem<TypeName>)>,
+		pub return_type: Option<PathItem<TypeName>>,
 		pub body: Block,
 	}
 
@@ -95,7 +166,7 @@ mod structures {
 	/// Can be a literal, an operations, or a block that contains more expressions
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub enum Expression {
-		Unit,
+		Root,
 		Binary {
 			left: Box<Expression>,
 			right: Box<Expression>,
@@ -110,7 +181,7 @@ mod structures {
 			op: PostfixOp,
 		},
 		FunctionCall {
-			name: String,
+			name: PathItem<Identifier>,
 			args: Vec<Expression>,
 		},
 		Debug(Box<Expression>),
@@ -119,49 +190,95 @@ mod structures {
 		Assign(Box<Assignment>),
 		Loop(Box<Expression>),
 		If(Box<If>),
-		Identifier(String),
+		Identifier(Identifier),
 		Block(Box<Block>),
 		StringLiteral(String),
 		NumberLiteral(u64),
 		BoolLiteral(bool),
-		FieldAccess(Box<Expression>, String),
-		Instantiation(String, Vec<(String, Expression)>),
+		FieldAccess(Box<Expression>, Identifier),
+		Instantiation(PathItem<TypeName>, Vec<(Identifier, Expression)>),
+		
 	}
 	
 	impl Expression {
-		pub fn get_type(&self) -> String {
+		pub fn get_type(&self) -> PathItem<TypeName> {
+			panic!("You shouldn't do this");
 			match self {
-				Expression::StringLiteral(_) => "str".to_owned(),
-				Expression::NumberLiteral(_) => "int".to_owned(),
+				Expression::StringLiteral(_) => PathItem {
+					module_path: ModulePath::new(false, vec![Identifier::from_string("core".to_string())]),
+					item: TypeName::from_ident(Identifier::from_string("String".to_owned())),
+				},
+				Expression::NumberLiteral(_) => PathItem {
+					module_path: ModulePath::new(false, vec![Identifier::from_string("core".to_string())]),
+					item: TypeName::from_ident(Identifier::from_string("Int".to_owned())),
+				},
 				Expression::Instantiation(ref name, _) => name.clone(),
-				Expression::Block(ref block) => block.output.as_ref().unwrap_or(&Expression::Unit).get_type(),
-				Expression::Unit => "unit".to_owned(),
+				Expression::Block(ref block) => block.output.as_ref().unwrap_or(&Expression::Root).get_type(),
+				Expression::Root => PathItem {
+					module_path: ModulePath::new(false, vec![Identifier::from_string("core".to_string())]),
+					item: TypeName::from_ident(Identifier::from_string("Root".to_owned()))
+				},
 				_ => {
 					panic!("Tried to get type for unsupported expression: {:?}", self)
 				},
 			}
 		}
 		
-		pub fn traverse_expressions<F: FnMut(&Expression)>(&self, f: &mut F) {
-			f(&self);
+		pub fn traverse_expressions_mut<F: FnMut(&mut Expression)>(&mut self, f: &mut F) {
+			f(self);
 			match self {
+				Expression::Root => {},
 				Expression::Binary { left, right, .. } => {
-					left.traverse_expressions(f);
-					right.traverse_expressions(f);
+					left.traverse_expressions_mut(f);
+					right.traverse_expressions_mut(f);
 				},
-				Expression::Debug(ref expr) => {
-					expr.traverse_expressions(f);
+				Expression::Prefix { right, .. } => {
+					right.traverse_expressions_mut(f);
 				},
-				Expression::Binding(ref binding) => {
-					binding.val.as_ref().map(|val| val.traverse_expressions(f));
+				Expression::Postfix { left, .. } => {
+					left.traverse_expressions_mut(f);
 				},
-				Expression::Block(ref block) => {
-					block.traverse_expressions(f);
+				Expression::FunctionCall { name, args: ref mut args, } => {
+					for arg in args {
+						arg.traverse_expressions_mut(f);
+					}
+				}
+				Expression::Debug(ref mut expr) => {
+					expr.traverse_expressions_mut(f);
 				},
-				Expression::FieldAccess(ref lhs, _) => {
-					lhs.traverse_expressions(f);
+				Expression::Break(ref mut expr) => {
+					expr.as_mut().map(|expr| expr.traverse_expressions_mut(f));
+				}
+				Expression::Binding(ref mut binding) => {
+					binding.val.as_mut().map(|val| val.traverse_expressions_mut(f));
 				},
-				_ => {},
+				Expression::Assign(ref mut assignment) => {
+					assignment.expr.traverse_expressions_mut(f);
+				},
+				Expression::Loop(ref mut expr) => {
+					expr.traverse_expressions_mut(f);
+				},
+				Expression::If(ref mut ifexpr) => {
+					ifexpr.condition.traverse_expressions_mut(f);
+					ifexpr.body.traverse_expressions_mut(f);
+					// TODO elifs
+					ifexpr.else_block.as_mut().map(|expr| expr.traverse_expressions_mut(f));
+				},
+				Expression::Identifier(_) => {},
+				Expression::Block(ref mut block) => {
+					block.traverse_expressions_mut(f);
+				},
+				Expression::StringLiteral(_) => {},
+				Expression::NumberLiteral(_) => {},
+				Expression::BoolLiteral(_) => {},
+				Expression::FieldAccess(ref mut lhs, _) => {
+					lhs.traverse_expressions_mut(f);
+				},
+				Expression::Instantiation(_, ref mut fields) => {
+					for field in fields {
+						field.1.traverse_expressions_mut(f);
+					}
+				},
 			}
 		}
 	}
@@ -176,8 +293,8 @@ mod structures {
 	
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub struct Type {
-		pub name: String,
-		pub members: Vec<(String, String)>,
+		pub name: TypeName,
+		pub members: Vec<(Identifier, PathItem<TypeName>)>,
 	}
 
 	/// A let binding. Contains the identifier being bound to, the
@@ -185,8 +302,8 @@ mod structures {
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub struct Binding {
 		pub mutable: bool,
-		pub ident: String,
-		pub bind_type: Option<String>,
+		pub ident: Identifier,
+		pub bind_type: Option<PathItem<TypeName>>,
 		pub val: Option<Expression>,
 	}
 
@@ -198,10 +315,11 @@ mod structures {
 			}
 		}
 		
-		pub fn traverse_expressions<F: FnMut(&Expression)>(&self, f: &mut F) {
-			for expression in &self.block {
-				f(expression)
+		pub fn traverse_expressions_mut<F: FnMut(&mut Expression)>(&mut self, f: &mut F) {
+			for expression in &mut self.block {
+				expression.traverse_expressions_mut(f);
 			}
+			self.output.as_mut().map(|expr| expr.traverse_expressions_mut(f));
 		}
 	}
 }

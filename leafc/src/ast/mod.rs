@@ -9,7 +9,7 @@ use std::fs::File;
 use std::io::Read;
 use failure;
 
-use self::parser::{SyntaxTree, Module};
+use self::parser::{SyntaxTree, Module, Identifier, PathItem, ModulePath};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ast {
@@ -55,20 +55,27 @@ impl<T> From<failure::Error<T>> for AstCreationError where T: Into<AstCreationEr
 }
 
 pub fn create_ast(input: &str) -> Result<SyntaxTree, AstCreationError> {
-	let lexemes = lexer::lex(&input)?;
+	info!("Text input:\n{}\n\t", input);
+	let lexemes = lexer::lex(&input).unwrap(); // TODO remove all unwraps in this file
+	info!("\n{:?}\n\t", lexemes);
 	let mut tokenizer = tokenizer::Tokenizer::new(lexemes);
-	let tokens = tokenizer.tokenize()?;
-	let tokentree = treeify::treeify(&tokens.tokens)?;
-	let st = parser::parse(&tokentree)?;
+	let tokens = tokenizer.tokenize().unwrap();
+	info!("\n{:?}\n\t", tokens);
+	let tokentree = treeify::treeify(&tokens.tokens).unwrap();
+	info!("\n{:?}\n\t", tokentree);
+	let st = parser::parse(&tokentree).unwrap();
+	info!("\n{:?}", st);
 	Ok(st)
 }
 
 pub fn create_ast_with_includes(input: &str, includes: &[(String, &Path)]) -> Result<SyntaxTree, AstCreationError> {
-	let mut st = create_ast(input)?;
+	let mut modules = Vec::new();
 	for include in includes {
-		let include_st = create_ast_from_file(&include.1, &[])?; // TODO support includes with includes? maybe should only be solved by libraries
-		st.modules.push(Module::new(include.0.clone(), include_st));
+		let include_st = create_ast_from_file(&include.1, &[]).unwrap(); // TODO support includes with includes? maybe should only be solved by libraries
+		modules.push(Module::new(Identifier::from_string(include.0.clone()), include_st));
 	}
+	let mut st = create_ast(input).unwrap();
+	st.modules = modules;
 	
 	Ok(st)
 }
@@ -80,5 +87,5 @@ pub fn create_ast_from_file<P: AsRef<Path>>(path: P, includes: &[(String, &Path)
 		main_file.read_to_string(&mut buf).unwrap();
 		buf
 	};
-	create_ast_with_includes(&input, includes)
+	Ok(create_ast_with_includes(&input, includes).unwrap())
 }

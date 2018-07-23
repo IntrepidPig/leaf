@@ -12,7 +12,7 @@ debug c;
 "###;
 
 fn main() {
-	let input = INPUT_TEST;
+	/*let input = INPUT_TEST;
 	let lexemes = leafc::ast::lexer::lex(input).unwrap();
 
 	let de_lexed = &lexemes.de_lex();
@@ -31,5 +31,5 @@ fn main() {
 
 	let mut code_generator = leafc::codegen::vmgen::CodeGenerator::new();
 	let instructions = code_generator.gen_instructions(&ast);
-	println!("{:#?}", instructions);
+	println!("{:#?}", instructions);*/
 }

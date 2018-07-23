@@ -18,7 +18,7 @@ impl ExpressionTaker for IdentifierTaker {
 	) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
 		Ok(Some((match in_tokens.get(0) {
 			Some(TokenTree::Token(Token::Name(ref name))) => {
-				Expression::Identifier(name.clone())
+				Expression::Identifier(Identifier::from_string(name.clone()))
 			},
 			_ => return Ok(None)
 		}, &in_tokens[1..])))

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use hir::*;
 use ast::parser::operators::*;
+use ast::parser::{PathItem, ModulePath, TypeName, Identifier};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Var {
@@ -110,20 +111,24 @@ pub enum Instruction {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CodeGenerator {
+pub struct CodeGenerator<'a> {
+	hir: &'a HIR,
+	root_mod: &'a Module,
 	pub instructions: Vec<Instruction>,
 	loop_breaks: Vec<Vec<usize>>,
 	block_is_loop: bool,
 	if_jumps: Vec<usize>,
-	locals: Vec<Vec<String>>,
-	function_locations: HashMap<String, usize>,
-	function_jumps_todo: Vec<(usize, String)>,
-	types: HashMap<String, TypeDefinition>,
+	locals: Vec<Vec<Identifier>>,
+	function_locations: HashMap<PathItem<Identifier>, usize>,
+	function_jumps_todo: Vec<(usize, PathItem<Identifier>)>,
+	module_path: ModulePath,
 }
 
-impl CodeGenerator {	
-	pub fn new() -> Self {
+impl<'a> CodeGenerator<'a> {	
+	pub fn new(hir: &'a HIR) -> Self {
 		CodeGenerator {
+			hir,
+			root_mod: &hir.modules[0],
 			instructions: Vec::new(),
 			loop_breaks: Vec::new(),
 			block_is_loop: false,
@@ -131,21 +136,51 @@ impl CodeGenerator {
 			locals: vec![Vec::new()],
 			function_locations: HashMap::new(),
 			function_jumps_todo: Vec::new(),
-			types: HashMap::new(),
+			module_path: ModulePath::new(false, vec![Identifier::from_str("root")]),
 		}
 	}
+	
+	pub fn find_typedef(&self, path: PathItem<TypeName>) -> Option<TypeDefinition> {
+		let mut typedef = None;
+		let mut current_path = ModulePath::new(false, Vec::new());
+		self.root_mod.traverse(&mut |module: &Module| {
+			current_path.path.push(module.name.clone());
+			
+			for test_typedef in &module.types {
+				if test_typedef.name == path.item && current_path == path.module_path {
+					typedef = Some(test_typedef.clone());
+				}
+			}
+			
+			current_path.path.pop().unwrap();
+		});
+		
+		typedef
+	}
+	
+	pub fn find_function(&self, path: PathItem<Identifier>) -> Option<FunctionDefinition> {
+		let mut functiondef = None;
+		let mut current_path = ModulePath::new(false, vec![Identifier::from_str("root")]);
+		self.root_mod.traverse(&mut |module: &Module| {
+			current_path.path.push(module.name.clone());
+			
+			for test_function in &module.functions {
+				if test_function.name == path.item && current_path == path.module_path {
+					functiondef = Some(test_function.clone());
+				}
+			}
+			
+			current_path.path.pop().unwrap();
+		});
+		
+		functiondef
+	}
 
-	pub fn gen_instructions(&mut self, hir: &HIR) {
-		let module = &hir.modules[0];
-		
-		for typedef in &module.types {
-			self.types.insert(typedef.name.clone(), typedef.clone());
-		}
-		
+	pub fn gen_instructions(&mut self) {
 		self.instructions.push(Instruction::Call(0, 0));
-		self.function_jumps_todo.push((0, "main".to_owned()));
+		self.function_jumps_todo.push((0, PathItem::root_item(Identifier::from_str("main"))));
 		self.instructions.push(Instruction::Terminate);
-		for func in &module.functions {
+		for func in &self.root_mod.functions {
 			self.gen_from_func(&func);
 		}
 		
@@ -156,14 +191,17 @@ impl CodeGenerator {
 		for (location, name) in &self.function_jumps_todo {
 			match self.instructions.get_mut(*location).unwrap() {
 				Instruction::Call(ref mut target, _argc) => *target = *self.function_locations.get(name).unwrap(),
-				_ => panic!("Expected a jump to {} at index {}", name, location)
+				_ => panic!("Expected a jump to {:?} at index {}", name, location)
 			}
 		}
 	} 
 	
 	pub fn gen_from_func(&mut self, function: &FunctionDefinition) {
 		self.locals.push(Vec::new());
-		self.function_locations.insert(function.name.clone(), self.instructions.len());
+		self.function_locations.insert(PathItem {
+			module_path: self.module_path.clone(),
+			item: function.name.clone(),
+		}, self.instructions.len());
 		// start a new stack frame
 		self.instructions.push(Instruction::Block);
 		// load all of the arguments
@@ -376,12 +414,12 @@ impl CodeGenerator {
 			ExpressionType::FieldAccess(ref expr, ref fieldname) => {
 				self.gen_from_expr(expr);
 				let exprtype = &expr.expr_out;
-				let typedef = self.types.get(&exprtype.name).expect("Type not found in list of typedefs");
+				let typedef = self.find_typedef(exprtype.clone()).expect("Type not found in list of typedefs");
 				let typeindex = typedef.fields.iter().position(|field| &field.0 == fieldname).expect("Type does not have this field");
 				self.instructions.push(Instruction::Retrieve(typeindex));
 			},
 			ExpressionType::Instantiation(ref instantiation) => {
-				let typedef = self.types.get(&instantiation.typename.name).expect("Type with that name not found").clone();
+				let typedef = self.find_typedef(instantiation.typename.clone()).unwrap().clone();
 				if instantiation.fields.len() != typedef.fields.len() {
 					panic!("Incorrect amount of fields provided for type")
 				}

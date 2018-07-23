@@ -1,0 +1,5 @@
+type Int { }
+type Root { }
+type Bool { }
+type List { }
+type String { }

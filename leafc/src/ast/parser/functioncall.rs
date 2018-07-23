@@ -17,12 +17,25 @@ impl ExpressionTaker for FunctionCallTaker {
 		
 		let mut tokens = in_tokens;
 		
+		let (path, leftovers) = if let Some(res) = pathitem::next_path(tokens)? {
+			res
+		} else {
+			return Ok(None);
+		};
+		
+		tokens = leftovers;
+		
 		let name = match tokens.get(0) {
 			Some(TokenTree::Token(Token::Name(ref name))) => {
 				tokens = &tokens[1..];
-				name.clone()
+				Identifier::from_string(name.clone())
 			},
 			_ => return Ok(None),
+		};
+		
+		let name = PathItem {
+			module_path: path,
+			item: name,
 		};
 
 		let args = match tokens.get(0) {

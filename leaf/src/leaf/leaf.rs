@@ -80,16 +80,13 @@ fn main() {
 		io::stdin().read_to_string(&mut input).unwrap();
 		leafc::ast::create_ast_with_includes(&input, &includes).unwrap()
 	} else {
-		let mut input = String::new();
-		let mut file = fs::File::open(&input_file).unwrap();
-		file.read_to_string(&mut input).unwrap();
-		leafc::ast::create_ast(&input).unwrap()
+		leafc::ast::create_ast_from_file(input_file, &includes).unwrap()
 	};
 	let mut hir_generator = leafc::hir::HIRGenerator::new();
-	let hir = hir_generator.ast_to_hir(&ast);
+	let hir = hir_generator.ast_to_hir(ast);
 	println!("{:#?}\n\t=>", hir);
-	let mut code_generator = leafc::codegen::vmgen::CodeGenerator::new();
-	code_generator.gen_instructions(&hir);
+	let mut code_generator = leafc::codegen::vmgen::CodeGenerator::new(&hir);
+	code_generator.gen_instructions();
 	print_instructions(&code_generator.instructions);
 	run_instructions(&code_generator.instructions, debug).unwrap();
 }

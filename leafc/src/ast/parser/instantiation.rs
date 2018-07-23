@@ -18,15 +18,15 @@ impl ExpressionTaker for InstantiationTaker {
 	) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
 		let mut tokens = in_tokens;
 		
-		let name = match tokens.get(0) {
-			Some(TokenTree::Token(Token::Name(ref name))) => {
-				tokens = &tokens[1..];
-				name.clone()
-			},
-			_ => return Ok(None),
+		let (typename, leftovers) = if let Some(res) = pathitem::next_type(tokens)? {
+			res
+		} else {
+			return Ok(None)
 		};
 		
-		let mut values = Vec::new();
+		tokens = leftovers;
+		
+		let mut values: Vec<(Identifier, Expression)> = Vec::new();
 		
 		match tokens.get(0) {
 			Some(TokenTree::Brace(ref tokens)) => {
@@ -49,7 +49,7 @@ impl ExpressionTaker for InstantiationTaker {
 						return Err(ParseError::Other.into()) // Expected an expression in the instantiation
 					};
 					
-					values.push((name, expr));
+					values.push((Identifier::from_string(name), expr));
 				}
 			},
 			_ => return Ok(None), // debug
@@ -57,6 +57,6 @@ impl ExpressionTaker for InstantiationTaker {
 		
 		tokens = &tokens[1..];
 		
-		Ok(Some((Expression::Instantiation(name, values), tokens)))
+		Ok(Some((Expression::Instantiation(typename, values), tokens)))
 	}
 }

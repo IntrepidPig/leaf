@@ -14,11 +14,13 @@ pub mod typedef;
 pub mod functioncall;
 pub mod separated;
 pub mod instantiation;
+pub mod pathitem;
 
 pub use ast::tokenizer::{Keyword, Symbol as TokenSymbol};
 pub use self::syntaxtree::*;
 pub use self::operators::*;
 pub use ast::treeify::*;
+pub use self::pathitem::*;
 pub use failure::Error;
 
 /// Parse a block from the tokens (will use all of the tokens or error)
