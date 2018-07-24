@@ -1,18 +1,20 @@
+use ::core::Int
+
 fn main() {
 	let a := 20;
 	let b := get_2000() + a;
 	let c := count_to_3000() + b;
 	let d := add_42(c);
-	sum(sum(c, d), a)
+	sum(sum(c, d), a) == 10102
 }
 
-fn get_2000() {
+fn get_2000(): Int {
 	let d := 1000;
 	let e := 1000;
 	d + e
 }
 
-fn count_to_3000() {
+fn count_to_3000(): Int {
 	let f := 0;
 	loop
 		if f == 3000 then
@@ -24,11 +26,11 @@ fn count_to_3000() {
 	f
 }
 
-fn add_42(x) {
+fn add_42(x: Int): Int {
 	sum(x, 42)
 }
 
-fn sum(a, b) {
+fn sum(a: Int, b: Int): Int {
 	let sum := a + b;
 	sum
 }

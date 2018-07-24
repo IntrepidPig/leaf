@@ -5,11 +5,9 @@ extern crate leafc;
 extern crate log;
 
 use std::io::{self, Read};
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::ffi::OsStr;
+use std::path::Path;
 
-use leafc::codegen::vmgen::{Instruction, Var, VarInfo, Primitive, Reference};
+use leafc::codegen::vmgen::Instruction;
 
 fn main() {
 	let matches = clap::App::new("Leaf")
@@ -63,34 +61,25 @@ fn main() {
 		.apply()
 		.expect("Failed to initialize logger");
 	
-	let includes: Vec<(String, &Path)> = if let Some(includes) = matches.values_of_os("includes"){
-		includes.into_iter().map(|include| {
-			let include_path = Path::new(include);
-			let include_file_name = include_path.file_name().unwrap().to_str().unwrap();
-			let include_name = include_file_name.split(".").next().unwrap();
-			(include_name.to_owned(), include_path)
-		}).collect()
+	let includes: Vec<&Path> = if let Some(includes) = matches.values_of_os("includes") {
+		includes.into_iter().map(|include| Path::new(include)).collect()
 	} else {
 		Vec::new()
 	};
 	let input_file = matches.value_of_os("FILE").unwrap();
 	
-	let ast = if input_file == "-" {
+	let instructions = if input_file == "-" {
 		let mut input = String::new();
 		io::stdin().read_to_string(&mut input).unwrap();
-		leafc::ast::create_ast_with_includes(&input, &includes).unwrap()
+		leafc::leafc_str(&input, Path::new("../leafc/src/libcore/core.leaf"), &includes).unwrap()
 	} else {
-		leafc::ast::create_ast_from_file(input_file, &includes).unwrap()
+		leafc::leafc(Path::new(input_file), Path::new("../leafc/src/libcore/core.leaf"), &includes).unwrap()
 	};
-	let mut hir_generator = leafc::hir::HIRGenerator::new();
-	let hir = hir_generator.ast_to_hir(ast);
-	println!("{:#?}\n\t=>", hir);
-	let mut code_generator = leafc::codegen::vmgen::CodeGenerator::new(&hir);
-	code_generator.gen_instructions();
+	
 	if debug {
-		print_instructions(&code_generator.instructions);
+		print_instructions(&instructions);
 	}
-	leaf::run_instructions(&code_generator.instructions, debug).unwrap();
+	leaf::run_instructions(&instructions, debug).unwrap();
 }
 
 fn print_instructions(instructions: &[Instruction]) {

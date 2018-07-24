@@ -1,5 +1,8 @@
 extern crate leafc;
 
+#[cfg(test)]
+mod tests;
+
 use leafc::codegen::vmgen::{Instruction, Var, VarInfo, Primitive, Reference};
 
 pub fn leaf() {
@@ -36,7 +39,7 @@ impl BlockFrame {
 	}
 }
 
-pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<(), ()> {
+pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<Var, ()> {
 	let mut ptr: usize = 0;
 	// Create a stack with a main stack frame and block frame for the main function's outputs
 	let mut stack: Vec<StackFrame> = vec![StackFrame::new(0)];
@@ -54,7 +57,7 @@ pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<(),
 			iter += 1;
 			if iter > 1000 {
 				println!("Reached maximum instruction execution");
-				return Ok(());
+				return Err(());
 			}
 
 			println!("Instruction {}: {:?}", instr_ptr, instructions[instr_ptr],);
@@ -134,6 +137,42 @@ pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<(),
 				stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.push(Var::new_u64(output));
 				ptr -= 1;
 			},
+			Instruction::Sub => {
+				let right = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
+				let left = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
+				let output = match (left.var_info, right.var_info) {
+					(VarInfo::Primitive(Primitive::U64(left)), VarInfo::Primitive(Primitive::U64(right))) => {
+						left - right
+					},
+					_ => panic!("Tried to add types that don't support it") // This is ok now because the conversion to hir changes operators to use the add method when they're not primitives
+				};
+				stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.push(Var::new_u64(output));
+				ptr -= 1;
+			},
+			Instruction::Mul => {
+				let right = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
+				let left = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
+				let output = match (left.var_info, right.var_info) {
+					(VarInfo::Primitive(Primitive::U64(left)), VarInfo::Primitive(Primitive::U64(right))) => {
+						left * right
+					},
+					_ => panic!("Tried to add types that don't support it") // This is ok now because the conversion to hir changes operators to use the add method when they're not primitives
+				};
+				stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.push(Var::new_u64(output));
+				ptr -= 1;
+			},
+			Instruction::Div => {
+				let right = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
+				let left = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
+				let output = match (left.var_info, right.var_info) {
+					(VarInfo::Primitive(Primitive::U64(left)), VarInfo::Primitive(Primitive::U64(right))) => {
+						left / right
+					},
+					_ => panic!("Tried to add types that don't support it") // This is ok now because the conversion to hir changes operators to use the add method when they're not primitives
+				};
+				stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.push(Var::new_u64(output));
+				ptr -= 1;
+			},
 			Instruction::Equal => {
 				let right = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
 				let left = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
@@ -185,12 +224,7 @@ pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<(),
 		}
 	}
 
-	println!(
-		"Program output: {:?}",
-		stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop()
-	);
-
-	Ok(())
+	Ok(stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap())
 }
 
 fn print_stack(stack: &[StackFrame]) {
