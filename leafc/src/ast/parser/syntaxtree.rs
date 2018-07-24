@@ -98,6 +98,15 @@ mod structures {
 		pub item: T,
 	}
 	
+	impl<T> PathItem<T> {
+		pub fn map<O, F: Fn(T) -> O>(self, f: F) -> PathItem<O> {
+			PathItem {
+				module_path: self.module_path,
+				item: f(self.item),
+			}
+		}
+	}
+	
 	impl Module {
 		pub fn new(body: SyntaxTree) -> Self {
 			Module {
@@ -123,14 +132,14 @@ mod structures {
 	
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub struct SyntaxTree {
-		pub uses: Vec<PathItem<TypeName>>,
+		pub uses: Vec<PathItem<Identifier>>,
 		pub types: Vec<Type>,
 		pub functions: Vec<Function>,
 		pub modules: Vec<(Identifier, Module)>,
 	}
 	
 	impl SyntaxTree {
-		pub fn new(uses: Vec<PathItem<TypeName>>, types: Vec<Type>, functions: Vec<Function>, modules: Vec<(Identifier, Module)>) -> Self {
+		pub fn new(uses: Vec<PathItem<Identifier>>, types: Vec<Type>, functions: Vec<Function>, modules: Vec<(Identifier, Module)>) -> Self {
 			SyntaxTree {
 				uses,
 				types,

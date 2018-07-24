@@ -345,8 +345,9 @@ impl HIRGenerator {
 	
 	/// Resolve all paths in a module to absolute paths with this module as a root.
 	pub fn resolve_paths(&mut self, module: &mut parser::Module, module_path: &mut ModulePath) {
-		//
-		// Appends `to_resolve` to current module path, if `to_resolve` isn't already absolute
+		// Only does anything if `to_resolve` isn't already relative.
+		// If to_resolve is in the uses, change it to that. If not, then it must be declared in this module so
+		// append it's path to the current module path.
 		fn resolve_path<T: Eq + Clone>(current: &ModulePath, uses: &Vec<PathItem<T>>, to_resolve: &mut PathItem<T>) {
 			if to_resolve.module_path.relative {
 				for u in uses {
@@ -373,21 +374,29 @@ impl HIRGenerator {
 			for function in functions {
 				// Resolve the types of the arguments of the function
 				for (_arg_name, arg_type) in &mut function.args {
-					resolve_path(&current_path, uses, arg_type);
+					let mut arg_type_name = arg_type.clone().map(|arg_type_name| arg_type_name.name);
+					resolve_path(&current_path, uses, &mut arg_type_name);
+					arg_type.module_path = arg_type_name.module_path;
 				}
 				
 				// Resolve the return type of the function
-				function.return_type.as_mut().map(|return_type| resolve_path(&current_path, uses, return_type));
+				
+				function.return_type.as_mut().map(|return_type| {
+					let mut arg_type_name = return_type.clone().map(|arg_type_name| arg_type_name.name);
+					resolve_path(&current_path, uses, &mut arg_type_name);
+					return_type.module_path = arg_type_name.module_path;
+				});
 				
 				// Resolve all of the function calls and instantiations in this function
 				function.body.traverse_expressions_mut(&mut |expr: &mut parser::Expression| {
 					match expr {
 						parser::Expression::Instantiation(ref mut name, _) => {
-							resolve_path(&current_path, &uses, name);
+							let mut arg_type_name = name.clone().map(|arg_type_name| arg_type_name.name);
+							resolve_path(&current_path, uses, &mut arg_type_name);
+							name.module_path = arg_type_name.module_path;
 						},
-						parser::Expression::FunctionCall { .. } => {
-							// TODO! allow using functions
-							//resolve_path(&current_path, &module.body.uses, name);
+						parser::Expression::FunctionCall { ref mut name, .. } => {
+							resolve_path(&current_path, uses, name);
 						},
 						_ => {},
 					}
@@ -397,7 +406,9 @@ impl HIRGenerator {
 			// Resolve all of the types of fields in each type definition of this module
 			for typedef in types {
 				for (_member_name, member_type) in &mut typedef.members {
-					resolve_path(&current_path, &module.body.uses, member_type);
+					let mut arg_type_name = member_type.clone().map(|arg_type_name| arg_type_name.name);
+					resolve_path(&current_path, uses, &mut arg_type_name);
+					member_type.module_path = arg_type_name.module_path;
 				}
 			}
 		}, module_path);
@@ -405,7 +416,6 @@ impl HIRGenerator {
 	
 	/// Convert an AST module to an HIR module. Assumes all paths are resolved as absolute, and will fail
 	/// if they aren't.
-	// TODO instead we should resolve paths on the fly in this function
 	pub fn ast_module_to_hir_module(&mut self, module: &parser::Module, module_path: &mut ModulePath) -> Module {		
 		// Add all type definitions to the global list of type definitions with it's full path
 		// Add all functions to the global list of function return types with it's full path
@@ -478,10 +488,14 @@ impl HIRGenerator {
 			}
 		}, module_path);
 		
-		// TODO!! traverse modules
 		// Put all typedefs in global typedef list
-		let typedefs = module.body.types.iter().map(|typedef| typedef.clone().into()).collect();
+		let mut typedefs = Vec::new();
+		module.traverse(&mut |_module_path: &ModulePath, module: &parser::Module| { 
+			let mut mod_typedefs: Vec<TypeDefinition> = module.body.types.iter().map(|typedef| typedef.clone().into()).collect();
+			typedefs.append(&mut mod_typedefs);
+		}, module_path);
 		
+		// Convert all the modules within to HIR modules recursively
 		let mut modules = Vec::new();
 		for (name, module) in &module.body.modules {
 			module_path.path.push(name.clone());
