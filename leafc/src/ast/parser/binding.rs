@@ -16,14 +16,14 @@ impl ExpressionTaker for BindingTaker {
 		}
 
 		let mut tokens = in_tokens;
-		
+
 		match tokens.get(0) {
 			Some(TokenTree::Token(Token::Keyword(Keyword::Let))) => {
 				tokens = &tokens[1..];
 			},
 			_ => return Ok(None),
 		}
-		
+
 		let mutable = match tokens.get(0) {
 			Some(TokenTree::Token(Token::Keyword(Keyword::Mutable))) => {
 				tokens = &tokens[1..];
@@ -31,42 +31,42 @@ impl ExpressionTaker for BindingTaker {
 			},
 			_ => false,
 		};
-		
+
 		let ident = match tokens.get(0) {
-			Some(TokenTree::Token(Token::Name(ref name))) => {
-				Identifier::from_str(name)
-			},
-			_ => return Err(ParseError::Other.into()) // expected an identifier after let
+			Some(TokenTree::Token(Token::Name(ref name))) => Identifier::from_str(name),
+			_ => return Err(ParseError::Other.into()), // expected an identifier after let
 		};
 		tokens = &tokens[1..];
-		
+
 		let bindtype = match tokens.get(0) {
 			Some(TokenTree::Token(Token::Symbol(TokenSymbol::Colon))) => {
 				tokens = &tokens[1..];
 				let (typename, leftovers) = if let Some(res) = next_type(tokens)? {
 					res
 				} else {
-					return Err(ParseError::Other.into()) // expected a type after let binding colon
+					return Err(ParseError::Other.into()); // expected a type after let binding colon
 				};
 				tokens = leftovers;
 				Some(typename)
 			},
 			_ => None,
 		};
-		
+
 		match tokens.get(0) {
-			Some(TokenTree::Token(Token::Symbol(TokenSymbol::Assign))) => { 
+			Some(TokenTree::Token(Token::Symbol(TokenSymbol::Assign))) => {
 				tokens = &tokens[1..];
 			},
-			_ => return Err(ParseError::Other.into()) // expected assign symbol in let binding
+			_ => return Err(ParseError::Other.into()), // expected assign symbol in let binding
 		}
-		
-		let (bindexpr, leftovers) = if let Some(res) = next_expression(tokens, Box::new(|token| token.is_semicolon()))? {
-			res
-		} else {
-			return Err(ParseError::Other.into()); // expected an expression after the assign symbol
-		};
-		
+
+		let (bindexpr, leftovers) =
+			if let Some(res) = next_expression(tokens, Box::new(|token| token.is_semicolon()))? {
+				res
+			} else {
+				// expected an expression after the assign symbol
+				return Err(ParseError::Other.into());
+			};
+
 		tokens = leftovers;
 
 		Ok(Some((

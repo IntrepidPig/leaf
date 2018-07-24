@@ -26,7 +26,7 @@ impl ExpressionTaker for OperationTaker {
 
 		// Get the tokens involved in the next expression
 		let (expr_tokens, leftovers) = split_at(tokens, args, false);
-		
+
 		parse_operation(expr_tokens).map(|expr| Some((expr, leftovers)))
 	}
 }
@@ -157,9 +157,9 @@ mod parse {
 									Expression::Identifier(ref ident) => {
 										Ok(Expression::FieldAccess(Box::new(lhs), ident.clone()))
 									},
-									_ => Err(ParseError::Other.into()) // Right hand side wasn't an identifier
+									_ => Err(ParseError::Other.into()), // Right hand side wasn't an identifier
 								}
-							}
+							},
 							binop => Ok(Expression::Binary {
 								left: Box::new(lhs),
 								right: Box::new(rhs),
@@ -308,15 +308,19 @@ mod parse {
 				&identifier::IdentifierTaker,
 				&block::BlockTaker,
 			];
-			
+
 			for expression_taker in expression_takers {
 				let expr_opt = expression_taker.take_expression(in_tokens, ())?;
 				if let Some((expr, leftovers)) = expr_opt {
-					return Ok(Some((ExpressionItem::Operand(expr), &[&BinaryTaker], leftovers)));
+					return Ok(Some((
+						ExpressionItem::Operand(expr),
+						&[&BinaryTaker],
+						leftovers,
+					)));
 				}
 			}
-			
-			return Err(ParseError::Other.into()) // Failed to parse operand
+
+			return Err(ParseError::Other.into()); // Failed to parse operand
 		}
 	}
 }

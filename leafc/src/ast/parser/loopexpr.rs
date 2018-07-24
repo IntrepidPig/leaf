@@ -19,12 +19,15 @@ impl ExpressionTaker for LoopTaker {
 		match in_tokens.get(0) {
 			Some(TokenTree::Loop(tokens)) => {
 				let expr = parse_block(tokens)?;
-				
+
 				if expr.output.is_some() {
-					return Err(ParseError::Other.into()) // Loop blocks can't have an output
+					return Err(ParseError::Other.into()); // Loop blocks can't have an output
 				}
-				
-				Ok(Some((Expression::Loop(Box::new(Expression::Block(Box::new(expr)))), &in_tokens[1..])))
+
+				Ok(Some((
+					Expression::Loop(Box::new(Expression::Block(Box::new(expr)))),
+					&in_tokens[1..],
+				)))
 			},
 			_ => Ok(None),
 		}

@@ -9,7 +9,7 @@ use std::fs::File;
 use std::io::Read;
 use failure;
 
-use self::parser::{SyntaxTree, Module, Identifier};
+use self::parser::{Identifier, Module, SyntaxTree};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ast {
@@ -48,7 +48,10 @@ impl From<treeify::TreeifyError> for AstCreationError {
 	}
 }
 
-impl<T> From<failure::Error<T>> for AstCreationError where T: Into<AstCreationError> + ::std::error::Error {
+impl<T> From<failure::Error<T>> for AstCreationError
+where
+	T: Into<AstCreationError> + ::std::error::Error,
+{
 	fn from(t: failure::Error<T>) -> Self {
 		t.error.into()
 	}
@@ -68,19 +71,28 @@ pub fn create_ast(input: &str) -> Result<SyntaxTree, AstCreationError> {
 	Ok(st)
 }
 
-pub fn create_ast_with_includes(input: &str, includes: &[(String, &Path)]) -> Result<SyntaxTree, AstCreationError> {
+pub fn create_ast_with_includes(
+	input: &str,
+	includes: &[(String, &Path)],
+) -> Result<SyntaxTree, AstCreationError> {
 	let mut modules = Vec::new();
 	for include in includes {
 		let include_st = create_ast_from_file(&include.1, &[]).unwrap(); // TODO support includes with includes? maybe should only be solved by libraries
-		modules.push((Identifier::from_string(include.0.clone()), Module::new(include_st)));
+		modules.push((
+			Identifier::from_string(include.0.clone()),
+			Module::new(include_st),
+		));
 	}
 	let mut st = create_ast(input).unwrap();
 	st.modules = modules;
-	
+
 	Ok(st)
 }
 
-pub fn create_ast_from_file<P: AsRef<Path>>(path: P, includes: &[(String, &Path)]) -> Result<SyntaxTree, AstCreationError> {
+pub fn create_ast_from_file<P: AsRef<Path>>(
+	path: P,
+	includes: &[(String, &Path)],
+) -> Result<SyntaxTree, AstCreationError> {
 	let mut main_file = File::open(&path).expect("Failed to open input file");
 	let input = {
 		let mut buf = String::new();

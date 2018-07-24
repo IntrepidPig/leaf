@@ -14,17 +14,17 @@ impl ExpressionTaker for FunctionCallTaker {
 		if in_tokens.is_empty() {
 			return Ok(None);
 		}
-		
+
 		let mut tokens = in_tokens;
-		
+
 		let (path, leftovers) = if let Some(res) = pathitem::next_path(tokens)? {
 			res
 		} else {
 			return Ok(None);
 		};
-		
+
 		tokens = leftovers;
-		
+
 		let name = match tokens.get(0) {
 			Some(TokenTree::Token(Token::Name(ref name))) => {
 				tokens = &tokens[1..];
@@ -32,7 +32,7 @@ impl ExpressionTaker for FunctionCallTaker {
 			},
 			_ => return Ok(None),
 		};
-		
+
 		let name = PathItem {
 			module_path: path,
 			item: name,
@@ -43,31 +43,32 @@ impl ExpressionTaker for FunctionCallTaker {
 				tokens = &tokens[1..];
 				parse_args(args_tokens)?
 			},
-			_ => return Ok(None) // it could be an identifier
+			_ => return Ok(None), // it could be an identifier
 		};
-		
-		Ok(Some((Expression::FunctionCall {
-			name,
-			args,
-		}, tokens)))
+
+		Ok(Some((Expression::FunctionCall { name, args }, tokens)))
 	}
 }
 
 fn parse_args(in_tokens: &[TokenTree]) -> Result<Vec<Expression>, Error<ParseError>> {
 	let mut each_args_tokens = Vec::new();
-	in_tokens.split(|token| token.is_comma()).map(|tokens| each_args_tokens.push(tokens)).collect::<()>();
-	
+	in_tokens
+		.split(|token| token.is_comma())
+		.map(|tokens| each_args_tokens.push(tokens))
+		.collect::<()>();
+
 	let mut args = Vec::new();
-	
+
 	for arg_tokens in each_args_tokens {
 		if let Some((expression, leftovers)) = next_expression(arg_tokens, Box::new(|_| false))? {
 			if !leftovers.is_empty() {
-				return Err(ParseError::Other.into()) // didn't parse the entire argument expression tokens
+				// didn't parse the entire argument expression tokens
+				return Err(ParseError::Other.into());
 			}
-			
+
 			args.push(expression);
 		}
 	}
-	
+
 	Ok(args)
 }

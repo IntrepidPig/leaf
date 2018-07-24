@@ -12,31 +12,34 @@ impl ExpressionTaker for IfTaker {
 	) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
 		match in_tokens.get(0) {
 			Some(TokenTree::If(tokens)) => {
-				let (until_then, leftovers) = operation::split_at(tokens, Box::new(|token| token.is_then()), false);
+				let (until_then, leftovers) =
+					operation::split_at(tokens, Box::new(|token| token.is_then()), false);
 				let condition = parse_block(until_then)?;
-								
+
 				if !(leftovers.get(0) == Some(&TokenTree::Token(Token::Keyword(Keyword::Then)))) {
-					return Err(ParseError::Other.into()) // needed `then` keyword
+					return Err(ParseError::Other.into()); // needed `then` keyword
 				}
-				
-				let (body_tokens, leftovers) = operation::split_at(&leftovers[1..], Box::new(|token| token.is_else()), false);
-				
+
+				let (body_tokens, leftovers) =
+					operation::split_at(&leftovers[1..], Box::new(|token| token.is_else()), false);
+
 				// TODO elseif
 				let body = parse_block(body_tokens)?;
-								
+
 				let else_block = if leftovers.is_empty() {
 					None
 				} else {
 					match leftovers.get(0) {
 						Some(TokenTree::Token(Token::Keyword(Keyword::Else))) => {
 							let else_body = parse_block(&leftovers[1..])?;
-							
+
 							Some(else_body)
 						},
-						_ => return Err(ParseError::Other.into()) // needed else or nothing after then
+						// needed else or nothing after then
+						_ => return Err(ParseError::Other.into()),
 					}
 				};
-				
+
 				Ok(Some((
 					Expression::If(Box::new(If {
 						condition: Expression::Block(Box::new(condition)),

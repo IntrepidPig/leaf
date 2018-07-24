@@ -32,14 +32,18 @@ mod structures {
 		ExpressionPointer,
 		Exclamation,
 	}
-	
+
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub struct Module {
 		pub body: SyntaxTree,
 	}
-	
+
 	impl Module {
-		pub fn traverse_mut<F: FnMut(&ModulePath, &mut Module)>(&mut self, f: &mut F, start_path: &mut ModulePath) {
+		pub fn traverse_mut<F: FnMut(&ModulePath, &mut Module)>(
+			&mut self,
+			f: &mut F,
+			start_path: &mut ModulePath,
+		) {
 			f(&start_path, self);
 			for (name, module) in &mut self.body.modules {
 				start_path.path.push(name.clone());
@@ -47,8 +51,12 @@ mod structures {
 				start_path.path.pop().unwrap();
 			}
 		}
-		
-		pub fn traverse<F: FnMut(&ModulePath, &Module)>(&self, f: &mut F, start_path: &mut ModulePath) {
+
+		pub fn traverse<F: FnMut(&ModulePath, &Module)>(
+			&self,
+			f: &mut F,
+			start_path: &mut ModulePath,
+		) {
 			f(&start_path, self);
 			for (name, module) in &self.body.modules {
 				start_path.path.push(name.clone());
@@ -57,20 +65,18 @@ mod structures {
 			}
 		}
 	}
-	
+
 	#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 	pub struct Identifier {
 		name: String,
 	}
-	
+
 	impl Identifier {
 		pub fn from_string(string: String) -> Self {
 			// TODO validate identifier string and return result
-			Identifier {
-				name: string,
-			}
+			Identifier { name: string }
 		}
-		
+
 		pub fn from_str(string: &str) -> Self {
 			// TODO validate identifier string
 			Identifier {
@@ -78,26 +84,24 @@ mod structures {
 			}
 		}
 	}
-	
+
 	#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 	pub struct TypeName {
 		pub name: Identifier,
 	}
-	
+
 	impl TypeName {
 		pub fn from_ident(identifier: Identifier) -> Self {
-			TypeName {
-				name: identifier,
-			}
+			TypeName { name: identifier }
 		}
 	}
-	
+
 	#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 	pub struct PathItem<T> {
 		pub module_path: ModulePath,
 		pub item: T,
 	}
-	
+
 	impl<T> PathItem<T> {
 		pub fn map<O, F: Fn(T) -> O>(self, f: F) -> PathItem<O> {
 			PathItem {
@@ -106,30 +110,25 @@ mod structures {
 			}
 		}
 	}
-	
+
 	impl Module {
 		pub fn new(body: SyntaxTree) -> Self {
-			Module {
-				body,
-			}
+			Module { body }
 		}
 	}
-	
+
 	#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 	pub struct ModulePath {
 		pub relative: bool,
 		pub path: Vec<Identifier>,
 	}
-	
+
 	impl ModulePath {
 		pub fn new(relative: bool, path: Vec<Identifier>) -> Self {
-			ModulePath {
-				relative,
-				path
-			}
+			ModulePath { relative, path }
 		}
 	}
-	
+
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub struct SyntaxTree {
 		pub uses: Vec<PathItem<Identifier>>,
@@ -137,9 +136,14 @@ mod structures {
 		pub functions: Vec<Function>,
 		pub modules: Vec<(Identifier, Module)>,
 	}
-	
+
 	impl SyntaxTree {
-		pub fn new(uses: Vec<PathItem<Identifier>>, types: Vec<Type>, functions: Vec<Function>, modules: Vec<(Identifier, Module)>) -> Self {
+		pub fn new(
+			uses: Vec<PathItem<Identifier>>,
+			types: Vec<Type>,
+			functions: Vec<Function>,
+			modules: Vec<(Identifier, Module)>,
+		) -> Self {
 			SyntaxTree {
 				uses,
 				types,
@@ -210,10 +214,9 @@ mod structures {
 		BoolLiteral(bool),
 		FieldAccess(Box<Expression>, Identifier),
 		Instantiation(PathItem<TypeName>, Vec<(Identifier, Expression)>),
-		
 	}
-	
-	impl Expression {		
+
+	impl Expression {
 		pub fn traverse_expressions_mut<F: FnMut(&mut Expression)>(&mut self, f: &mut F) {
 			f(self);
 			match self {
@@ -228,19 +231,20 @@ mod structures {
 				Expression::Postfix { left, .. } => {
 					left.traverse_expressions_mut(f);
 				},
-				Expression::FunctionCall { name: _, args, } => {
-					for arg in args {
-						arg.traverse_expressions_mut(f);
-					}
-				}
+				Expression::FunctionCall { name: _, args } => for arg in args {
+					arg.traverse_expressions_mut(f);
+				},
 				Expression::Debug(ref mut expr) => {
 					expr.traverse_expressions_mut(f);
 				},
 				Expression::Break(ref mut expr) => {
 					expr.as_mut().map(|expr| expr.traverse_expressions_mut(f));
-				}
+				},
 				Expression::Binding(ref mut binding) => {
-					binding.val.as_mut().map(|val| val.traverse_expressions_mut(f));
+					binding
+						.val
+						.as_mut()
+						.map(|val| val.traverse_expressions_mut(f));
 				},
 				Expression::Assign(ref mut assignment) => {
 					assignment.expr.traverse_expressions_mut(f);
@@ -252,7 +256,10 @@ mod structures {
 					ifexpr.condition.traverse_expressions_mut(f);
 					ifexpr.body.traverse_expressions_mut(f);
 					// TODO elifs
-					ifexpr.else_block.as_mut().map(|expr| expr.traverse_expressions_mut(f));
+					ifexpr
+						.else_block
+						.as_mut()
+						.map(|expr| expr.traverse_expressions_mut(f));
 				},
 				Expression::Identifier(_) => {},
 				Expression::Block(ref mut block) => {
@@ -264,10 +271,8 @@ mod structures {
 				Expression::FieldAccess(ref mut lhs, _) => {
 					lhs.traverse_expressions_mut(f);
 				},
-				Expression::Instantiation(_, ref mut fields) => {
-					for field in fields {
-						field.1.traverse_expressions_mut(f);
-					}
+				Expression::Instantiation(_, ref mut fields) => for field in fields {
+					field.1.traverse_expressions_mut(f);
 				},
 			}
 		}
@@ -280,7 +285,7 @@ mod structures {
 		pub elif: Option<Box<If>>,
 		pub else_block: Option<Expression>,
 	}
-	
+
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub struct Type {
 		pub name: TypeName,
@@ -304,12 +309,14 @@ mod structures {
 				output: None,
 			}
 		}
-		
+
 		pub fn traverse_expressions_mut<F: FnMut(&mut Expression)>(&mut self, f: &mut F) {
 			for expression in &mut self.block {
 				expression.traverse_expressions_mut(f);
 			}
-			self.output.as_mut().map(|expr| expr.traverse_expressions_mut(f));
+			self.output
+				.as_mut()
+				.map(|expr| expr.traverse_expressions_mut(f));
 		}
 	}
 }
@@ -336,18 +343,16 @@ static mut RECURSION_LEVEL: usize = 0;
 
 /// Gets statements until it can't from the tokens, and then gets a final expression if there is one
 /// TODO don't return option
-pub fn parse_block<'a>(
-	mut tokens: &'a [TokenTree],
-) -> Result<Block, Error<ParseError>> {
+pub fn parse_block<'a>(mut tokens: &'a [TokenTree]) -> Result<Block, Error<ParseError>> {
 	unsafe {
 		RECURSION_LEVEL = RECURSION_LEVEL + 1;
 		if RECURSION_LEVEL > 4096 {
 			return Err(ParseError::Other.into()); // Too much nesting DEBUG purposes only
 		}
 	}
-	
+
 	let mut block = Block::new();
-	
+
 	// Parse each statement until none are left
 	while let Some((stmnt, leftovers)) = next_statement(tokens)? {
 		block.block.push(stmnt);
@@ -360,7 +365,6 @@ pub fn parse_block<'a>(
 		}
 		block.output = Some(expr);
 	}
-
 
 	Ok(block)
 }
@@ -385,7 +389,7 @@ pub fn next_statement<'a>(
 pub fn next_expression<'a>(
 	in_tokens: &'a [TokenTree],
 	end_predicate: Box<FnMut(&TokenTree) -> bool>,
-) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {	
+) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
 	if in_tokens.is_empty() {
 		return Ok(None);
 	}

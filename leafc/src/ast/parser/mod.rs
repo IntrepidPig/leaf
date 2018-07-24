@@ -28,7 +28,7 @@ pub use failure::Error;
 pub fn parse(in_tokens: &[TokenTree]) -> Result<SyntaxTree, Error<ParseError>> {
 	let mut stree = SyntaxTree::new(Vec::new(), Vec::new(), Vec::new(), Vec::new());
 	let mut tokens = in_tokens;
-	
+
 	while !tokens.is_empty() {
 		if let Some((func, leftovers)) = functiondef::take_functiondef(tokens)? {
 			tokens = leftovers;
@@ -43,11 +43,11 @@ pub fn parse(in_tokens: &[TokenTree]) -> Result<SyntaxTree, Error<ParseError>> {
 			stree.uses.push(u);
 			continue;
 		}
-		
+
 		// TODO! parse uses and modules
-		
-		return Err(ParseError::Other.into()) // Didn't get a function or a typedef in the root
+
+		return Err(ParseError::Other.into()); // Didn't get a function or a typedef in the root
 	}
-	
+
 	Ok(stree)
 }

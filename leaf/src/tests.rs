@@ -3,7 +3,11 @@ extern crate leafc;
 use std::path::Path;
 
 fn test_file<P: AsRef<Path>>(file: P) {
-	let instructions = leafc::leafc(file.as_ref(), Path::new("../leafc/src/libcore/core.leaf"), &[]).unwrap();
+	let instructions = leafc::leafc(
+		file.as_ref(),
+		Path::new("../leafc/src/libcore/core.leaf"),
+		&[],
+	).unwrap();
 	let res = ::run_instructions(&instructions, false).unwrap();
 	println!("Program output: {:?}", res);
 	assert!(!res.is_false());

@@ -57,21 +57,21 @@ impl TokenTree {
 			_ => false,
 		}
 	}
-	
+
 	pub fn is_end(&self) -> bool {
 		match self {
 			TokenTree::Token(Token::Keyword(Keyword::End)) => true,
 			_ => false,
 		}
 	}
-	
+
 	pub fn is_brace_expr(&self) -> bool {
 		match self {
 			TokenTree::Brace(_) => true,
 			_ => false,
 		}
 	}
-	
+
 	pub fn is_comma(&self) -> bool {
 		match self {
 			TokenTree::Token(Token::Symbol(Symbol::Comma)) => true,
@@ -112,20 +112,18 @@ fn treeify_brackets(in_tokens: &[OldToken]) -> Result<Vec<TokenTree>, Error<Tree
 				if *state == BracketState::Close {
 					return Err(TreeifyError::IncorrectBrace.into());
 				}
-				let (sub, leftovers) = get_sub(old_tokens, |old_token| {
-					match old_token {
-						OldToken::Bracket(test_bracket, test_state) => {
-							if test_bracket == bracket {
-								match test_state {
-									BracketState::Open => 1,
-									BracketState::Close => -1,
-								}
-							} else {
-								0
+				let (sub, leftovers) = get_sub(old_tokens, |old_token| match old_token {
+					OldToken::Bracket(test_bracket, test_state) => {
+						if test_bracket == bracket {
+							match test_state {
+								BracketState::Open => 1,
+								BracketState::Close => -1,
 							}
-						},
-						_ => 0
-					}
+						} else {
+							0
+						}
+					},
+					_ => 0,
 				})?;
 				match bracket {
 					Bracket::Curly => tokens.push(TokenTree::Brace(treeify_brackets(sub)?)),
@@ -136,10 +134,10 @@ fn treeify_brackets(in_tokens: &[OldToken]) -> Result<Vec<TokenTree>, Error<Tree
 				match leftovers.get(0) {
 					Some(OldToken::Bracket(test_bracket, test_state)) => {
 						if !(test_bracket == bracket && *test_state == BracketState::Close) {
-							return Err(TreeifyError::UnclosedBrace.into()) // There was no close bracket
+							return Err(TreeifyError::UnclosedBrace.into()); // There was no close bracket
 						}
 					},
-					_ => {}
+					_ => {},
 				}
 
 				// cut off the close bracket
@@ -167,7 +165,7 @@ fn treeify_ifs(in_tokens: &[TokenTree]) -> Result<Vec<TokenTree>, Error<TreeifyE
 					TokenTree::Token(Token::Keyword(Keyword::End)) => -1,
 					_ => 0,
 				})?;
-				
+
 				tokens.push(TokenTree::If(treeify_ifs(sub)?));
 				old_tokens = &leftovers[1..];
 			},
@@ -209,7 +207,7 @@ fn treeify_loops(in_tokens: &[TokenTree]) -> Result<Vec<TokenTree>, Error<Treeif
 					TokenTree::Token(Token::Keyword(Keyword::Back)) => -1,
 					_ => 0,
 				})?;
-				
+
 				tokens.push(TokenTree::Loop(treeify_loops(sub)?));
 				old_tokens = &leftovers[1..];
 			},

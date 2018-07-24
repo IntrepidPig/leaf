@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use hir::*;
 use ast::parser::operators::*;
-use ast::parser::{PathItem, ModulePath, TypeName, Identifier};
+use ast::parser::{Identifier, ModulePath, PathItem, TypeName};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Var {
@@ -29,9 +29,7 @@ pub struct Reference {
 
 impl Reference {
 	pub fn new(fields: Vec<Var>) -> Self {
-		Reference {
-			fields
-		}
+		Reference { fields }
 	}
 }
 
@@ -41,25 +39,25 @@ impl Var {
 			var_info: VarInfo::Primitive(Primitive::U64(val)),
 		}
 	}
-	
+
 	pub fn root() -> Self {
 		Var {
 			var_info: VarInfo::Root,
 		}
 	}
-	
+
 	pub fn new_bool(val: bool) -> Self {
 		Var {
-			var_info: VarInfo::Primitive(Primitive::Bool(val))
+			var_info: VarInfo::Primitive(Primitive::Bool(val)),
 		}
 	}
-	
+
 	pub fn new_ref(reference: Reference) -> Self {
 		Var {
-			var_info: VarInfo::Reference(reference)
+			var_info: VarInfo::Reference(reference),
 		}
 	}
-	
+
 	pub fn is_false(&self) -> bool {
 		match self.var_info {
 			VarInfo::Primitive(Primitive::U64(val)) => val == 0,
@@ -113,7 +111,7 @@ pub enum Instruction {
 	/// Pop the amount of values on the stack and push a reference to them all
 	Ref(usize),
 	/// Stop execution of the program
-	Terminate
+	Terminate,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -130,7 +128,7 @@ pub struct CodeGenerator<'a> {
 	module_path: ModulePath,
 }
 
-impl<'a> CodeGenerator<'a> {	
+impl<'a> CodeGenerator<'a> {
 	pub fn new(hir: &'a HIR) -> Self {
 		CodeGenerator {
 			hir,
@@ -145,59 +143,71 @@ impl<'a> CodeGenerator<'a> {
 			module_path: ModulePath::new(false, Vec::new()),
 		}
 	}
-	
+
 	pub fn find_typedef(&self, path: PathItem<TypeName>) -> Option<TypeDefinition> {
 		let mut typedef = None;
-		self.root_mod.traverse(&mut |current_path: &ModulePath, module: &Module| {			
-			for test_typedef in &module.types {
-				if test_typedef.name == path.item && current_path == &path.module_path {
-					typedef = Some(test_typedef.clone());
+		self.root_mod.traverse(
+			&mut |current_path: &ModulePath, module: &Module| {
+				for test_typedef in &module.types {
+					if test_typedef.name == path.item && current_path == &path.module_path {
+						typedef = Some(test_typedef.clone());
+					}
 				}
-			}
-		}, &mut ModulePath::new(false, Vec::new()));
-		
+			},
+			&mut ModulePath::new(false, Vec::new()),
+		);
+
 		typedef
 	}
-	
+
 	pub fn find_function(&self, path: PathItem<Identifier>) -> Option<FunctionDefinition> {
 		let mut functiondef = None;
-		self.root_mod.traverse(&mut |current_path: &ModulePath, module: &Module| {
-			for test_function in &module.functions {
-				if test_function.name == path.item && current_path == &path.module_path {
-					functiondef = Some(test_function.clone());
+		self.root_mod.traverse(
+			&mut |current_path: &ModulePath, module: &Module| {
+				for test_function in &module.functions {
+					if test_function.name == path.item && current_path == &path.module_path {
+						functiondef = Some(test_function.clone());
+					}
 				}
-			}
-		}, &mut ModulePath::new(false, Vec::new()));
-		
+			},
+			&mut ModulePath::new(false, Vec::new()),
+		);
+
 		functiondef
 	}
 
 	pub fn gen_instructions(&mut self) {
 		self.instructions.push(Instruction::Call(0, 0));
-		self.function_jumps_todo.push((0, PathItem::root_item(Identifier::from_str("main"))));
+		self.function_jumps_todo
+			.push((0, PathItem::root_item(Identifier::from_str("main"))));
 		self.instructions.push(Instruction::Terminate);
 		for func in &self.root_mod.functions {
 			self.gen_from_func(&func);
 		}
-		
+
 		self.change_function_jumps();
 	}
-	
+
 	pub fn change_function_jumps(&mut self) {
 		for (location, name) in &self.function_jumps_todo {
 			match self.instructions.get_mut(*location).unwrap() {
-				Instruction::Call(ref mut target, _argc) => *target = *self.function_locations.get(name).unwrap(),
-				_ => panic!("Expected a jump to {:?} at index {}", name, location)
+				Instruction::Call(ref mut target, _argc) => {
+					*target = *self.function_locations.get(name).unwrap()
+				},
+				_ => panic!("Expected a jump to {:?} at index {}", name, location),
 			}
 		}
-	} 
-	
+	}
+
 	pub fn gen_from_func(&mut self, function: &FunctionDefinition) {
 		self.locals.push(Vec::new());
-		self.function_locations.insert(PathItem {
-			module_path: self.module_path.clone(),
-			item: function.name.clone(),
-		}, self.instructions.len());
+		self.function_locations.insert(
+			PathItem {
+				module_path: self.module_path.clone(),
+				item: function.name.clone(),
+			},
+			self.instructions.len(),
+		);
 		// start a new stack frame
 		self.instructions.push(Instruction::Block);
 		// load all of the arguments
@@ -289,8 +299,9 @@ impl<'a> CodeGenerator<'a> {
 	pub fn gen_from_expr(&mut self, expr: &Expression) {
 		match expr.expr {
 			// Push literal values onto the stack
-			ExpressionType::IntLiteral(num) => self.instructions
-				.push(Instruction::Push(Var::new_u64(num))),
+			ExpressionType::IntLiteral(num) => {
+				self.instructions.push(Instruction::Push(Var::new_u64(num)))
+			},
 			// Generate instructions for nested blocks
 			ExpressionType::Block(ref ast) => {
 				self.gen_from_block(ast);
@@ -298,7 +309,14 @@ impl<'a> CodeGenerator<'a> {
 			// Dereference variables
 			ExpressionType::Identifier(ref ident) => {
 				// Push the value of the variable onto the top of the stack
-				self.instructions.push(Instruction::Load(self.locals.last().unwrap().iter().position(|test_name| test_name == ident).unwrap()))
+				self.instructions.push(Instruction::Load(
+					self.locals
+						.last()
+						.unwrap()
+						.iter()
+						.position(|test_name| test_name == ident)
+						.unwrap(),
+				))
 			},
 			// Evalute binary expressions
 			ExpressionType::Binary(ref binary) => {
@@ -322,13 +340,25 @@ impl<'a> CodeGenerator<'a> {
 			},
 			ExpressionType::Assignment(ref assignment) => {
 				// Load the value that used to be in the variable being assigned to
-				self.instructions
-					.push(Instruction::Load(self.locals.last().unwrap().iter().position(|test_name| test_name == &assignment.ident).unwrap()));
+				self.instructions.push(Instruction::Load(
+					self.locals
+						.last()
+						.unwrap()
+						.iter()
+						.position(|test_name| test_name == &assignment.ident)
+						.unwrap(),
+				));
 				// Push the result of the expr onto the stack
 				self.gen_from_expr(&assignment.expr);
 				// Move the result into the variable
-				self.instructions
-					.push(Instruction::Set(self.locals.last().unwrap().iter().position(|test_name| test_name == &assignment.ident).unwrap()));
+				self.instructions.push(Instruction::Set(
+					self.locals
+						.last()
+						.unwrap()
+						.iter()
+						.position(|test_name| test_name == &assignment.ident)
+						.unwrap(),
+				));
 				// And the old value will be left on the stack as the result of the expression
 			},
 			ExpressionType::Loop(ref block) => {
@@ -355,16 +385,14 @@ impl<'a> CodeGenerator<'a> {
 					// This will push the result onto the stack
 					self.gen_from_expr(expr);
 					// Bind the variable to the current local var location
-					self.instructions
-						.push(Instruction::Bind);
+					self.instructions.push(Instruction::Bind);
 					// Push the variable name to the local var stack
 					self.locals.last_mut().unwrap().push(binding.ident.clone())
 				} else {
 					// Push a nil value to the stack
 					self.instructions.push(Instruction::Push(Var::root()));
 					// Bind the variable to the nil value
-					self.instructions
-						.push(Instruction::Bind);
+					self.instructions.push(Instruction::Bind);
 					// Push the variable name to the local var stack
 					self.locals.last_mut().unwrap().push(binding.ident.clone());
 				}
@@ -399,46 +427,55 @@ impl<'a> CodeGenerator<'a> {
 				// Push a nil value since break is an expression and it's result will be popped
 				self.instructions.push(Instruction::Push(Var::root()))
 			},
-			ExpressionType::BoolLiteral(val) => {
-				self.instructions.push(Instruction::Push(Var::new_bool(val)))
-			},
+			ExpressionType::BoolLiteral(val) => self.instructions
+				.push(Instruction::Push(Var::new_bool(val))),
 			ExpressionType::FunctionCall(ref call) => {
 				for arg in &call.args {
 					self.gen_from_expr(arg);
 				}
 				let function_call_index = self.instructions.len();
-				self.function_jumps_todo.push((function_call_index, call.name.clone()));
-				self.instructions.push(Instruction::Call(0, call.args.len()));
+				self.function_jumps_todo
+					.push((function_call_index, call.name.clone()));
+				self.instructions
+					.push(Instruction::Call(0, call.args.len()));
 			},
 			ExpressionType::FieldAccess(ref expr, ref fieldname) => {
 				self.gen_from_expr(expr);
 				let exprtype = &expr.expr_out;
-				let typedef = self.find_typedef(exprtype.clone()).expect("Type not found in list of typedefs");
-				let typeindex = typedef.fields.iter().position(|field| &field.0 == fieldname).expect("Type does not have this field");
+				let typedef = self.find_typedef(exprtype.clone())
+					.expect("Type not found in list of typedefs");
+				let typeindex = typedef
+					.fields
+					.iter()
+					.position(|field| &field.0 == fieldname)
+					.expect("Type does not have this field");
 				self.instructions.push(Instruction::Retrieve(typeindex));
 			},
 			ExpressionType::Instantiation(ref instantiation) => {
-				let typedef = self.find_typedef(instantiation.typename.clone()).unwrap().clone();
+				let typedef = self.find_typedef(instantiation.typename.clone())
+					.unwrap()
+					.clone();
 				if instantiation.fields.len() != typedef.fields.len() {
 					panic!("Incorrect amount of fields provided for type")
 				}
 				for i in 0..instantiation.fields.len() {
 					self.gen_from_expr(&instantiation.fields[i].1);
 				}
-				self.instructions.push(Instruction::Ref(instantiation.fields.len()))
+				self.instructions
+					.push(Instruction::Ref(instantiation.fields.len()))
 			},
 			ExpressionType::Root => self.instructions.push(Instruction::Push(Var::root())),
 			ExpressionType::StringLiteral(_) => unimplemented!(),
 			ExpressionType::Postfix(ref postfix) => {
 				self.gen_from_expr(&postfix.left);
 				match postfix.op {
-					_ => unimplemented!()
+					_ => unimplemented!(),
 				}
 			},
 			ExpressionType::Prefix(ref prefix) => {
 				self.gen_from_expr(&prefix.right);
 				match prefix.op {
-					_ => unimplemented!()
+					_ => unimplemented!(),
 				}
 			},
 		}
