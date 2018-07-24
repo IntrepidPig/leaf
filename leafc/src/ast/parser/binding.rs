@@ -10,7 +10,7 @@ impl ExpressionTaker for BindingTaker {
 		&self,
 		in_tokens: &'a [TokenTree],
 		_args: Self::Args,
-	) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
+	) -> ParseResult<'a, Expression> {
 		if in_tokens.is_empty() {
 			return Ok(None);
 		}
@@ -33,7 +33,7 @@ impl ExpressionTaker for BindingTaker {
 		};
 
 		let ident = match tokens.get(0) {
-			Some(TokenTree::Token(Token::Name(ref name))) => Identifier::from_str(name),
+			Some(TokenTree::Token(Token::Name(ref name))) => Identifier::try_from_str(name),
 			_ => return Err(ParseError::Other.into()), // expected an identifier after let
 		};
 		tokens = &tokens[1..];

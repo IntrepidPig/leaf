@@ -3,6 +3,7 @@ use self::parse::*;
 
 /// Gets the entirety of the next expression available as a single expression. This taker only stops upon recieving a token
 /// that matches the predicate given
+#[derive(Default)]
 pub struct OperationTaker;
 
 impl OperationTaker {
@@ -19,7 +20,7 @@ impl ExpressionTaker for OperationTaker {
 		&self,
 		tokens: &'a [TokenTree],
 		args: Self::Args,
-	) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
+	) -> ParseResult<'a, Expression> {
 		if tokens.is_empty() {
 			return Ok(None);
 		}
@@ -42,11 +43,22 @@ pub fn split_at(
 		}
 	}
 
-	return (&tokens[..], &tokens[tokens.len()..]);
+	(&tokens[..], &tokens[tokens.len()..])
 }
 
 mod parse {
 	use ast::parser::*;
+
+	type ItemTakerResult<'a> = Result<
+		Option<
+			(
+				ExpressionItem,
+				&'static [&'static ItemTaker],
+				&'a [TokenTree],
+			),
+		>,
+		Error<ParseError>,
+	>;
 
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub enum ExpressionItem {
@@ -56,19 +68,7 @@ mod parse {
 
 	/// Trait for a struct that takes an ExpressionItem
 	pub trait ItemTaker: ::std::fmt::Debug {
-		fn next_item<'a>(
-			&self,
-			tokens: &'a [TokenTree],
-		) -> Result<
-			Option<
-				(
-					ExpressionItem,
-					&'static [&'static ItemTaker],
-					&'a [TokenTree],
-				),
-			>,
-			Error<ParseError>,
-		>;
+		fn next_item<'a>(&self, tokens: &'a [TokenTree]) -> ItemTakerResult<'a>;
 	}
 
 	/// Parse the entirety of the tokens passed as an expression. If not all the tokens are used up, then there was an error.
@@ -97,7 +97,7 @@ mod parse {
 		// heap allocation.
 		// TODO disallow chained binary operators, require parentheses for explicit order of operations
 		fn simplify(items: &[ExpressionItem]) -> Result<Expression, Error<ParseError>> {
-			if items.len() == 0 {
+			if items.is_empty() {
 				// A previous iteration returned something bad
 				return Err(ParseError::Other.into());
 			}
@@ -117,15 +117,13 @@ mod parse {
 			let mut priority_op: usize = 0;
 
 			for (i, item) in items.iter().enumerate() {
-				match item {
-					ExpressionItem::Operator(op) => if op.precedence() < priority {
+				if let ExpressionItem::Operator(op) = item {
+					if (op.precedence() < priority)
+						|| (op.left_associative() && op.precedence() == priority)
+					{
 						priority = op.precedence();
 						priority_op = i;
-					} else if op.left_associative() && op.precedence() == priority {
-						priority = op.precedence();
-						priority_op = i;
-					},
-					_ => {},
+					}
 				}
 			}
 
@@ -187,7 +185,7 @@ mod parse {
 					},
 				},
 				ExpressionItem::Operand(_) => {
-					return Err(ParseError::Other.into()); // The token at this index should be an operator
+					Err(ParseError::Other.into()) // The token at this index should be an operator
 				},
 			}
 		}
@@ -205,19 +203,7 @@ mod parse {
 	#[derive(Debug)]
 	struct PrefixTaker;
 	impl ItemTaker for PrefixTaker {
-		fn next_item<'a>(
-			&self,
-			tokens: &'a [TokenTree],
-		) -> Result<
-			Option<
-				(
-					ExpressionItem,
-					&'static [&'static ItemTaker],
-					&'a [TokenTree],
-				),
-			>,
-			Error<ParseError>,
-		> {
+		fn next_item<'a>(&self, tokens: &'a [TokenTree]) -> ItemTakerResult<'a> {
 			if let Some(token) = tokens.get(0) {
 				Ok(Some((
 					ExpressionItem::Operator(Operator::Prefix(match token {
@@ -241,19 +227,7 @@ mod parse {
 	#[derive(Debug)]
 	struct BinaryTaker;
 	impl ItemTaker for BinaryTaker {
-		fn next_item<'a>(
-			&self,
-			tokens: &'a [TokenTree],
-		) -> Result<
-			Option<
-				(
-					ExpressionItem,
-					&'static [&'static ItemTaker],
-					&'a [TokenTree],
-				),
-			>,
-			Error<ParseError>,
-		> {
+		fn next_item<'a>(&self, tokens: &'a [TokenTree]) -> ItemTakerResult<'a> {
 			if let Some(token) = tokens.get(0) {
 				Ok(Some((
 					ExpressionItem::Operator(Operator::Binary(match token {
@@ -283,19 +257,7 @@ mod parse {
 	#[derive(Debug)]
 	struct OperandTaker;
 	impl ItemTaker for OperandTaker {
-		fn next_item<'a>(
-			&self,
-			in_tokens: &'a [TokenTree],
-		) -> Result<
-			Option<
-				(
-					ExpressionItem,
-					&'static [&'static ItemTaker],
-					&'a [TokenTree],
-				),
-			>,
-			Error<ParseError>,
-		> {
+		fn next_item<'a>(&self, in_tokens: &'a [TokenTree]) -> ItemTakerResult<'a> {
 			let expression_takers: &[&ExpressionTaker<Args = ()>] = &[
 				&binding::BindingTaker,
 				&debug::DebugTaker,
@@ -320,7 +282,7 @@ mod parse {
 				}
 			}
 
-			return Err(ParseError::Other.into()); // Failed to parse operand
+			Err(ParseError::Other.into()) // Failed to parse operand
 		}
 	}
 }

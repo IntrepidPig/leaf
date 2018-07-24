@@ -1,8 +1,6 @@
 use ast::parser::*;
 
-pub fn take_typedef(
-	in_tokens: &[TokenTree],
-) -> Result<Option<(Type, &[TokenTree])>, Error<ParseError>> {
+pub fn take_typedef(in_tokens: &[TokenTree]) -> ParseResult<Type> {
 	let mut tokens = in_tokens;
 
 	match tokens.get(0) {
@@ -16,7 +14,7 @@ pub fn take_typedef(
 		Some(TokenTree::Token(Token::Name(ref name))) => {
 			// TODO parse this properly
 			tokens = &tokens[1..];
-			TypeName::from_ident(Identifier::from_str(name))
+			TypeName::from_ident(Identifier::try_from_str(name))
 		},
 		_ => return Err(ParseError::Other.into()), // Type was not given a name
 	};
@@ -27,7 +25,7 @@ pub fn take_typedef(
 		Some(TokenTree::Brace(ref type_tokens)) => {
 			for field_tokens in separated::parse_separated(type_tokens, |token| token.is_comma())? {
 				let name = match field_tokens.get(0) {
-					Some(TokenTree::Token(Token::Name(ref name))) => Identifier::from_str(name),
+					Some(TokenTree::Token(Token::Name(ref name))) => Identifier::try_from_str(name),
 					_ => return Err(ParseError::Other.into()), // Got a field that wasn't a name
 				};
 

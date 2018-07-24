@@ -144,7 +144,7 @@ impl<'a> CodeGenerator<'a> {
 		}
 	}
 
-	pub fn find_typedef(&self, path: PathItem<TypeName>) -> Option<TypeDefinition> {
+	pub fn find_typedef(&self, path: &PathItem<TypeName>) -> Option<TypeDefinition> {
 		let mut typedef = None;
 		self.root_mod.traverse(
 			&mut |current_path: &ModulePath, module: &Module| {
@@ -160,7 +160,7 @@ impl<'a> CodeGenerator<'a> {
 		typedef
 	}
 
-	pub fn find_function(&self, path: PathItem<Identifier>) -> Option<FunctionDefinition> {
+	pub fn find_function(&self, path: &PathItem<Identifier>) -> Option<FunctionDefinition> {
 		let mut functiondef = None;
 		self.root_mod.traverse(
 			&mut |current_path: &ModulePath, module: &Module| {
@@ -179,7 +179,7 @@ impl<'a> CodeGenerator<'a> {
 	pub fn gen_instructions(&mut self) {
 		self.instructions.push(Instruction::Call(0, 0));
 		self.function_jumps_todo
-			.push((0, PathItem::root_item(Identifier::from_str("main"))));
+			.push((0, PathItem::root_item(Identifier::try_from_str("main"))));
 		self.instructions.push(Instruction::Terminate);
 		for func in &self.root_mod.functions {
 			self.gen_from_func(&func);
@@ -190,10 +190,8 @@ impl<'a> CodeGenerator<'a> {
 
 	pub fn change_function_jumps(&mut self) {
 		for (location, name) in &self.function_jumps_todo {
-			match self.instructions.get_mut(*location).unwrap() {
-				Instruction::Call(ref mut target, _argc) => {
-					*target = *self.function_locations.get(name).unwrap()
-				},
+			match self.instructions[*location] {
+				Instruction::Call(ref mut target, _argc) => *target = self.function_locations[name],
 				_ => panic!("Expected a jump to {:?} at index {}", name, location),
 			}
 		}
@@ -442,7 +440,7 @@ impl<'a> CodeGenerator<'a> {
 			ExpressionType::FieldAccess(ref expr, ref fieldname) => {
 				self.gen_from_expr(expr);
 				let exprtype = &expr.expr_out;
-				let typedef = self.find_typedef(exprtype.clone())
+				let typedef = self.find_typedef(exprtype)
 					.expect("Type not found in list of typedefs");
 				let typeindex = typedef
 					.fields
@@ -452,9 +450,7 @@ impl<'a> CodeGenerator<'a> {
 				self.instructions.push(Instruction::Retrieve(typeindex));
 			},
 			ExpressionType::Instantiation(ref instantiation) => {
-				let typedef = self.find_typedef(instantiation.typename.clone())
-					.unwrap()
-					.clone();
+				let typedef = self.find_typedef(&instantiation.typename).unwrap().clone();
 				if instantiation.fields.len() != typedef.fields.len() {
 					panic!("Incorrect amount of fields provided for type")
 				}

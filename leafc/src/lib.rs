@@ -24,7 +24,7 @@ pub fn leafc_str<P: AsRef<Path>>(
 			.map(|include_path| {
 				let include_path = include_path.as_ref();
 				let include_file_name = include_path.file_name().unwrap().to_str().unwrap();
-				let include_name = include_file_name.split(".").next().unwrap();
+				let include_name = include_file_name.split('.').next().unwrap();
 				(include_name.to_owned(), include_path)
 			})
 			.collect()
@@ -49,7 +49,7 @@ pub fn leafc<P: AsRef<Path>>(
 			.map(|include_path| {
 				let include_path = include_path.as_ref();
 				let include_file_name = include_path.file_name().unwrap().to_str().unwrap();
-				let include_name = include_file_name.split(".").next().unwrap();
+				let include_name = include_file_name.split('.').next().unwrap();
 				(include_name.to_owned(), include_path)
 			})
 			.collect()

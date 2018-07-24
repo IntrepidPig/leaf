@@ -308,6 +308,7 @@ pub struct HIR {
 
 /// A struct that will generate HIR from an AST, resolving all `PathItem`s to absolute ones and giving
 /// all expressions a type in the process.
+#[derive(Default)]
 pub struct HIRGenerator {
 	/// A map of all types in the application referenced by their absolute module path to avoid conflict
 	types: HashMap<PathItem<TypeName>, TypeDefinition>,
@@ -358,7 +359,7 @@ impl HIRGenerator {
 		// append it's path to the current module path.
 		fn resolve_path<T: Eq + Clone>(
 			current: &ModulePath,
-			uses: &Vec<PathItem<T>>,
+			uses: &[PathItem<T>],
 			to_resolve: &mut PathItem<T>,
 		) {
 			if to_resolve.module_path.relative {
@@ -395,12 +396,12 @@ impl HIRGenerator {
 
 					// Resolve the return type of the function
 
-					function.return_type.as_mut().map(|return_type| {
+					if let Some(return_type) = function.return_type.as_mut() {
 						let mut arg_type_name =
 							return_type.clone().map(|arg_type_name| arg_type_name.name);
 						resolve_path(&current_path, uses, &mut arg_type_name);
 						return_type.module_path = arg_type_name.module_path;
-					});
+					};
 
 					// Resolve all of the function calls and instantiations in this function
 					function
@@ -471,7 +472,7 @@ impl HIRGenerator {
 						function
 							.return_type
 							.clone()
-							.unwrap_or(PathItem::<TypeName>::root()),
+							.unwrap_or_else(PathItem::<TypeName>::root),
 					);
 				}
 			},
@@ -684,7 +685,7 @@ impl HIRGenerator {
 				.output
 				.as_ref()
 				.map(|expr| expr.expr_out.clone())
-				.unwrap_or(PathItem::<TypeName>::root()),
+				.unwrap_or_else(PathItem::<TypeName>::root),
 			ExpressionType::Root => PathItem::<TypeName>::root(),
 			ExpressionType::Binding(_) => PathItem::<TypeName>::root(),
 			ExpressionType::IntLiteral(_) => PathItem::<TypeName>::core_type("Int"),
@@ -713,7 +714,7 @@ impl HIRGenerator {
 			ExpressionType::Break(ref break_expr) => break_expr
 				.clone()
 				.map(|expr| expr.expr_out)
-				.unwrap_or(PathItem::<TypeName>::root()),
+				.unwrap_or_else(PathItem::<TypeName>::root),
 			ExpressionType::Debug(_) => PathItem::<TypeName>::root(),
 			ExpressionType::FunctionCall(ref call) => {
 				self.function_defs_returns.get(&call.name).cloned().unwrap()
@@ -722,27 +723,24 @@ impl HIRGenerator {
 				let mut break_type: Option<PathItem<TypeName>> = None;
 				expr.traverse(&mut |test_expr: &Expression| {
 					// TODO handle break labels and nested loops
-					match test_expr.expr {
-						ExpressionType::Break(ref break_expr) => {
-							let test_break_type = break_expr
-								.as_ref()
-								.map(|expr| expr.expr_out.clone())
-								.unwrap_or(PathItem::<TypeName>::root())
-								.clone();
-							if let Some(old_break_type) = break_type.clone() {
-								if old_break_type != test_break_type {
-									panic!("Multiple break types in loop")
-								}
-							} else {
-								break_type = Some(test_break_type)
+					if let ExpressionType::Break(ref break_expr) = test_expr.expr {
+						let test_break_type = break_expr
+							.as_ref()
+							.map(|expr| expr.expr_out.clone())
+							.unwrap_or_else(PathItem::<TypeName>::root)
+							.clone();
+						if let Some(old_break_type) = break_type.clone() {
+							if old_break_type != test_break_type {
+								panic!("Multiple break types in loop")
 							}
-						},
-						_ => {},
+						} else {
+							break_type = Some(test_break_type)
+						}
 					}
 				});
 
 				// TODO change this to diverging like rusts !
-				break_type.unwrap_or(PathItem::<TypeName>::root())
+				break_type.unwrap_or_else(PathItem::<TypeName>::root)
 			},
 			ExpressionType::If(ref if_expr) => {
 				let body_type = if_expr.body.expr_out.clone();
@@ -788,7 +786,7 @@ impl HIRGenerator {
 			.map(|out| self.ast_expr_to_hir_expr(out));
 
 		ExpressionType::Block(Box::new(Block {
-			statements: statements,
+			statements,
 			output: out,
 		}))
 	}
@@ -812,16 +810,20 @@ impl Expression {
 				postfix.left.traverse(f);
 			},
 			ExpressionType::FunctionCall(ref call) => for arg in &call.args {
-				f(arg);
+				arg.traverse(f);
 			},
 			ExpressionType::Debug(ref expr) => {
-				f(expr);
+				expr.traverse(f);
 			},
 			ExpressionType::Break(ref expr_opt) => {
-				expr_opt.as_ref().map(|expr| f(expr));
+				if let Some(expr) = expr_opt.as_ref() {
+					expr.traverse(f)
+				};
 			},
 			ExpressionType::Binding(ref binding) => {
-				binding.expr.as_ref().map(|expr| f(expr));
+				if let Some(expr) = binding.expr.as_ref() {
+					expr.traverse(f)
+				};
 			},
 			ExpressionType::Assignment(ref assignment) => {
 				assignment.expr.traverse(f);
@@ -833,7 +835,9 @@ impl Expression {
 				if_expr.condition.traverse(f);
 				if_expr.body.traverse(f);
 				// TODO elif
-				if_expr.else_block.as_ref().map(|expr| expr.traverse(f));
+				if let Some(expr) = if_expr.else_block.as_ref() {
+					expr.traverse(f)
+				};
 			},
 			ExpressionType::Identifier(_) => {
 				// no action necesssary
@@ -851,7 +855,9 @@ impl Expression {
 				for statement in &block.statements {
 					statement.traverse(f);
 				}
-				block.output.as_ref().map(|expr| expr.traverse(f));
+				if let Some(expr) = block.output.as_ref() {
+					expr.traverse(f)
+				};
 			},
 			ExpressionType::FieldAccess(ref base, _) => {
 				base.traverse(f);

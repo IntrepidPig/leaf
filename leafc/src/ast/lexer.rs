@@ -226,7 +226,7 @@ impl LexemeTaker for WhitespaceTaker {
 			// If this char is whitespace
 			if let Some(new_whitespace_type) = WhitespaceType::from_char(c) {
 				// If we already have a type of whitespace
-				if let Some(old_whitespace_type) = whitespace_type.clone() {
+				if let Some(old_whitespace_type) = whitespace_type {
 					// If they're the same type of whitespce
 					if new_whitespace_type == old_whitespace_type {
 						end += c.len_utf8();
@@ -273,10 +273,8 @@ impl LexemeTaker for WordTaker {
 		let mut end = 0;
 
 		for c in input.chars() {
-			if c.is_ascii_alphabetic() || c == '_' {
+			if c.is_ascii_alphabetic() || c == '_' || (c.is_ascii_alphanumeric() && end > 0) {
 				// Letters and underscores are allowed in words
-				end += c.len_utf8();
-			} else if c.is_ascii_alphanumeric() && end > 0 {
 				// Numbers are allowed so long as they are not the first character
 				end += c.len_utf8();
 			} else {
@@ -334,19 +332,17 @@ impl LexemeTaker for StringTaker {
 		input: &'a str,
 		actual_index: usize,
 	) -> Result<Option<(Lexeme<'a>, &'a str)>, LexError> {
-		let chars = input.chars();
+		let mut chars = input.chars();
 		// start of string after quote marks marks
 		let mut start = 0;
 
 		// set the start variable to the index after the first quote mark
-		for c in chars {
-			if c == '"' {
-				start += c.len_utf8();
-				break;
-			} else {
-				// If it wasn't a quote mark this isn't a string literal
-				return Ok(None);
-			}
+		match chars.next() {
+			Some('"') => {
+				start += '"'.len_utf8();
+			},
+			// If it wasn't a quote mark this isn't a string literal
+			_ => return Ok(None),
 		}
 
 		// now start parsing from after the first quote
@@ -377,22 +373,18 @@ impl LexemeTaker for StringTaker {
 					'\\' => string.push('\\'),                   // actual backslashes
 					c => return Err(LexError::UnknownEscape(c)), // fail if an unknown character was escaped
 				}
+			// if its a quote the string is over
+			} else if c == '"' {
+				// set the end to be after the quote mark
+				end = finish + c.len_utf8();
+				found_end = true;
+				break;
+			// if we got a backslash we start escaping
+			} else if c == '\\' {
+				backslash = true;
 			} else {
-				// if its a quote the string is over
-				if c == '"' {
-					// set the end to be after the quote mark
-					end = finish + c.len_utf8();
-					found_end = true;
-					break;
-				} else {
-					// if we got a backslash we start escaping
-					if c == '\\' {
-						backslash = true;
-					} else {
-						// otherwise it's any old character
-						string.push(c);
-					}
-				}
+				// otherwise it's any old character
+				string.push(c);
 			}
 			finish += c.len_utf8();
 		}
@@ -443,7 +435,7 @@ impl LexemeTaker for SymbolTaker {
 		let mut char2_len = 0;
 
 		// If there's a second char, set the char2_len
-		return Ok(Some((
+		Ok(Some((
 			match (c1, c2) {
 				(':', Some('=')) => {
 					char2_len = c2.unwrap().len_utf8();
@@ -474,7 +466,7 @@ impl LexemeTaker for SymbolTaker {
 				(_, _) => return Ok(None),
 			},
 			&input[c1.len_utf8() + char2_len..],
-		)));
+		)))
 	}
 }
 

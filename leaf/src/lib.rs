@@ -26,7 +26,7 @@ impl StackFrame {
 	}
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct BlockFrame {
 	operands: Vec<Var>,
 }
@@ -104,13 +104,7 @@ pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<Var
 					.unwrap();
 			},
 			Instruction::Load(ref index) => {
-				let var = stack
-					.last_mut()
-					.unwrap()
-					.locals
-					.get(*index)
-					.unwrap()
-					.clone();
+				let var = stack.last_mut().unwrap().locals[*index].clone();
 				stack
 					.last_mut()
 					.unwrap()
@@ -162,7 +156,7 @@ pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<Var
 					.operands
 					.pop()
 					.unwrap();
-				*stack.last_mut().unwrap().locals.get_mut(*index).unwrap() = var;
+				stack.last_mut().unwrap().locals[*index] = var;
 			},
 			Instruction::Output => {
 				let var = stack
@@ -175,12 +169,7 @@ pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<Var
 					.pop()
 					.unwrap();
 				let len = stack.last().unwrap().block_frames.len();
-				stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.get_mut(len - 2)
-					.unwrap()
+				stack.last_mut().unwrap().block_frames[len - 2]
 					.operands
 					.push(var);
 				stack.last_mut().unwrap().block_frames.pop().unwrap();
@@ -197,9 +186,7 @@ pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<Var
 					.pop()
 					.unwrap();
 				let len = stack.len();
-				stack
-					.get_mut(len - 2)
-					.unwrap()
+				stack[len - 2]
 					.block_frames
 					.last_mut()
 					.unwrap()
@@ -488,6 +475,6 @@ fn print_stack(stack: &[StackFrame]) {
 				println!("\t\t\t{:?}", operand);
 			}
 		}
-		println!("");
+		println!();
 	}
 }

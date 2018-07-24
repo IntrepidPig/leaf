@@ -131,13 +131,10 @@ fn treeify_brackets(in_tokens: &[OldToken]) -> Result<Vec<TokenTree>, Error<Tree
 					Bracket::Square => tokens.push(TokenTree::Bracket(treeify_brackets(sub)?)),
 				}
 
-				match leftovers.get(0) {
-					Some(OldToken::Bracket(test_bracket, test_state)) => {
-						if !(test_bracket == bracket && *test_state == BracketState::Close) {
-							return Err(TreeifyError::UnclosedBrace.into()); // There was no close bracket
-						}
-					},
-					_ => {},
+				if let Some(OldToken::Bracket(test_bracket, test_state)) = leftovers.get(0) {
+					if !(test_bracket == bracket && *test_state == BracketState::Close) {
+						return Err(TreeifyError::UnclosedBrace.into()); // There was no close bracket
+					}
 				}
 
 				// cut off the close bracket

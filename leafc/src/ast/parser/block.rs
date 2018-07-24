@@ -11,7 +11,7 @@ impl ExpressionTaker for BlockTaker {
 		&self,
 		in_tokens: &'a [TokenTree],
 		_args: Self::Args,
-	) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
+	) -> ParseResult<'a, Expression> {
 		if in_tokens.is_empty() {
 			return Ok(None);
 		}

@@ -1,8 +1,6 @@
 use ast::parser::*;
 
-pub fn take_use(
-	in_tokens: &[TokenTree],
-) -> Result<Option<(PathItem<Identifier>, &[TokenTree])>, Error<ParseError>> {
+pub fn take_use<'a>(in_tokens: &'a [TokenTree]) -> ParseResult<'a, PathItem<Identifier>> {
 	let mut tokens = in_tokens;
 
 	match tokens.get(0) {
@@ -23,7 +21,7 @@ pub fn take_use(
 	let item = match tokens.get(0) {
 		Some(TokenTree::Token(Token::Name(ref name))) => {
 			tokens = &tokens[1..];
-			Identifier::from_str(name)
+			Identifier::try_from_str(name)
 		},
 		_ => return Err(ParseError::Other.into()), // Expected an identifier after the use path
 	};

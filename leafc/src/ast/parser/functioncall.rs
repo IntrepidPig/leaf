@@ -10,7 +10,7 @@ impl ExpressionTaker for FunctionCallTaker {
 		&self,
 		in_tokens: &'a [TokenTree],
 		_args: Self::Args,
-	) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
+	) -> ParseResult<'a, Expression> {
 		if in_tokens.is_empty() {
 			return Ok(None);
 		}
@@ -52,10 +52,9 @@ impl ExpressionTaker for FunctionCallTaker {
 
 fn parse_args(in_tokens: &[TokenTree]) -> Result<Vec<Expression>, Error<ParseError>> {
 	let mut each_args_tokens = Vec::new();
-	in_tokens
-		.split(|token| token.is_comma())
-		.map(|tokens| each_args_tokens.push(tokens))
-		.collect::<()>();
+	for tokens in in_tokens.split(|token| token.is_comma()) {
+		each_args_tokens.push(tokens)
+	}
 
 	let mut args = Vec::new();
 

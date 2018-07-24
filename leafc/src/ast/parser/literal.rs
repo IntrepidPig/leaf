@@ -1,5 +1,6 @@
 use ast::parser::*;
 
+#[derive(Default)]
 pub struct LiteralTaker;
 
 impl LiteralTaker {
@@ -15,11 +16,11 @@ impl ExpressionTaker for LiteralTaker {
 		&self,
 		in_tokens: &'a [TokenTree],
 		_args: Self::Args,
-	) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
+	) -> ParseResult<'a, Expression> {
 		Ok(Some((
 			match in_tokens.get(0) {
 				Some(TokenTree::Token(Token::NumberLiteral(ref num))) => {
-					Expression::NumberLiteral(num.clone())
+					Expression::NumberLiteral(*num)
 				},
 				Some(TokenTree::Token(Token::StringLiteral(ref string))) => {
 					Expression::StringLiteral(string.clone())

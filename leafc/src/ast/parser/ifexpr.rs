@@ -9,7 +9,7 @@ impl ExpressionTaker for IfTaker {
 		&self,
 		in_tokens: &'a [TokenTree],
 		_args: Self::Args,
-	) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
+	) -> ParseResult<'a, Expression> {
 		match in_tokens.get(0) {
 			Some(TokenTree::If(tokens)) => {
 				let (until_then, leftovers) =
@@ -50,7 +50,7 @@ impl ExpressionTaker for IfTaker {
 					&in_tokens[1..],
 				)))
 			},
-			_ => return Ok(None),
+			_ => Ok(None),
 		}
 	}
 }

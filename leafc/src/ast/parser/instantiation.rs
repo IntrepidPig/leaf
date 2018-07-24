@@ -1,5 +1,6 @@
 use ast::parser::*;
 
+#[derive(Default)]
 pub struct InstantiationTaker;
 
 impl InstantiationTaker {
@@ -15,7 +16,7 @@ impl ExpressionTaker for InstantiationTaker {
 		&self,
 		in_tokens: &'a [TokenTree],
 		_args: Self::Args,
-	) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
+	) -> ParseResult<'a, Expression> {
 		let mut tokens = in_tokens;
 
 		let (typename, leftovers) = if let Some(res) = pathitem::next_type(tokens)? {

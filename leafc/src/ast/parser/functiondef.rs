@@ -1,8 +1,6 @@
 use ast::parser::*;
 
-pub fn take_functiondef(
-	in_tokens: &[TokenTree],
-) -> Result<Option<(Function, &[TokenTree])>, Error<ParseError>> {
+pub fn take_functiondef(in_tokens: &[TokenTree]) -> ParseResult<Function> {
 	let mut tokens = in_tokens;
 
 	match tokens.get(0) {
@@ -15,7 +13,7 @@ pub fn take_functiondef(
 	let name = match tokens.get(0) {
 		Some(TokenTree::Token(Token::Name(ref name))) => {
 			tokens = &tokens[1..];
-			Identifier::from_str(name)
+			Identifier::try_from_str(name)
 		},
 		_ => return Err(ParseError::Other.into()), // needed a function name
 	};
@@ -77,7 +75,7 @@ fn parse_args(
 	let mut args = Vec::new();
 	for arg_tokens in separated::parse_separated(in_tokens, |token| token.is_comma())? {
 		let name = match arg_tokens.get(0) {
-			Some(TokenTree::Token(Token::Name(ref name))) => Identifier::from_str(name),
+			Some(TokenTree::Token(Token::Name(ref name))) => Identifier::try_from_str(name),
 			_ => return Err(ParseError::Other.into()), // Got an argument that wasn't a name
 		};
 

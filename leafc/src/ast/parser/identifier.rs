@@ -1,5 +1,6 @@
 use ast::parser::*;
 
+#[derive(Default)]
 pub struct IdentifierTaker;
 
 impl IdentifierTaker {
@@ -15,7 +16,7 @@ impl ExpressionTaker for IdentifierTaker {
 		&self,
 		in_tokens: &'a [TokenTree],
 		_args: Self::Args,
-	) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
+	) -> ParseResult<'a, Expression> {
 		Ok(Some((
 			match in_tokens.get(0) {
 				Some(TokenTree::Token(Token::Name(ref name))) => {

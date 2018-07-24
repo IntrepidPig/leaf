@@ -7,6 +7,8 @@ use failure::Error;
 pub use self::structures::*;
 pub use self::errors::*;
 
+pub type ParseResult<'a, T> = Result<Option<(T, &'a [TokenTree])>, Error<ParseError>>;
+
 /// Trait that takes an expression from a stream of tokens. If it was successfull, then it returns an option with
 /// the expression and the tokens that are still left over. If the expression wasn't there, then it returns None.
 /// It can also return an error if there was an unrecoverable error.
@@ -17,7 +19,7 @@ pub trait ExpressionTaker {
 		&self,
 		in_tokens: &'a [TokenTree],
 		args: Self::Args,
-	) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>>;
+	) -> ParseResult<'a, Expression>;
 }
 
 mod structures {
@@ -77,7 +79,7 @@ mod structures {
 			Identifier { name: string }
 		}
 
-		pub fn from_str(string: &str) -> Self {
+		pub fn try_from_str(string: &str) -> Self {
 			// TODO validate identifier string
 			Identifier {
 				name: string.to_owned(),
@@ -156,7 +158,7 @@ mod structures {
 	/// A list of statements and an optional return expression
 	/// The output is the value that will be returned from the entire
 	/// block if a value is set to the syntax tree
-	#[derive(Debug, Clone, PartialEq, Eq)]
+	#[derive(Debug, Clone, PartialEq, Eq, Default)]
 	pub struct Block {
 		pub block: Vec<Expression>, // TODO rename
 		pub output: Option<Expression>,
@@ -231,20 +233,21 @@ mod structures {
 				Expression::Postfix { left, .. } => {
 					left.traverse_expressions_mut(f);
 				},
-				Expression::FunctionCall { name: _, args } => for arg in args {
+				Expression::FunctionCall { args, .. } => for arg in args {
 					arg.traverse_expressions_mut(f);
 				},
 				Expression::Debug(ref mut expr) => {
 					expr.traverse_expressions_mut(f);
 				},
 				Expression::Break(ref mut expr) => {
-					expr.as_mut().map(|expr| expr.traverse_expressions_mut(f));
+					if let Some(ref mut expr) = expr {
+						expr.traverse_expressions_mut(f)
+					};
 				},
 				Expression::Binding(ref mut binding) => {
-					binding
-						.val
-						.as_mut()
-						.map(|val| val.traverse_expressions_mut(f));
+					if let Some(ref mut val) = binding.val {
+						val.traverse_expressions_mut(f)
+					};
 				},
 				Expression::Assign(ref mut assignment) => {
 					assignment.expr.traverse_expressions_mut(f);
@@ -256,10 +259,9 @@ mod structures {
 					ifexpr.condition.traverse_expressions_mut(f);
 					ifexpr.body.traverse_expressions_mut(f);
 					// TODO elifs
-					ifexpr
-						.else_block
-						.as_mut()
-						.map(|expr| expr.traverse_expressions_mut(f));
+					if let Some(ref mut expr) = ifexpr.else_block {
+						expr.traverse_expressions_mut(f)
+					}
 				},
 				Expression::Identifier(_) => {},
 				Expression::Block(ref mut block) => {
@@ -314,9 +316,9 @@ mod structures {
 			for expression in &mut self.block {
 				expression.traverse_expressions_mut(f);
 			}
-			self.output
-				.as_mut()
-				.map(|expr| expr.traverse_expressions_mut(f));
+			if let Some(ref mut expr) = self.output {
+				expr.traverse_expressions_mut(f)
+			};
 		}
 	}
 }
@@ -343,9 +345,9 @@ static mut RECURSION_LEVEL: usize = 0;
 
 /// Gets statements until it can't from the tokens, and then gets a final expression if there is one
 /// TODO don't return option
-pub fn parse_block<'a>(mut tokens: &'a [TokenTree]) -> Result<Block, Error<ParseError>> {
+pub fn parse_block(mut tokens: &[TokenTree]) -> Result<Block, Error<ParseError>> {
 	unsafe {
-		RECURSION_LEVEL = RECURSION_LEVEL + 1;
+		RECURSION_LEVEL += 1;
 		if RECURSION_LEVEL > 4096 {
 			return Err(ParseError::Other.into()); // Too much nesting DEBUG purposes only
 		}
@@ -370,9 +372,7 @@ pub fn parse_block<'a>(mut tokens: &'a [TokenTree]) -> Result<Block, Error<Parse
 }
 
 /// Gets the next statement requiring a terminating semicolon
-pub fn next_statement<'a>(
-	in_tokens: &'a [TokenTree],
-) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
+pub fn next_statement(in_tokens: &[TokenTree]) -> ParseResult<Expression> {
 	if let Some((expr, leftovers)) =
 		next_expression(in_tokens, Box::new(|token| token.is_semicolon()))?
 	{
@@ -389,7 +389,7 @@ pub fn next_statement<'a>(
 pub fn next_expression<'a>(
 	in_tokens: &'a [TokenTree],
 	end_predicate: Box<FnMut(&TokenTree) -> bool>,
-) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
+) -> ParseResult<'a, Expression> {
 	if in_tokens.is_empty() {
 		return Ok(None);
 	}

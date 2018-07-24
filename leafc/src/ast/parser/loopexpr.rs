@@ -1,5 +1,6 @@
 use ast::parser::*;
 
+#[derive(Default)]
 pub struct LoopTaker;
 
 impl LoopTaker {
@@ -15,7 +16,7 @@ impl ExpressionTaker for LoopTaker {
 		&self,
 		in_tokens: &'a [TokenTree],
 		_args: Self::Args,
-	) -> Result<Option<(Expression, &'a [TokenTree])>, Error<ParseError>> {
+	) -> ParseResult<'a, Expression> {
 		match in_tokens.get(0) {
 			Some(TokenTree::Loop(tokens)) => {
 				let expr = parse_block(tokens)?;

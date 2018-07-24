@@ -1,8 +1,6 @@
 use ast::parser::*;
 
-pub fn next_type<'a>(
-	in_tokens: &'a [TokenTree],
-) -> Result<Option<(PathItem<TypeName>, &'a [TokenTree])>, Error<ParseError>> {
+pub fn next_type<'a>(in_tokens: &'a [TokenTree]) -> ParseResult<'a, PathItem<TypeName>> {
 	let mut tokens = in_tokens;
 
 	let (modpath, leftovers) = if let Some(res) = next_path(tokens)? {
@@ -15,7 +13,7 @@ pub fn next_type<'a>(
 	let typename = match leftovers.get(0) {
 		Some(TokenTree::Token(Token::Name(ref name))) => {
 			tokens = &tokens[1..];
-			TypeName::from_ident(Identifier::from_str(name))
+			TypeName::from_ident(Identifier::try_from_str(name))
 		},
 		_ => return Ok(None),
 	};
