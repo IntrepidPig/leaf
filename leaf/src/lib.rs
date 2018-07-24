@@ -40,7 +40,6 @@ impl BlockFrame {
 }
 
 pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<Var, ()> {
-	let mut ptr: usize = 0;
 	// Create a stack with a main stack frame and block frame for the main function's outputs
 	let mut stack: Vec<StackFrame> = vec![StackFrame::new(0)];
 	stack[0].block_frames.push(BlockFrame::new());
@@ -70,25 +69,20 @@ pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<Var
 			Instruction::Bind => {
 				let var = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
 				stack.last_mut().unwrap().locals.push(var);
-				ptr -= 1;
 			},
 			Instruction::Push(ref var) => {
 				stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.push(var.clone());
-				ptr += 1;
 			},
 			Instruction::Pop => {
 				stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
-				ptr -= 1;
 			},
 			Instruction::Load(ref index) => {
 				let var = stack.last_mut().unwrap().locals.get(*index).unwrap().clone();
 				stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.push(var.clone());
-				ptr += 1;
 			},
 			Instruction::Debug => {
 				let var = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
 				println!("\t => Var: {:?}", var);
-				ptr -= 1;
 			},
 			Instruction::Call(ref index, ref argc) => {
 				let mut new_frame = StackFrame::new(instr_ptr);
@@ -105,13 +99,11 @@ pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<Var
 			Instruction::Set(ref index) => {
 				let var = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
 				*stack.last_mut().unwrap().locals.get_mut(*index).unwrap() = var;
-				ptr -= 1;
 			},
 			Instruction::Output => {
 				let var = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
 				let len = stack.last().unwrap().block_frames.len();
 				stack.last_mut().unwrap().block_frames.get_mut(len - 2).unwrap().operands.push(var);
-				ptr -= stack.last().unwrap().block_frames.last().unwrap().operands.len();
 				stack.last_mut().unwrap().block_frames.pop().unwrap();
 				// TODO drop all items in stack
 			},
@@ -119,8 +111,8 @@ pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<Var
 				let var = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
 				let len = stack.len();
 				stack.get_mut(len - 2).unwrap().block_frames.last_mut().unwrap().operands.push(var);
-				for block_frame in &stack.last().unwrap().block_frames {
-					ptr -= block_frame.operands.len()
+				for _block_frame in &stack.last().unwrap().block_frames {
+					// TODO
 				}
 				let old_frame = stack.pop().unwrap();
 				instr_ptr = old_frame.return_to_ptr;
@@ -135,7 +127,6 @@ pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<Var
 					_ => panic!("Tried to add types that don't support it") // This is ok now because the conversion to hir changes operators to use the add method when they're not primitives
 				};
 				stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.push(Var::new_u64(output));
-				ptr -= 1;
 			},
 			Instruction::Sub => {
 				let right = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
@@ -147,7 +138,6 @@ pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<Var
 					_ => panic!("Tried to add types that don't support it") // This is ok now because the conversion to hir changes operators to use the add method when they're not primitives
 				};
 				stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.push(Var::new_u64(output));
-				ptr -= 1;
 			},
 			Instruction::Mul => {
 				let right = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
@@ -159,7 +149,6 @@ pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<Var
 					_ => panic!("Tried to add types that don't support it") // This is ok now because the conversion to hir changes operators to use the add method when they're not primitives
 				};
 				stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.push(Var::new_u64(output));
-				ptr -= 1;
 			},
 			Instruction::Div => {
 				let right = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
@@ -171,14 +160,12 @@ pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<Var
 					_ => panic!("Tried to add types that don't support it") // This is ok now because the conversion to hir changes operators to use the add method when they're not primitives
 				};
 				stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.push(Var::new_u64(output));
-				ptr -= 1;
 			},
 			Instruction::Equal => {
 				let right = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
 				let left = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
 				let output = Var::new_bool(left == right);
 				stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.push(output);
-				ptr -= 1;
 			},
 			Instruction::Jump(target_instr_ptr) => {
 				instr_ptr = target_instr_ptr;
@@ -186,7 +173,6 @@ pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<Var
 			},
 			Instruction::Check(target_instr_ptr) => {
 				let var = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
-				ptr -= 1;
 				// If the value is false jump past the if block
 				if var.is_false() {
 					instr_ptr = target_instr_ptr;
@@ -195,7 +181,6 @@ pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<Var
 			},
 			Instruction::Retrieve(ref idx) => {
 				let var = stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands.pop().unwrap();
-				ptr -= 1;
 				match var.var_info {
 					VarInfo::Reference(ref reference) => {
 						if let Some(field) = reference.fields.get(*idx) {
