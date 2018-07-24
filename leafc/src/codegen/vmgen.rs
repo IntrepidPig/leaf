@@ -92,6 +92,12 @@ pub enum Instruction {
 	Pop,
 	/// Pop the top two values on the stack and push their sum back
 	Add,
+	/// Pop the top two values on the stack and push their difference back
+	Sub,
+	/// Pop the top two values on the stack and push their product back
+	Mul,
+	/// Pop the top two values on the stack and push their quotient back
+	Div,
 	/// Print the value at the top of the stack and pop it
 	Debug,
 	/// Set the instruction pointer
@@ -303,6 +309,9 @@ impl<'a> CodeGenerator<'a> {
 				// Perform the operation
 				match binary.op {
 					BinaryOp::Add => self.instructions.push(Instruction::Add),
+					BinaryOp::Sub => self.instructions.push(Instruction::Sub),
+					BinaryOp::Mul => self.instructions.push(Instruction::Mul),
+					BinaryOp::Div => self.instructions.push(Instruction::Div),
 					BinaryOp::Equality => self.instructions.push(Instruction::Equal),
 					BinaryOp::Assign => {
 						panic!("Assign binary operator found. This should have been converted to a standalone\

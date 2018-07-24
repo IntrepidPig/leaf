@@ -62,6 +62,8 @@ pub enum Symbol {
 	Question,
 	Exclamation,
 	Plus,
+	Minus,
+	Slash,
 	Namespace,
 }
 
@@ -159,6 +161,12 @@ impl<'a> Tokenizer<'a> {
 				},
 				Lexeme::Plus => {
 					tokens.push(Token::Symbol(Symbol::Plus));
+				},
+				Lexeme::Minus => {
+					tokens.push(Token::Symbol(Symbol::Minus));
+				},
+				Lexeme::Slash => {
+					tokens.push(Token::Symbol(Symbol::Slash));
 				},
 				Lexeme::Namespace => {
 					tokens.push(Token::Symbol(Symbol::Namespace));

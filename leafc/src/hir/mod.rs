@@ -269,7 +269,6 @@ pub struct Module {
 }
 
 impl Module {
-	// TODO for traversing pass the current module path as an argument, to avoid having to keep track manually
 	/// Traverse this module and the modules within it mutably. Performs `f` on each module including
 	/// the current one.
 	pub fn traverse_mut<F: FnMut(&ModulePath, &mut Module)>(&mut self, f: &mut F, start_path: &mut ModulePath) {
@@ -295,7 +294,8 @@ impl Module {
 
 /// A High-level Intermediate Representation of a Leaf program. HIR will have a type for all expressions that
 /// is the type they output, and it will have all reference to items that can be in seperate modules resolved
-/// to absolute paths from the root of the crate.
+/// to absolute paths from the root of the crate. Also, operators on non primitive types will be converted to
+/// using the associated methods of the types.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HIR {
 	pub modules: Vec<Module>,

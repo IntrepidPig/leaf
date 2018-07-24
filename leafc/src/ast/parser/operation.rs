@@ -259,6 +259,9 @@ mod parse {
 					ExpressionItem::Operator(Operator::Binary(match token {
 						TokenTree::Token(Token::Symbol(symbol)) => match symbol {
 							TokenSymbol::Plus => BinaryOp::Add,
+							TokenSymbol::Minus => BinaryOp::Sub,
+							TokenSymbol::Asterisk => BinaryOp::Mul,
+							TokenSymbol::Slash => BinaryOp::Div,
 							TokenSymbol::Assign => BinaryOp::Assign,
 							TokenSymbol::Equality => BinaryOp::Equality,
 							TokenSymbol::Dot => BinaryOp::Dot,

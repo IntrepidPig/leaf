@@ -28,6 +28,9 @@ impl Operator {
 pub enum BinaryOp {
 	Assign,
 	Add,
+	Sub,
+	Mul,
+	Div,
 	Equality,
 	Greater,
 	GreaterEqual,
@@ -40,9 +43,12 @@ pub enum BinaryOp {
 impl BinaryOp {
 	pub fn precedence(self) -> i32 {
 		match self {
-			BinaryOp::Dot => 6,
-			BinaryOp::Equality => 4,
-			BinaryOp::Add => 5,
+			BinaryOp::Dot => 7,
+			BinaryOp::Equality => 6,
+			BinaryOp::Add => 4,
+			BinaryOp::Sub => 4,
+			BinaryOp::Mul => 5,
+			BinaryOp::Div => 5,
 			BinaryOp::Assign => 3,
 			_ => unimplemented!(),
 		}

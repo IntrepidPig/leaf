@@ -54,6 +54,8 @@ impl<'a> Lexemes<'a> {
 				Lexeme::Question => out.push('?'),
 				Lexeme::Exclamation => out.push('!'),
 				Lexeme::Plus => out.push('+'),
+				Lexeme::Minus => out.push('-'),
+				Lexeme::Slash => out.push('/'),
 				Lexeme::Namespace => out.push_str("::"),
 				Lexeme::Whitespace {
 					whitespace_type,
@@ -89,6 +91,8 @@ pub enum Lexeme<'a> {
 	Question,
 	Exclamation,
 	Plus,
+	Minus,
+	Slash,
 	Namespace,
 	Whitespace {
 		whitespace_type: WhitespaceType,
@@ -465,6 +469,8 @@ impl LexemeTaker for SymbolTaker {
 				('?', _) => Lexeme::Question,
 				('!', _) => Lexeme::Exclamation,
 				('+', _) => Lexeme::Plus,
+				('-', _) => Lexeme::Minus,
+				('/', _) => Lexeme::Slash,
 				(_, _) => return Ok(None),
 			},
 			&input[c1.len_utf8() + char2_len..],

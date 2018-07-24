@@ -341,7 +341,7 @@ pub fn parse_block<'a>(
 ) -> Result<Block, Error<ParseError>> {
 	unsafe {
 		RECURSION_LEVEL = RECURSION_LEVEL + 1;
-		if RECURSION_LEVEL > 20 {
+		if RECURSION_LEVEL > 4096 {
 			return Err(ParseError::Other.into()); // Too much nesting DEBUG purposes only
 		}
 	}
