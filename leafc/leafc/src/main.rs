@@ -1,23 +1,24 @@
 extern crate clap;
 extern crate fern;
-extern crate leaf;
+extern crate leafvm;
 extern crate leafc;
 extern crate log;
 
-use std::io::{self, Read};
+use std::fs;
 use std::path::Path;
+use std::io::{self, Read, Write};
 
-use leafc::codegen::vmgen::Instruction;
+use leafvm::instruction::Instruction;
 
 fn main() {
-	let matches = clap::App::new("Leaf")
+	let matches = clap::App::new("Leafc")
 		.author("IntrepidPig")
-		.about("Leaf bytecode VM")
+		.about("Leaf compiler")
 		.arg(
 			clap::Arg::with_name("debug")
 				.short("d")
 				.long("debug")
-				.help("Print debugging info"),
+				.help("Print debugging information")
 		)
 		.arg(
 			clap::Arg::with_name("includes")
@@ -25,19 +26,28 @@ fn main() {
 				.long("include")
 				.help("Includes another leaf source file as a module available in the current file")
 				.takes_value(true)
-				.multiple(true),
+				.multiple(true)
 		)
 		.arg(
 			clap::Arg::with_name("FILE")
+				.index(1)
 				.takes_value(true)
 				.required(true)
 				.value_name("FILE")
-				.help("The leaf file to compile. '-' for stdin"),
+				.help("The leaf file to compile. '-' for stdin")
+		)
+		.arg(
+			clap::Arg::with_name("OUTPUT")
+				.index(2)
+				.takes_value(true)
+				.required(true)
+				.value_name("OUTPUT")
+				.help("The name of the leaf bytecode binary file to output. '-' for stdout")
 		)
 		.get_matches();
-
+	
 	let debug = matches.is_present("debug");
-
+	
 	fern::Dispatch::new()
 		.format(|out, message, record| {
 			if let (Some(file), Some(line)) = (record.file(), record.line()) {
@@ -55,51 +65,37 @@ fn main() {
 		.level(if debug {
 			log::LevelFilter::Trace
 		} else {
-			log::LevelFilter::Info
+			log::LevelFilter::Warn
 		})
-		.chain(std::io::stdout())
+		.chain(std::io::stderr())
 		.apply()
 		.expect("Failed to initialize logger");
-
+	
 	let includes: Vec<&Path> = if let Some(includes) = matches.values_of_os("includes") {
-		includes
-			.into_iter()
-			.map(|include| Path::new(include))
-			.collect()
+		includes.into_iter().map(|include| Path::new(include)).collect()
 	} else {
 		Vec::new()
 	};
 	let input_file = matches.value_of_os("FILE").unwrap();
-
+	let output_file = matches.value_of_os("OUTPUT").unwrap();
+	
 	let instructions = if input_file == "-" {
 		let mut input = String::new();
 		io::stdin().read_to_string(&mut input).unwrap();
-		leafc::leafc_str(
-			&input,
-			Path::new("../leafc/src/libcore/core.leaf"),
-			&includes,
-		).unwrap()
+		leafc::leafc_str(&input, Path::new("/usr/local/lib/leaf/libcore/core.leaf"), &includes).unwrap()
 	} else {
-		leafc::leafc(
-			Path::new(input_file),
-			Path::new("../leafc/src/libcore/core.leaf"),
-			&includes,
-		).unwrap()
+		leafc::leafc(Path::new(input_file), Path::new("/usr/local/lib/leaf/libcore/core.leaf"), &includes).unwrap()
 	};
-
+	
+	let mut output_file: Box<Write> = if output_file == "-" {
+		Box::new(io::stdout())
+	} else {
+		Box::new(fs::File::create(output_file).unwrap())
+	};
+	
 	if debug {
-		print_instructions(&instructions);
+		leafvm::instruction::print_instructions(&instructions);
 	}
-	leaf::run_instructions(&instructions, debug).unwrap();
-}
-
-fn print_instructions(instructions: &[Instruction]) {
-	let max_length = instructions.len().to_string().len();
-	for (i, instr) in instructions.iter().enumerate() {
-		let i_str = i.to_string();
-		for _ in 0..max_length - i_str.len() {
-			print!(" ");
-		}
-		println!("{}: {:?}", i_str, instr);
-	}
+	
+	leafc::codegen::serialize_instructions(instructions, &mut output_file);
 }

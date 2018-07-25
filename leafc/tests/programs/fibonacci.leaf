@@ -1,7 +1,9 @@
 use ::core::Int
 
 fn main() {
-	fibonacci(10) == 89
+	let fib10 := fibonacci(10);
+	debug fib10;
+	fib10 == 89
 }
 
 fn fibonacci(n: Int): Int {

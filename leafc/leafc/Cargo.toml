@@ -1,18 +1,15 @@
 [package]
-name = "leaf"
+name = "leafc"
 version = "0.0.1"
 authors = ["virusdownloader7@gmail.com"]
 
-[lib]
-name = "leaf"
-path = "src/lib.rs"
-
 [[bin]]
-name = "leaf"
-path = "src/leaf/leaf.rs"
+name = "leafc"
+path = "src/main.rs"
 
 [dependencies]
-leafc = { path = "../leafc/" }
 log = "0.4.3"
 fern = "0.5.6"
 clap = "2.32.0"
+leafvm = { path = "../../leafvm" }
+libleafc = { path = "../../leafc" }

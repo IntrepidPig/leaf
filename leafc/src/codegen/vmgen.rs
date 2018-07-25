@@ -3,116 +3,7 @@ use std::collections::HashMap;
 use hir::*;
 use ast::parser::operators::*;
 use ast::parser::{Identifier, ModulePath, PathItem, TypeName};
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Var {
-	pub var_info: VarInfo,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum VarInfo {
-	Root,
-	Primitive(Primitive),
-	Reference(Reference),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Primitive {
-	Bool(bool),
-	U64(u64),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Reference {
-	pub fields: Vec<Var>,
-}
-
-impl Reference {
-	pub fn new(fields: Vec<Var>) -> Self {
-		Reference { fields }
-	}
-}
-
-impl Var {
-	pub fn new_u64(val: u64) -> Self {
-		Var {
-			var_info: VarInfo::Primitive(Primitive::U64(val)),
-		}
-	}
-
-	pub fn root() -> Self {
-		Var {
-			var_info: VarInfo::Root,
-		}
-	}
-
-	pub fn new_bool(val: bool) -> Self {
-		Var {
-			var_info: VarInfo::Primitive(Primitive::Bool(val)),
-		}
-	}
-
-	pub fn new_ref(reference: Reference) -> Self {
-		Var {
-			var_info: VarInfo::Reference(reference),
-		}
-	}
-
-	pub fn is_false(&self) -> bool {
-		match self.var_info {
-			VarInfo::Primitive(Primitive::U64(val)) => val == 0,
-			VarInfo::Primitive(Primitive::Bool(val)) => !val,
-			_ => panic!("Tried to check if value was false when it doesn't support it"),
-		}
-	}
-}
-
-/// An instruction/opcode for the vm
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Instruction {
-	/// Call a function that starts at usize and create a new stack frame. Pop a
-	//. certain amount of values from the current stack frame into the next (arguments)
-	Call(usize, usize),
-	/// New block frame
-	Block,
-	/// Exit the stack frame, dropping all the values it had
-	Push(Var),
-	/// Pop the top of the stack into the top of the previous stack frame
-	/// Exit the stack frame dropping all of the values present
-	Output,
-	/// Pop the top of the operand stack into the locals stack
-	Bind,
-	/// Load the value of a variable to the top of the stack
-	Load(usize),
-	/// Pop the top of the stack value into the address pointed to by a variable
-	Set(usize),
-	/// Pop the top of the stack into oblivion
-	Pop,
-	/// Pop the top two values on the stack and push their sum back
-	Add,
-	/// Pop the top two values on the stack and push their difference back
-	Sub,
-	/// Pop the top two values on the stack and push their product back
-	Mul,
-	/// Pop the top two values on the stack and push their quotient back
-	Div,
-	/// Print the value at the top of the stack and pop it
-	Debug,
-	/// Set the instruction pointer
-	Jump(usize),
-	/// Jump to the location if the top of the stack is false
-	Check(usize),
-	/// Pop two values and push a boolean representing their equality
-	Equal,
-	/// Get the indexed field of a value
-	Retrieve(usize),
-	/// Return the value at the top of the stack to the previous stack frame
-	Return,
-	/// Pop the amount of values on the stack and push a reference to them all
-	Ref(usize),
-	/// Stop execution of the program
-	Terminate,
-}
+use leafvm::instruction::Instruction;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CodeGenerator<'a> {
@@ -236,7 +127,7 @@ impl<'a> CodeGenerator<'a> {
 		} else {
 			// Return a nil value
 			// This is necessary because if the block was a statement then it will always drop the result
-			self.instructions.push(Instruction::Push(Var::root()));
+			self.instructions.push(Instruction::PushRoot);
 		}
 		// Return the value into the previous stack frame
 		// and exit the current one
@@ -282,7 +173,7 @@ impl<'a> CodeGenerator<'a> {
 		if let Some(else_block) = &if_stmnt.else_block {
 			self.gen_from_expr(&else_block);
 		} else {
-			self.instructions.push(Instruction::Push(Var::root()));
+			self.instructions.push(Instruction::PushRoot);
 		}
 
 		// Fix the jump to after else locations
@@ -298,7 +189,7 @@ impl<'a> CodeGenerator<'a> {
 		match expr.expr {
 			// Push literal values onto the stack
 			ExpressionType::IntLiteral(num) => {
-				self.instructions.push(Instruction::Push(Var::new_u64(num)))
+				self.instructions.push(Instruction::PushInt(num))
 			},
 			// Generate instructions for nested blocks
 			ExpressionType::Block(ref ast) => {
@@ -388,14 +279,14 @@ impl<'a> CodeGenerator<'a> {
 					self.locals.last_mut().unwrap().push(binding.ident.clone())
 				} else {
 					// Push a nil value to the stack
-					self.instructions.push(Instruction::Push(Var::root()));
+					self.instructions.push(Instruction::PushRoot);
 					// Bind the variable to the nil value
 					self.instructions.push(Instruction::Bind);
 					// Push the variable name to the local var stack
 					self.locals.last_mut().unwrap().push(binding.ident.clone());
 				}
 				// Push a nil value since let is an expression and it's result will be popped
-				self.instructions.push(Instruction::Push(Var::root()))
+				self.instructions.push(Instruction::PushRoot)
 			},
 			ExpressionType::Debug(ref expr) => {
 				// Generate the expression instructions
@@ -403,14 +294,14 @@ impl<'a> CodeGenerator<'a> {
 				// Debug the value at the top of the stack (pops it automatically)
 				self.instructions.push(Instruction::Debug);
 				// Push a nil value since debug is an expression and it's result will be popped
-				self.instructions.push(Instruction::Push(Var::root()))
+				self.instructions.push(Instruction::PushRoot)
 			},
 			ExpressionType::Break(ref expr) => {
 				// If there's an associated expression then gen instructions for it, otherwise just push a nil
 				if let Some(expr) = expr {
 					self.gen_from_expr(expr);
 				} else {
-					self.instructions.push(Instruction::Push(Var::root()))
+					self.instructions.push(Instruction::PushRoot)
 				}
 				// Return the value being broken and exit the loop stack frame
 				self.instructions.push(Instruction::Output);
@@ -423,10 +314,10 @@ impl<'a> CodeGenerator<'a> {
 					.unwrap()
 					.push(self.instructions.len() - 1);
 				// Push a nil value since break is an expression and it's result will be popped
-				self.instructions.push(Instruction::Push(Var::root()))
+				self.instructions.push(Instruction::PushRoot)
 			},
 			ExpressionType::BoolLiteral(val) => self.instructions
-				.push(Instruction::Push(Var::new_bool(val))),
+				.push(Instruction::PushBool(val)),
 			ExpressionType::FunctionCall(ref call) => {
 				for arg in &call.args {
 					self.gen_from_expr(arg);
@@ -460,7 +351,7 @@ impl<'a> CodeGenerator<'a> {
 				self.instructions
 					.push(Instruction::Ref(instantiation.fields.len()))
 			},
-			ExpressionType::Root => self.instructions.push(Instruction::Push(Var::root())),
+			ExpressionType::Root => self.instructions.push(Instruction::PushRoot),
 			ExpressionType::StringLiteral(_) => unimplemented!(),
 			ExpressionType::Postfix(ref postfix) => {
 				self.gen_from_expr(&postfix.left);

@@ -1,13 +1,11 @@
 [package]
-name = "libleafc"
+name = "leafvm"
 version = "0.0.1"
 authors = ["virusdownloader7@gmail.com"]
 
 [lib]
-name = "leafc"
+name = "leafvm"
 path = "src/lib.rs"
 
 [dependencies]
-backtrace = "0.3"
 log = "0.4.3"
-leafvm = { path = "../leafvm/" }

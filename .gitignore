@@ -4,5 +4,5 @@ Cargo.lock
 .idea/
 .vscode/
 .project
-leaf/tmp.leaf
+tmp.leaf
 leaf.iml

@@ -1,13 +1,4 @@
-extern crate leafc;
-
-#[cfg(test)]
-mod tests;
-
-use leafc::codegen::vmgen::{Instruction, Primitive, Reference, Var, VarInfo};
-
-pub fn leaf() {
-	println!("Running leaf");
-}
+use instruction::Instruction;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StackFrame {
@@ -38,6 +29,78 @@ impl BlockFrame {
 		}
 	}
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Var {
+	pub var_info: VarInfo,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VarInfo {
+	Root,
+	Primitive(Primitive),
+	Reference(Reference),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Primitive {
+	Bool(bool),
+	U64(u64),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Reference {
+	pub fields: Vec<Var>,
+}
+
+impl Reference {
+	pub fn new(fields: Vec<Var>) -> Self {
+		Reference { fields }
+	}
+}
+
+impl Var {
+	pub fn new_u64(val: u64) -> Self {
+		Var {
+			var_info: VarInfo::Primitive(Primitive::U64(val)),
+		}
+	}
+
+	pub fn root() -> Self {
+		Var {
+			var_info: VarInfo::Root,
+		}
+	}
+
+	pub fn new_bool(val: bool) -> Self {
+		Var {
+			var_info: VarInfo::Primitive(Primitive::Bool(val)),
+		}
+	}
+
+	pub fn new_ref(reference: Reference) -> Self {
+		Var {
+			var_info: VarInfo::Reference(reference),
+		}
+	}
+
+	pub fn is_false(&self) -> bool {
+		match self.var_info {
+			VarInfo::Primitive(Primitive::U64(val)) => val == 0,
+			VarInfo::Primitive(Primitive::Bool(val)) => !val,
+			_ => panic!("Tried to check if value was false when it doesn't support it"),
+		}
+	}
+	
+	pub fn as_number(&self) -> Option<u64> {
+		if let VarInfo::Primitive(Primitive::U64(val)) = &self.var_info {
+			Some(*val)
+		} else {
+			None
+		}
+	}
+}
+
 
 pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<Var, ()> {
 	// Create a stack with a main stack frame and block frame for the main function's outputs
@@ -82,7 +145,7 @@ pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<Var
 					.unwrap();
 				stack.last_mut().unwrap().locals.push(var);
 			},
-			Instruction::Push(ref var) => {
+			Instruction::PushInt(ref val) => {
 				stack
 					.last_mut()
 					.unwrap()
@@ -90,7 +153,7 @@ pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<Var
 					.last_mut()
 					.unwrap()
 					.operands
-					.push(var.clone());
+					.push(Var::new_u64(*val));
 			},
 			Instruction::Pop => {
 				stack
@@ -440,6 +503,26 @@ pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<Var
 			},
 			Instruction::Terminate => {
 				break;
+			},
+			Instruction::PushRoot => {
+				stack
+					.last_mut()
+					.unwrap()
+					.block_frames
+					.last_mut()
+					.unwrap()
+					.operands
+					.push(Var::root());
+			},
+			Instruction::PushBool(ref val) => {
+				stack
+					.last_mut()
+					.unwrap()
+					.block_frames
+					.last_mut()
+					.unwrap()
+					.operands
+					.push(Var::new_bool(*val));
 			},
 		}
 

@@ -1,6 +1,7 @@
 extern crate backtrace;
 #[macro_use]
 extern crate log;
+extern crate leafvm;
 
 use std::path::Path;
 
@@ -11,7 +12,7 @@ pub mod hir;
 #[cfg(test)]
 mod tests;
 
-use codegen::vmgen::Instruction;
+use leafvm::instruction::Instruction;
 
 pub fn leafc_str<P: AsRef<Path>>(
 	input: &str,
