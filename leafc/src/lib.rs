@@ -1,7 +1,7 @@
 extern crate backtrace;
+extern crate leafvm;
 #[macro_use]
 extern crate log;
-extern crate leafvm;
 
 use std::path::Path;
 

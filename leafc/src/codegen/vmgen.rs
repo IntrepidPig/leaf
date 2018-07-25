@@ -188,9 +188,7 @@ impl<'a> CodeGenerator<'a> {
 	pub fn gen_from_expr(&mut self, expr: &Expression) {
 		match expr.expr {
 			// Push literal values onto the stack
-			ExpressionType::IntLiteral(num) => {
-				self.instructions.push(Instruction::PushInt(num))
-			},
+			ExpressionType::IntLiteral(num) => self.instructions.push(Instruction::PushInt(num)),
 			// Generate instructions for nested blocks
 			ExpressionType::Block(ref ast) => {
 				self.gen_from_block(ast);
@@ -316,8 +314,7 @@ impl<'a> CodeGenerator<'a> {
 				// Push a nil value since break is an expression and it's result will be popped
 				self.instructions.push(Instruction::PushRoot)
 			},
-			ExpressionType::BoolLiteral(val) => self.instructions
-				.push(Instruction::PushBool(val)),
+			ExpressionType::BoolLiteral(val) => self.instructions.push(Instruction::PushBool(val)),
 			ExpressionType::FunctionCall(ref call) => {
 				for arg in &call.args {
 					self.gen_from_expr(arg);

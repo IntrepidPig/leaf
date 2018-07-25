@@ -6,7 +6,11 @@ fn compile(name: &str) {
 	let mut test_path = tests_path.to_owned();
 	test_path.push_str(name);
 	test_path.push_str(".leaf");
-	let instructions = ::leafc(test_path, "/usr/local/lib/leaf/libcore/core.leaf".to_owned(), &[]).unwrap();
+	let instructions = ::leafc(
+		test_path,
+		"/usr/local/lib/leaf/libcore/core.leaf".to_owned(),
+		&[],
+	).unwrap();
 	let mut vm_test_path = vm_tests_path.to_owned();
 	vm_test_path.push_str(name);
 	vm_test_path.push_str(".lfb");

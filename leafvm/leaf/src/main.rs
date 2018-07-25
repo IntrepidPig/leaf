@@ -1,7 +1,7 @@
 extern crate clap;
 extern crate fern;
-extern crate leafvm;
 extern crate leafc;
+extern crate leafvm;
 extern crate log;
 
 use std::fs;
@@ -51,7 +51,7 @@ fn main() {
 		.chain(std::io::stderr())
 		.apply()
 		.expect("Failed to initialize logger");
-		
+
 	let instruction_input: Box<Read> = if input_file == "-" {
 		Box::new(io::stdin())
 	} else {
@@ -59,10 +59,10 @@ fn main() {
 	};
 
 	let instructions = leafvm::instruction::read_instructions(instruction_input);
-	
+
 	if debug {
 		leafvm::instruction::print_instructions(&instructions);
 	}
-	
+
 	leafvm::vm::run_instructions(&instructions, debug).unwrap();
 }

@@ -91,7 +91,7 @@ impl Var {
 			_ => panic!("Tried to check if value was false when it doesn't support it"),
 		}
 	}
-	
+
 	pub fn as_number(&self) -> Option<u64> {
 		if let VarInfo::Primitive(Primitive::U64(val)) = &self.var_info {
 			Some(*val)
@@ -100,7 +100,6 @@ impl Var {
 		}
 	}
 }
-
 
 pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<Var, ()> {
 	// Create a stack with a main stack frame and block frame for the main function's outputs

@@ -65,14 +65,10 @@ pub fn print_instructions(instructions: &[Instruction]) {
 pub fn read_instructions<R: Read>(mut raw: R) -> Vec<Instruction> {
 	let mut out = Vec::<usize>::new();
 	let mut buf = [0u8; 8];
-	loop {
-		match raw.read_exact(&mut buf) {
-			Ok(_) => {},
-			Err(_) => break,
-		}
+	while let Ok(_) = raw.read_exact(&mut buf) {
 		let mut val: usize = 0;
-		for i in 0..8 {
-			val += buf[i] as usize * 256usize.pow(i as u32);
+		for (i, item) in buf.iter().enumerate() {
+			val += *item as usize * 256usize.pow(i as u32);
 		}
 		out.push(val);
 	}
