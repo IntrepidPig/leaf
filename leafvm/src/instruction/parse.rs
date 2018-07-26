@@ -37,11 +37,11 @@ fn next_u64<R: Read>(mut input: R) -> io::Result<u64> {
 
 fn next_usize<R: Read>(mut input: R) -> io::Result<usize> {
 	let num_bytes = read_item(&mut input)?;
-	let num = u8s_to_u64_le(&num_bytes);
-	if num as usize > ::std::usize::MAX {
-		// could fail on >64 bit platforms
-		panic!("Tried to load a pointer that was too big to fit in the system pointer size")
+	if num_bytes.len() > ::std::mem::size_of::<usize>() || num_bytes.len() > 8 {
+		panic!("Tried to load a pointer that was larger than this systems address size")
 	}
+	let num = u8s_to_u64_le(&num_bytes);
+
 	Ok(num as usize)
 }
 
