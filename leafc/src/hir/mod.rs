@@ -610,7 +610,7 @@ impl HIRGenerator {
 						op: *op,
 					}))
 				} else {
-					println!("{:?}\n{:?}\n{:?}", left, right, op);
+					error!("{:?}\n{:?}\n{:?}", left, right, op);
 					// TODO operation traits
 					unimplemented!()
 				}

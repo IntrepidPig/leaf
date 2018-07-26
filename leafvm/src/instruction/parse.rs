@@ -85,8 +85,8 @@ pub fn print_instructions(instructions: &[Instruction]) {
 	for (i, instr) in instructions.iter().enumerate() {
 		let i_str = i.to_string();
 		for _ in 0..max_length - i_str.len() {
-			print!(" ");
+			eprint!(" ");
 		}
-		println!("{}: {:?}", i_str, instr);
+		eprint!("{}: {:?}", i_str, instr);
 	}
 }
