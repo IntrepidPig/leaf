@@ -191,12 +191,18 @@ pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<Var
 			Instruction::Call(ref index, ref argc) => {
 				let mut new_frame = StackFrame::new(instr_ptr);
 				{
-					let operands = &mut stack.last_mut().unwrap().block_frames.last_mut().unwrap().operands;
+					let operands = &mut stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands;
 					let len = operands.len();
 					let args = operands.split_off(len - argc);
 					new_frame.locals = args;
 				}
-				
+
 				// Start a new stack frame
 				stack.push(new_frame);
 				// Jump to the index pointed to by the call instruction

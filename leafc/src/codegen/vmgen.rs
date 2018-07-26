@@ -78,7 +78,7 @@ impl<'a> CodeGenerator<'a> {
 					self.gen_from_func(function, module_path)
 				}
 			},
-			&mut ModulePath::new(false, Vec::new())
+			&mut ModulePath::new(false, Vec::new()),
 		);
 
 		self.change_function_jumps();

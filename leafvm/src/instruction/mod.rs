@@ -1,4 +1,4 @@
-use std::io::Read;
+pub mod parse;
 
 /// An instruction/opcode for the vm
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,61 +49,4 @@ pub enum Instruction {
 	PushRoot,
 	/// Push a boolean onto the operand stack
 	PushBool(bool),
-}
-
-pub fn print_instructions(instructions: &[Instruction]) {
-	let max_length = instructions.len().to_string().len();
-	for (i, instr) in instructions.iter().enumerate() {
-		let i_str = i.to_string();
-		for _ in 0..max_length - i_str.len() {
-			print!(" ");
-		}
-		println!("{}: {:?}", i_str, instr);
-	}
-}
-
-pub fn read_instructions<R: Read>(mut raw: R) -> Vec<Instruction> {
-	let mut out = Vec::<usize>::new();
-	let mut buf = [0u8; 8];
-	while let Ok(_) = raw.read_exact(&mut buf) {
-		let mut val: usize = 0;
-		for (i, item) in buf.iter().enumerate() {
-			val += *item as usize * 256usize.pow(i as u32);
-		}
-		out.push(val);
-	}
-	parse_instructions(out)
-}
-
-pub fn parse_instructions(mut raw: Vec<usize>) -> Vec<Instruction> {
-	let mut instructions: Vec<Instruction> = Vec::new();
-	while !raw.is_empty() {
-		let opcode = raw.remove(0);
-		instructions.push(match opcode {
-			2 => Instruction::Call(raw.remove(0), raw.remove(0)),
-			3 => Instruction::Block,
-			4 => Instruction::PushInt(raw.remove(0) as u64),
-			5 => Instruction::Output,
-			6 => Instruction::Bind,
-			7 => Instruction::Load(raw.remove(0)),
-			8 => Instruction::Set(raw.remove(0)),
-			9 => Instruction::Pop,
-			10 => Instruction::Add,
-			11 => Instruction::Sub,
-			12 => Instruction::Mul,
-			13 => Instruction::Div,
-			14 => Instruction::Debug,
-			15 => Instruction::Jump(raw.remove(0)),
-			16 => Instruction::Check(raw.remove(0)),
-			17 => Instruction::Equal,
-			18 => Instruction::Retrieve(raw.remove(0)),
-			19 => Instruction::Return,
-			20 => Instruction::Ref(raw.remove(0)),
-			21 => Instruction::Terminate,
-			22 => Instruction::PushRoot,
-			23 => Instruction::PushBool(raw.remove(0) != 0),
-			_ => panic!("Unknown opcode {}", opcode),
-		});
-	}
-	instructions
 }

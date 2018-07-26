@@ -48,7 +48,7 @@ pub fn parse(in_tokens: &[TokenTree]) -> Result<SyntaxTree, Error<ParseError>> {
 			stree.modules.push(module);
 			continue;
 		}
-		
+
 		return Err(ParseError::Other.into()); // Didn't get a function or a typedef in the root
 	}
 

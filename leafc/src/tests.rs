@@ -15,7 +15,7 @@ fn compile(name: &str) {
 	vm_test_path.push_str(name);
 	vm_test_path.push_str(".lfb");
 	let mut out_file = fs::File::create(&vm_test_path).unwrap();
-	::codegen::serialize_instructions(instructions, &mut out_file);
+	::codegen::output::serialize_instructions(instructions, &mut out_file).unwrap();
 }
 
 #[test]

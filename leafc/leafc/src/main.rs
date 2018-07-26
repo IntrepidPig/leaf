@@ -103,8 +103,8 @@ fn main() {
 	};
 
 	if debug {
-		leafvm::instruction::print_instructions(&instructions);
+		leafvm::instruction::parse::print_instructions(&instructions);
 	}
 
-	leafc::codegen::serialize_instructions(instructions, &mut output_file);
+	leafc::codegen::output::serialize_instructions(instructions, &mut output_file).unwrap();
 }

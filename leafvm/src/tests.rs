@@ -8,8 +8,9 @@ fn test(name: &str) {
 	test_path.push_str(name);
 	test_path.push_str(".lfb");
 	let mut test_file = fs::File::open(&test_path).unwrap();
-	let instructions = ::instruction::read_instructions(&mut test_file);
-	let result = ::vm::run_instructions(&instructions, false).unwrap();
+	let instructions = ::instruction::parse::read_instructions(&mut test_file).unwrap();
+	::instruction::parse::print_instructions(&instructions);
+	let result = ::vm::run_instructions(&instructions, true).unwrap();
 	assert_eq!(result, Var::new_bool(true));
 }
 

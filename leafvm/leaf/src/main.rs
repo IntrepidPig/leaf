@@ -58,10 +58,10 @@ fn main() {
 		Box::new(fs::File::open(input_file).unwrap())
 	};
 
-	let instructions = leafvm::instruction::read_instructions(instruction_input);
+	let instructions = leafvm::instruction::parse::read_instructions(instruction_input).unwrap();
 
 	if debug {
-		leafvm::instruction::print_instructions(&instructions);
+		leafvm::instruction::parse::print_instructions(&instructions);
 	}
 
 	leafvm::vm::run_instructions(&instructions, debug).unwrap();
