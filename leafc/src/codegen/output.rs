@@ -9,88 +9,110 @@ pub fn serialize_instructions<W: Write>(
 	for instruction in instructions {
 		match instruction {
 			Instruction::Call(ptr, argc) => {
-				write_val(2u8, &mut output, |t| vec![*t])?;
-				write_val(ptr, &mut output, |t| usize_to_u8s(*t).to_vec())?;
-				write_val(argc, &mut output, |t| usize_to_u8s(*t).to_vec())?;
+				write_val(&2u8, &mut output)?;
+				write_val(&ptr, &mut output)?;
+				write_val(&argc, &mut output)?;
 			},
-			Instruction::Block => write_val(3u8, &mut output, |t| vec![*t])?,
+			Instruction::Block => write_val(&3u8, &mut output)?,
 			Instruction::PushInt(val) => {
-				write_val(4u8, &mut output, |t| vec![*t])?;
-				write_val(val, &mut output, |t| u64_to_u8s(*t).to_vec())?;
+				write_val(&4u8, &mut output)?;
+				write_val(&val, &mut output)?;
 			},
-			Instruction::Output => write_val(5u8, &mut output, |t| vec![*t])?,
-			Instruction::Bind => write_val(6u8, &mut output, |t| vec![*t])?,
+			Instruction::Output => write_val(&5u8, &mut output)?,
+			Instruction::Bind => write_val(&6u8, &mut output)?,
 			Instruction::Load(ptr) => {
-				write_val(7u8, &mut output, |t| vec![*t])?;
-				write_val(ptr, &mut output, |t| usize_to_u8s(*t).to_vec())?;
+				write_val(&7u8, &mut output)?;
+				write_val(&ptr, &mut output)?;
 			},
 			Instruction::Set(ptr) => {
-				write_val(8u8, &mut output, |t| vec![*t])?;
-				write_val(ptr, &mut output, |t| usize_to_u8s(*t).to_vec())?;
+				write_val(&8u8, &mut output)?;
+				write_val(&ptr, &mut output)?;
 			},
-			Instruction::Pop => write_val(9u8, &mut output, |t| vec![*t])?,
-			Instruction::Add => write_val(10u8, &mut output, |t| vec![*t])?,
-			Instruction::Sub => write_val(11u8, &mut output, |t| vec![*t])?,
-			Instruction::Mul => write_val(12u8, &mut output, |t| vec![*t])?,
-			Instruction::Div => write_val(13u8, &mut output, |t| vec![*t])?,
-			Instruction::Debug => write_val(14u8, &mut output, |t| vec![*t])?,
+			Instruction::Pop => write_val(&9u8, &mut output)?,
+			Instruction::Add => write_val(&10u8, &mut output)?,
+			Instruction::Sub => write_val(&11u8, &mut output)?,
+			Instruction::Mul => write_val(&12u8, &mut output)?,
+			Instruction::Div => write_val(&13u8, &mut output)?,
+			Instruction::Debug => write_val(&14u8, &mut output)?,
 			Instruction::Jump(ptr) => {
-				write_val(15u8, &mut output, |t| vec![*t])?;
-				write_val(ptr, &mut output, |t| usize_to_u8s(*t).to_vec())?;
+				write_val(&15u8, &mut output)?;
+				write_val(&ptr, &mut output)?;
 			},
 			Instruction::Check(ptr) => {
-				write_val(16u8, &mut output, |t| vec![*t])?;
-				write_val(ptr, &mut output, |t| usize_to_u8s(*t).to_vec())?;
+				write_val(&16u8, &mut output)?;
+				write_val(&ptr, &mut output)?;
 			},
-			Instruction::Equal => write_val(17u8, &mut output, |t| vec![*t])?,
+			Instruction::Equal => write_val(&17u8, &mut output)?,
 			Instruction::Retrieve(ptr) => {
-				write_val(18u8, &mut output, |t| vec![*t])?;
-				write_val(ptr, &mut output, |t| usize_to_u8s(*t).to_vec())?;
+				write_val(&18u8, &mut output)?;
+				write_val(&ptr, &mut output)?;
 			},
-			Instruction::Return => write_val(19u8, &mut output, |t| vec![*t])?,
+			Instruction::Return => write_val(&19u8, &mut output)?,
 			Instruction::Ref(size) => {
-				write_val(20u8, &mut output, |t| vec![*t])?;
-				write_val(size, &mut output, |t| usize_to_u8s(*t).to_vec())?
+				write_val(&20u8, &mut output)?;
+				write_val(&size, &mut output)?
 			},
-			Instruction::Terminate => write_val(21u8, &mut output, |t| vec![*t])?,
-			Instruction::PushRoot => write_val(22u8, &mut output, |t| vec![*t])?,
+			Instruction::Terminate => write_val(&21u8, &mut output)?,
+			Instruction::PushRoot => write_val(&22u8, &mut output)?,
 			Instruction::PushBool(val) => {
-				write_val(23u8, &mut output, |t| vec![*t])?;
-				write_val(val, &mut output, |t| vec![*t as u8])?;
+				write_val(&23u8, &mut output)?;
+				write_val(&val, &mut output)?;
 			},
 		}
 	}
-	write_val(0u8, &mut output, |t| vec![*t])?;
+	write_val(&0u8, &mut output)?;
 	Ok(())
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
-fn write_val<T, W: Write, F: FnMut(&T) -> Vec<u8>>(
-	val: T,
-	mut out: W,
-	mut to_le: F,
-) -> io::Result<()> {
-	let size = ::std::mem::size_of::<T>();
+fn write_val<T: ToBytesLe, W: Write>(val: &T, mut out: W) -> io::Result<()> {
+	let bytes = val.to_bytes_le();
+	let size = bytes.len();
 	if size < 255 {
 		out.write_all(&[size as u8])?;
 	} else {
 		out.write_all(&[255u8])?;
-		out.write_all(&u64_to_u8s(size as u64))?; // might fail on >64 bit platforms
+		out.write_all(&size.to_bytes_le())?;
 	}
 
-	out.write_all(&to_le(&val))?;
+	out.write_all(&bytes)?;
 
 	Ok(())
 }
 
-fn u64_to_u8s(num: u64) -> [u8; 8] {
-	let mut buf = [0u8; 8];
-	for (i, item) in buf.iter_mut().enumerate() {
-		*item = ((num >> (i * 8)) & 0xffu64) as u8;
-	}
-	buf
+// Trait to represent a type that can be converted to bytes, in little endian if necessary
+trait ToBytesLe {
+	fn to_bytes_le(&self) -> Vec<u8>;
 }
 
-fn usize_to_u8s(size: usize) -> [u8; 8] {
-	u64_to_u8s(size as u64) // might fail on >64 bit platforms
+impl ToBytesLe for u8 {
+	fn to_bytes_le(&self) -> Vec<u8> {
+		vec![*self]
+	}
+}
+
+impl ToBytesLe for u64 {
+	fn to_bytes_le(&self) -> Vec<u8> {
+		let mut buf = [0u8; 8];
+		for (i, item) in buf.iter_mut().enumerate() {
+			*item = ((*self >> (i * 8)) & 0xffu64) as u8;
+		}
+		buf.to_vec()
+	}
+}
+
+impl ToBytesLe for usize {
+	fn to_bytes_le(&self) -> Vec<u8> {
+		let size = ::std::mem::size_of::<Self>();
+		let mut buf: Vec<u8> = Vec::with_capacity(size);
+		for i in 0..size {
+			buf.push(((*self >> (i * 8)) & 0xffusize) as u8);
+		}
+		buf
+	}
+}
+
+impl ToBytesLe for bool {
+	fn to_bytes_le(&self) -> Vec<u8> {
+		vec![*self as u8]
+	}
 }
