@@ -84,7 +84,7 @@ pub fn create_ast_with_includes(
 		));
 	}
 	let mut st = create_ast(input).unwrap();
-	st.modules = modules;
+	st.modules.append(&mut modules);
 
 	Ok(st)
 }

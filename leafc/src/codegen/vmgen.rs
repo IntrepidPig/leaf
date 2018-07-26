@@ -72,9 +72,14 @@ impl<'a> CodeGenerator<'a> {
 		self.function_jumps_todo
 			.push((0, PathItem::root_item(Identifier::try_from_str("main"))));
 		self.instructions.push(Instruction::Terminate);
-		for func in &self.root_mod.functions {
-			self.gen_from_func(&func);
-		}
+		self.root_mod.traverse(
+			&mut |module_path: &ModulePath, module: &Module| {
+				for function in &module.functions {
+					self.gen_from_func(function, module_path)
+				}
+			},
+			&mut ModulePath::new(false, Vec::new())
+		);
 
 		self.change_function_jumps();
 	}
@@ -88,11 +93,11 @@ impl<'a> CodeGenerator<'a> {
 		}
 	}
 
-	pub fn gen_from_func(&mut self, function: &FunctionDefinition) {
+	pub fn gen_from_func(&mut self, function: &FunctionDefinition, module_path: &ModulePath) {
 		self.locals.push(Vec::new());
 		self.function_locations.insert(
 			PathItem {
-				module_path: self.module_path.clone(),
+				module_path: module_path.clone(),
 				item: function.name.clone(),
 			},
 			self.instructions.len(),

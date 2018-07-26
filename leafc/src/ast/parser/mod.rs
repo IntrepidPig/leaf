@@ -16,6 +16,7 @@ pub mod separated;
 pub mod instantiation;
 pub mod pathitem;
 pub mod uses;
+pub mod module;
 
 pub use ast::tokenizer::{Keyword, Symbol as TokenSymbol};
 pub use self::syntaxtree::*;
@@ -42,10 +43,12 @@ pub fn parse(in_tokens: &[TokenTree]) -> Result<SyntaxTree, Error<ParseError>> {
 			tokens = leftovers;
 			stree.uses.push(u);
 			continue;
+		} else if let Some((module, leftovers)) = module::take_module(tokens)? {
+			tokens = leftovers;
+			stree.modules.push(module);
+			continue;
 		}
-
-		// TODO! parse uses and modules
-
+		
 		return Err(ParseError::Other.into()); // Didn't get a function or a typedef in the root
 	}
 

@@ -37,3 +37,8 @@ fn fibonacci() {
 fn functions() {
 	compile("functions");
 }
+
+#[test]
+fn modules() {
+	compile("modules");
+}

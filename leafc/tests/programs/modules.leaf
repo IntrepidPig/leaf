@@ -1,0 +1,31 @@
+use ::core::Int
+
+mod vector {
+	use ::core::Int
+	
+	type Vec2 {
+		x: ::core::Int,
+		y: Int,
+	}
+
+	fn vec2_add(a: Vec2, b: Vec2): Vec2 {
+		let x := a.x + b.x;
+		let y := a.y + b.y;
+		Vec2 { x: x, y: y }
+	}
+
+	fn vec2_sub(a: Vec2, b: Vec2): Vec2 {
+		let x := a.x - b.x;
+		let y := a.y - b.y;
+		Vec2 { x: x, y: y }
+	}
+}
+
+use ::vector::Vec2
+use ::vector::vec2_sub
+
+fn main() {
+	::vector::vec2_add(Vec2 { x: 13, y: 10 }, Vec2 { x: 5, y: 30, });
+	let sub := vec2_sub(Vec2 { x: 10, y: 150 }, Vec2 { x: 1, y: 50 });
+	sub.y == 100
+}

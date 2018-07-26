@@ -1,7 +1,7 @@
 [workspace]
 members = [
-    "leafvm",
-	"leafvm/leaf",
-    "leafc",
+	"leafc",
+	"leafvm",
 	"leafc/leafc",
+	"leafvm/leaf",
 ]

@@ -32,3 +32,8 @@ fn fibonacci() {
 fn functions() {
 	test("functions");
 }
+
+#[test]
+fn modules() {
+	test("modules");
+}
