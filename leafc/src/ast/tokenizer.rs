@@ -44,6 +44,7 @@ pub enum Keyword {
 	Module,
 	Use,
 	Mutable,
+	Extern,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -108,6 +109,7 @@ impl<'a> Tokenizer<'a> {
 					"mod" => tokens.push(Token::Keyword(Keyword::Module)),
 					"use" => tokens.push(Token::Keyword(Keyword::Use)),
 					"mut" => tokens.push(Token::Keyword(Keyword::Mutable)),
+					"extern" => tokens.push(Token::Keyword(Keyword::Extern)),
 					word => tokens.push(Token::Name(word.to_owned())),
 				},
 				Lexeme::Bracket(bracket, state) => {

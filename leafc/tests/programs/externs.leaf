@@ -1,0 +1,11 @@
+use ::core::Int
+use ::core::Bool
+
+extern fn print_int(x: Int)
+extern fn flip_bool(b: Bool): Bool
+
+fn main() {
+	print_int(35);
+	let falsy := flip_bool(true);
+	falsy == false
+}

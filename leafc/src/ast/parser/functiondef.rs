@@ -69,6 +69,67 @@ pub fn take_functiondef(in_tokens: &[TokenTree]) -> ParseResult<Function> {
 	)))
 }
 
+pub fn take_externfn(in_tokens: &[TokenTree]) -> ParseResult<ExternFunction> {
+	let mut tokens = in_tokens;
+	
+	match tokens.get(0) {
+		Some(TokenTree::Token(Token::Keyword(Keyword::Extern))) => {
+			tokens = &tokens[1..];
+		},
+		_ => return Ok(None),
+	}
+
+	match tokens.get(0) {
+		Some(TokenTree::Token(Token::Keyword(Keyword::Function))) => {
+			tokens = &tokens[1..];
+		},
+		_ => return Ok(None),
+	}
+
+	let name = match tokens.get(0) {
+		Some(TokenTree::Token(Token::Name(ref name))) => {
+			tokens = &tokens[1..];
+			Identifier::try_from_str(name)
+		},
+		_ => return Err(ParseError::Other.into()), // needed a function name
+	};
+
+	let args = match tokens.get(0) {
+		Some(TokenTree::Paren(ref args_tokens)) => {
+			tokens = &tokens[1..];
+			if !args_tokens.is_empty() {
+				parse_args(args_tokens)?
+			} else {
+				Vec::new()
+			}
+		},
+		_ => return Err(ParseError::Other.into()), // needed parens with arguments inside
+	};
+
+	let return_type = match tokens.get(0) {
+		Some(TokenTree::Token(Token::Symbol(TokenSymbol::Colon))) => {
+			tokens = &tokens[1..];
+			let (typename, leftovers) = if let Some(res) = next_type(tokens)? {
+				res
+			} else {
+				return Err(ParseError::Other.into()); // Expected a type after the colon
+			};
+			tokens = leftovers;
+			Some(typename)
+		},
+		_ => None,
+	};
+
+	Ok(Some((
+		ExternFunction {
+			name,
+			args,
+			return_type,
+		},
+		tokens,
+	)))
+}
+
 fn parse_args(
 	in_tokens: &[TokenTree],
 ) -> Result<Vec<(Identifier, PathItem<TypeName>)>, Error<ParseError>> {

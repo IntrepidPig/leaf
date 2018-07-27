@@ -136,7 +136,15 @@ mod structures {
 		pub uses: Vec<PathItem<Identifier>>,
 		pub types: Vec<Type>,
 		pub functions: Vec<Function>,
+		pub extern_fns: Vec<ExternFunction>,
 		pub modules: Vec<(Identifier, Module)>,
+	}
+	
+	#[derive(Debug, Clone, PartialEq, Eq)]
+	pub struct ExternFunction {
+		pub name: Identifier,
+		pub args: Vec<(Identifier, PathItem<TypeName>)>,
+		pub return_type: Option<PathItem<TypeName>>,
 	}
 
 	impl SyntaxTree {
@@ -144,12 +152,14 @@ mod structures {
 			uses: Vec<PathItem<Identifier>>,
 			types: Vec<Type>,
 			functions: Vec<Function>,
+			extern_fns: Vec<ExternFunction>,
 			modules: Vec<(Identifier, Module)>,
 		) -> Self {
 			SyntaxTree {
 				uses,
 				types,
 				functions,
+				extern_fns,
 				modules,
 			}
 		}

@@ -27,7 +27,7 @@ pub use failure::Error;
 
 /// Parse a block from the tokens (will use all of the tokens or error)
 pub fn parse(in_tokens: &[TokenTree]) -> Result<SyntaxTree, Error<ParseError>> {
-	let mut stree = SyntaxTree::new(Vec::new(), Vec::new(), Vec::new(), Vec::new());
+	let mut stree = SyntaxTree::new(Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
 	let mut tokens = in_tokens;
 
 	while !tokens.is_empty() {
@@ -46,6 +46,10 @@ pub fn parse(in_tokens: &[TokenTree]) -> Result<SyntaxTree, Error<ParseError>> {
 		} else if let Some((module, leftovers)) = module::take_module(tokens)? {
 			tokens = leftovers;
 			stree.modules.push(module);
+			continue;
+		} else if let Some((extern_fn, leftovers)) = functiondef::take_externfn(tokens)? {
+			tokens = leftovers;
+			stree.extern_fns.push(extern_fn);
 			continue;
 		}
 
