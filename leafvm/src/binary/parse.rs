@@ -102,7 +102,7 @@ pub fn read_binary<R: Read>(mut raw: R) -> io::Result<Binary> {
 	let instructions = read_instructions(instruction_table.as_slice())?;
 
 	Ok(Binary {
-		symbol_table: Vec::new(),
+		link_table: Vec::new(),
 		extern_table: externs,
 		instructions,
 	})
