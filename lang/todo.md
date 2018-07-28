@@ -4,5 +4,6 @@
 	- Type checking
 	- Symbol checking
 	- Field existence checking
-- Compile a list of type definitions
-- "Syscalls" / intrinsics
+- Compile error messages
+- Generics
+- Polymorphism

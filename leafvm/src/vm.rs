@@ -1,4 +1,9 @@
+use std::collections::HashMap;
+
 use instruction::Instruction;
+use binary::Binary;
+
+pub type LeafFn = FnMut(Vec<Var>) -> Var;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StackFrame {
@@ -101,368 +106,407 @@ impl Var {
 	}
 }
 
-pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<Var, ()> {
-	// Create a stack with a main stack frame and block frame for the main function's outputs
-	let mut stack: Vec<StackFrame> = vec![StackFrame::new(0)];
-	stack[0].block_frames.push(BlockFrame::new());
+pub struct VM {
+	instructions: Vec<Instruction>,
+	extern_fns: Vec<Box<LeafFn>>,
+}
 
-	let mut instr_ptr: usize = 0;
-	let mut iter: usize = 0;
-
-	loop {
-		if instr_ptr == instructions.len() {
-			break;
+impl VM {
+	pub fn new(bin: Binary, mut fns: HashMap<String, Box<LeafFn>>) -> Self {
+		let (instructions, extern_fns) = (bin.instructions, bin.extern_table);
+		// Load all to the values in the symbol table into a Vec of functions
+		let fns = extern_fns
+			.into_iter()
+			.map(|symbol| fns.remove(&symbol).unwrap())
+			.collect();
+		VM {
+			instructions,
+			extern_fns: fns,
 		}
+	}
 
-		if debug {
-			iter += 1;
-			if iter > 1000 {
-				println!("Reached maximum instruction execution");
-				return Err(());
+	pub fn run(&mut self, debug: bool) -> Result<Var, ()> {
+		// Create a stack with a main stack frame and block frame for the main function's outputs
+		let mut stack: Vec<StackFrame> = vec![StackFrame::new(0)];
+		stack[0].block_frames.push(BlockFrame::new());
+
+		let instructions = &self.instructions;
+		let extern_fns = &mut self.extern_fns;
+		let mut instr_ptr: usize = 0;
+		let mut iter: usize = 0;
+
+		loop {
+			if instr_ptr == instructions.len() {
+				break;
 			}
 
-			println!("Instruction {}: {:?}", instr_ptr, instructions[instr_ptr],);
-		}
+			if debug {
+				iter += 1;
+				if iter > 1000 {
+					println!("Reached maximum instruction execution");
+					return Err(());
+				}
 
-		match instructions[instr_ptr] {
-			Instruction::Block => {
-				stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.push(BlockFrame::new());
-			},
-			Instruction::Bind => {
-				let var = stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.pop()
-					.unwrap();
-				stack.last_mut().unwrap().locals.push(var);
-			},
-			Instruction::PushInt(ref val) => {
-				stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.push(Var::new_u64(*val));
-			},
-			Instruction::Pop => {
-				stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.pop()
-					.unwrap();
-			},
-			Instruction::Load(ref index) => {
-				let var = stack.last_mut().unwrap().locals[*index].clone();
-				stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.push(var.clone());
-			},
-			Instruction::Debug => {
-				let var = stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.pop()
-					.unwrap();
-				println!("\t => Var: {:?}", var);
-			},
-			Instruction::Call(ref index, ref argc) => {
-				let mut new_frame = StackFrame::new(instr_ptr);
-				{
-					let operands = &mut stack
+				println!("Instruction {}: {:?}", instr_ptr, instructions[instr_ptr]);
+			}
+
+			match instructions[instr_ptr] {
+				Instruction::Block => {
+					stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.push(BlockFrame::new());
+				},
+				Instruction::Bind => {
+					let var = stack
 						.last_mut()
 						.unwrap()
 						.block_frames
 						.last_mut()
 						.unwrap()
-						.operands;
-					let len = operands.len();
-					let args = operands.split_off(len - argc);
-					new_frame.locals = args;
-				}
+						.operands
+						.pop()
+						.unwrap();
+					stack.last_mut().unwrap().locals.push(var);
+				},
+				Instruction::PushInt(ref val) => {
+					stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.push(Var::new_u64(*val));
+				},
+				Instruction::Pop => {
+					stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.pop()
+						.unwrap();
+				},
+				Instruction::Load(ref index) => {
+					let var = stack.last_mut().unwrap().locals[*index].clone();
+					stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.push(var.clone());
+				},
+				Instruction::Debug => {
+					let var = stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.pop()
+						.unwrap();
+					println!("\t => Var: {:?}", var);
+				},
+				Instruction::Call(ref index, ref argc) => {
+					let mut new_frame = StackFrame::new(instr_ptr);
+					{
+						let operands = &mut stack
+							.last_mut()
+							.unwrap()
+							.block_frames
+							.last_mut()
+							.unwrap()
+							.operands;
+						let len = operands.len();
+						let args = operands.split_off(len - argc);
+						new_frame.locals = args;
+					}
 
-				// Start a new stack frame
-				stack.push(new_frame);
-				// Jump to the index pointed to by the call instruction
-				instr_ptr = *index;
-				continue;
-			},
-			Instruction::Set(ref index) => {
-				let var = stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.pop()
-					.unwrap();
-				stack.last_mut().unwrap().locals[*index] = var;
-			},
-			Instruction::Output => {
-				let var = stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.pop()
-					.unwrap();
-				let len = stack.last().unwrap().block_frames.len();
-				stack.last_mut().unwrap().block_frames[len - 2]
-					.operands
-					.push(var);
-				stack.last_mut().unwrap().block_frames.pop().unwrap();
-				// TODO drop all items in stack
-			},
-			Instruction::Return => {
-				let var = stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.pop()
-					.unwrap();
-				let len = stack.len();
-				stack[len - 2]
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.push(var);
-				for _block_frame in &stack.last().unwrap().block_frames {
-					// TODO
-				}
-				let old_frame = stack.pop().unwrap();
-				instr_ptr = old_frame.return_to_ptr;
-			},
-			Instruction::Add => {
-				let right = stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.pop()
-					.unwrap();
-				let left = stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.pop()
-					.unwrap();
-				let output = match (left.var_info, right.var_info) {
-					(
-						VarInfo::Primitive(Primitive::U64(left)),
-						VarInfo::Primitive(Primitive::U64(right)),
-					) => left + right,
-					_ => panic!("Tried to add types that don't support it"), // This is ok now because the conversion to hir changes operators to use the add method when they're not primitives
-				};
-				stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.push(Var::new_u64(output));
-			},
-			Instruction::Sub => {
-				let right = stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.pop()
-					.unwrap();
-				let left = stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.pop()
-					.unwrap();
-				let output = match (left.var_info, right.var_info) {
-					(
-						VarInfo::Primitive(Primitive::U64(left)),
-						VarInfo::Primitive(Primitive::U64(right)),
-					) => left - right,
-					_ => panic!("Tried to add types that don't support it"), // This is ok now because the conversion to hir changes operators to use the add method when they're not primitives
-				};
-				stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.push(Var::new_u64(output));
-			},
-			Instruction::Mul => {
-				let right = stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.pop()
-					.unwrap();
-				let left = stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.pop()
-					.unwrap();
-				let output = match (left.var_info, right.var_info) {
-					(
-						VarInfo::Primitive(Primitive::U64(left)),
-						VarInfo::Primitive(Primitive::U64(right)),
-					) => left * right,
-					_ => panic!("Tried to add types that don't support it"), // This is ok now because the conversion to hir changes operators to use the add method when they're not primitives
-				};
-				stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.push(Var::new_u64(output));
-			},
-			Instruction::Div => {
-				let right = stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.pop()
-					.unwrap();
-				let left = stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.pop()
-					.unwrap();
-				let output = match (left.var_info, right.var_info) {
-					(
-						VarInfo::Primitive(Primitive::U64(left)),
-						VarInfo::Primitive(Primitive::U64(right)),
-					) => left / right,
-					_ => panic!("Tried to add types that don't support it"), // This is ok now because the conversion to hir changes operators to use the add method when they're not primitives
-				};
-				stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.push(Var::new_u64(output));
-			},
-			Instruction::Equal => {
-				let right = stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.pop()
-					.unwrap();
-				let left = stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.pop()
-					.unwrap();
-				let output = Var::new_bool(left == right);
-				stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.push(output);
-			},
-			Instruction::Jump(target_instr_ptr) => {
-				instr_ptr = target_instr_ptr;
-				continue;
-			},
-			Instruction::Check(target_instr_ptr) => {
-				let var = stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.pop()
-					.unwrap();
-				// If the value is false jump past the if block
-				if var.is_false() {
+					// Start a new stack frame
+					stack.push(new_frame);
+					// Jump to the index pointed to by the call instruction
+					instr_ptr = *index;
+					continue;
+				},
+				Instruction::Set(ref index) => {
+					let var = stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.pop()
+						.unwrap();
+					stack.last_mut().unwrap().locals[*index] = var;
+				},
+				Instruction::Output => {
+					let var = stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.pop()
+						.unwrap();
+					let len = stack.last().unwrap().block_frames.len();
+					stack.last_mut().unwrap().block_frames[len - 2]
+						.operands
+						.push(var);
+					stack.last_mut().unwrap().block_frames.pop().unwrap();
+					// TODO drop all items in stack
+				},
+				Instruction::Return => {
+					let var = stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.pop()
+						.unwrap();
+					let len = stack.len();
+					stack[len - 2]
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.push(var);
+					for _block_frame in &stack.last().unwrap().block_frames {
+						// TODO
+					}
+					let old_frame = stack.pop().unwrap();
+					instr_ptr = old_frame.return_to_ptr;
+				},
+				Instruction::Add => {
+					let right = stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.pop()
+						.unwrap();
+					let left = stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.pop()
+						.unwrap();
+					let output = match (left.var_info, right.var_info) {
+						(
+							VarInfo::Primitive(Primitive::U64(left)),
+							VarInfo::Primitive(Primitive::U64(right)),
+						) => left + right,
+						_ => panic!("Tried to add types that don't support it"), // This is ok now because the conversion to hir changes operators to use the add method when they're not primitives
+					};
+					stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.push(Var::new_u64(output));
+				},
+				Instruction::Sub => {
+					let right = stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.pop()
+						.unwrap();
+					let left = stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.pop()
+						.unwrap();
+					let output = match (left.var_info, right.var_info) {
+						(
+							VarInfo::Primitive(Primitive::U64(left)),
+							VarInfo::Primitive(Primitive::U64(right)),
+						) => left - right,
+						_ => panic!("Tried to add types that don't support it"), // This is ok now because the conversion to hir changes operators to use the add method when they're not primitives
+					};
+					stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.push(Var::new_u64(output));
+				},
+				Instruction::Mul => {
+					let right = stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.pop()
+						.unwrap();
+					let left = stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.pop()
+						.unwrap();
+					let output = match (left.var_info, right.var_info) {
+						(
+							VarInfo::Primitive(Primitive::U64(left)),
+							VarInfo::Primitive(Primitive::U64(right)),
+						) => left * right,
+						_ => panic!("Tried to add types that don't support it"), // This is ok now because the conversion to hir changes operators to use the add method when they're not primitives
+					};
+					stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.push(Var::new_u64(output));
+				},
+				Instruction::Div => {
+					let right = stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.pop()
+						.unwrap();
+					let left = stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.pop()
+						.unwrap();
+					let output = match (left.var_info, right.var_info) {
+						(
+							VarInfo::Primitive(Primitive::U64(left)),
+							VarInfo::Primitive(Primitive::U64(right)),
+						) => left / right,
+						_ => panic!("Tried to add types that don't support it"), // This is ok now because the conversion to hir changes operators to use the add method when they're not primitives
+					};
+					stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.push(Var::new_u64(output));
+				},
+				Instruction::Equal => {
+					let right = stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.pop()
+						.unwrap();
+					let left = stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.pop()
+						.unwrap();
+					let output = Var::new_bool(left == right);
+					stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.push(output);
+				},
+				Instruction::Jump(target_instr_ptr) => {
 					instr_ptr = target_instr_ptr;
 					continue;
-				}
-			},
-			Instruction::Retrieve(ref idx) => {
-				let var = stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.pop()
-					.unwrap();
-				match var.var_info {
-					VarInfo::Reference(ref reference) => {
-						if let Some(field) = reference.fields.get(*idx) {
+				},
+				Instruction::Check(target_instr_ptr) => {
+					let var = stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.pop()
+						.unwrap();
+					// If the value is false jump past the if block
+					if var.is_false() {
+						instr_ptr = target_instr_ptr;
+						continue;
+					}
+				},
+				Instruction::Retrieve(ref idx) => {
+					let var = stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.pop()
+						.unwrap();
+					match var.var_info {
+						VarInfo::Reference(ref reference) => {
+							if let Some(field) = reference.fields.get(*idx) {
+								stack
+									.last_mut()
+									.unwrap()
+									.block_frames
+									.last_mut()
+									.unwrap()
+									.operands
+									.push(field.clone());
+							}
+						},
+						_ => panic!("Field doesn't exist"),
+					}
+				},
+				Instruction::Ref(ref amt) => {
+					let mut buf = Vec::new();
+					for _ in 0..*amt {
+						buf.insert(
+							0,
 							stack
 								.last_mut()
 								.unwrap()
@@ -470,78 +514,84 @@ pub fn run_instructions(instructions: &[Instruction], debug: bool) -> Result<Var
 								.last_mut()
 								.unwrap()
 								.operands
-								.push(field.clone());
-						}
-					},
-					_ => panic!("Field doesn't exist"),
-				}
-			},
-			Instruction::Ref(ref amt) => {
-				let mut buf = Vec::new();
-				for _ in 0..*amt {
-					buf.insert(
-						0,
-						stack
+								.pop()
+								.unwrap(),
+						);
+					}
+					stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.push(Var::new_ref(Reference::new(buf)));
+				},
+				Instruction::Terminate => {
+					break;
+				},
+				Instruction::PushRoot => {
+					stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.push(Var::root());
+				},
+				Instruction::PushBool(ref val) => {
+					stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.push(Var::new_bool(*val));
+				},
+				Instruction::ExternCall(ref _lib_idx, ref symbol_idx, ref argc) => {
+					let args = {
+						let operands = &mut stack
 							.last_mut()
 							.unwrap()
 							.block_frames
 							.last_mut()
 							.unwrap()
-							.operands
-							.pop()
-							.unwrap(),
-					);
-				}
-				stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.push(Var::new_ref(Reference::new(buf)));
-			},
-			Instruction::Terminate => {
-				break;
-			},
-			Instruction::PushRoot => {
-				stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.push(Var::root());
-			},
-			Instruction::PushBool(ref val) => {
-				stack
-					.last_mut()
-					.unwrap()
-					.block_frames
-					.last_mut()
-					.unwrap()
-					.operands
-					.push(Var::new_bool(*val));
-			},
+							.operands;
+						let len = operands.len();
+						operands.split_off(len - argc)
+					};
+
+					let val = extern_fns[*symbol_idx].as_mut()(args); // TODO handle not found
+					stack
+						.last_mut()
+						.unwrap()
+						.block_frames
+						.last_mut()
+						.unwrap()
+						.operands
+						.push(val);
+				},
+			}
+
+			instr_ptr += 1;
+
+			if debug {
+				print_stack(&stack);
+			}
 		}
 
-		instr_ptr += 1;
-
-		if debug {
-			print_stack(&stack);
-		}
+		Ok(stack
+			.last_mut()
+			.unwrap()
+			.block_frames
+			.last_mut()
+			.unwrap()
+			.operands
+			.pop()
+			.unwrap())
 	}
-
-	Ok(stack
-		.last_mut()
-		.unwrap()
-		.block_frames
-		.last_mut()
-		.unwrap()
-		.operands
-		.pop()
-		.unwrap())
 }
 
 fn print_stack(stack: &[StackFrame]) {

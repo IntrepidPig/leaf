@@ -80,7 +80,7 @@ fn main() {
 	let input_file = matches.value_of_os("FILE").unwrap();
 	let output_file = matches.value_of_os("OUTPUT").unwrap();
 
-	let instructions = if input_file == "-" {
+	let lir = if input_file == "-" {
 		let mut input = String::new();
 		io::stdin().read_to_string(&mut input).unwrap();
 		leafc::leafc_str(
@@ -103,8 +103,8 @@ fn main() {
 	};
 
 	if debug {
-		leafvm::instruction::parse::print_instructions(&instructions);
+		leafvm::binary::parse::print_instructions(&lir.instructions);
 	}
 
-	leafc::codegen::output::serialize_instructions(instructions, &mut output_file).unwrap();
+	leafc::codegen::output::serialize_lir_bin(&lir, &mut output_file).unwrap();
 }

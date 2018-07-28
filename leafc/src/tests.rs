@@ -6,7 +6,7 @@ fn compile(name: &str) {
 	let mut test_path = tests_path.to_owned();
 	test_path.push_str(name);
 	test_path.push_str(".leaf");
-	let instructions = ::leafc(
+	let lir = ::leafc(
 		test_path,
 		"/usr/local/lib/leaf/libcore/core.leaf".to_owned(),
 		&[],
@@ -15,7 +15,7 @@ fn compile(name: &str) {
 	vm_test_path.push_str(name);
 	vm_test_path.push_str(".lfb");
 	let mut out_file = fs::File::create(&vm_test_path).unwrap();
-	::codegen::output::serialize_instructions(instructions, &mut out_file).unwrap();
+	::codegen::output::serialize_lir_bin(&lir, &mut out_file).unwrap();
 }
 
 #[test]
@@ -41,4 +41,9 @@ fn functions() {
 #[test]
 fn modules() {
 	compile("modules");
+}
+
+#[test]
+fn externs() {
+	compile("externs");
 }

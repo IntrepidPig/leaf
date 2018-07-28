@@ -19,6 +19,12 @@ pub struct CodeGenerator<'a> {
 	module_path: ModulePath,
 }
 
+pub struct LIR {
+	pub symbol_table: Vec<()>,
+	pub extern_table: Vec<String>,
+	pub instructions: Vec<Instruction>,
+}
+
 impl<'a> CodeGenerator<'a> {
 	pub fn new(hir: &'a HIR) -> Self {
 		CodeGenerator {
@@ -32,6 +38,19 @@ impl<'a> CodeGenerator<'a> {
 			function_locations: HashMap::new(),
 			function_jumps_todo: Vec::new(),
 			module_path: ModulePath::new(false, Vec::new()),
+		}
+	}
+
+	pub fn gen_lir(&mut self) -> LIR {
+		self.gen_instructions();
+		let mut extern_table = Vec::new();
+		for extern_fn in &self.hir.extern_table {
+			extern_table.push(extern_fn.name.to_string());
+		}
+		LIR {
+			symbol_table: Vec::new(),
+			extern_table,
+			instructions: self.instructions.clone(),
 		}
 	}
 
@@ -88,6 +107,14 @@ impl<'a> CodeGenerator<'a> {
 		for (location, name) in &self.function_jumps_todo {
 			match self.instructions[*location] {
 				Instruction::Call(ref mut target, _argc) => *target = self.function_locations[name],
+				Instruction::ExternCall(ref mut lib_idx, ref mut symbol_idx, _argc) => {
+					*lib_idx = 0; // In this binary only for now
+					*symbol_idx = self.hir
+						.extern_table
+						.iter()
+						.position(|x| x.name == *name)
+						.unwrap();
+				},
 				_ => panic!("Expected a jump to {:?} at index {}", name, location),
 			}
 		}
@@ -327,8 +354,12 @@ impl<'a> CodeGenerator<'a> {
 				let function_call_index = self.instructions.len();
 				self.function_jumps_todo
 					.push((function_call_index, call.name.clone()));
-				self.instructions
-					.push(Instruction::Call(0, call.args.len()));
+				let is_extern = self.hir.extern_table.iter().any(|x| x.name == call.name);
+				self.instructions.push(if is_extern {
+					Instruction::ExternCall(0, 0, call.args.len())
+				} else {
+					Instruction::Call(0, call.args.len())
+				});
 			},
 			ExpressionType::FieldAccess(ref expr, ref fieldname) => {
 				self.gen_from_expr(expr);
@@ -368,13 +399,5 @@ impl<'a> CodeGenerator<'a> {
 				}
 			},
 		}
-	}
-}
-
-pub struct ByteGen {}
-
-impl ByteGen {
-	pub fn gen_bytes(_instructions: &[Instruction]) {
-		unimplemented!()
 	}
 }

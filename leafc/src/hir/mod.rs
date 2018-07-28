@@ -19,6 +19,17 @@ pub struct FunctionDefinition {
 	pub body: Expression,
 }
 
+/// An extern function definition
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExternDefinition {
+	/// The name of the function
+	pub name: PathItem<Identifier>,
+	/// The named arguments of the function
+	pub args: Vec<(Identifier, PathItem<TypeName>)>,
+	/// The return type of the function
+	pub return_type: PathItem<TypeName>,
+}
+
 /// A function call (not a method call)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionCall {
@@ -303,6 +314,8 @@ impl Module {
 /// using the associated methods of the types.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HIR {
+	pub extern_table: Vec<ExternDefinition>,
+	// TODO make this one module
 	pub modules: Vec<Module>,
 }
 
@@ -319,6 +332,7 @@ pub struct HIRGenerator {
 	// Is currently implemented as a stack to allow for nested function definitions, but that isn't
 	// supported by the parser yet.
 	bindings_stack: Vec<HashMap<Identifier, PathItem<TypeName>>>,
+	// The in progress of being build extern table
 }
 
 impl HIRGenerator {
@@ -342,14 +356,35 @@ impl HIRGenerator {
 		// as the root.
 		self.resolve_paths(&mut root_module, &mut ModulePath::new(false, Vec::new()));
 
+		let extern_table = self.gen_extern_table(&root_module);
+
+		let root_module =
+			self.ast_module_to_hir_module(&root_module, &mut ModulePath::new(false, Vec::new()));
+
 		HIR {
-			modules: vec![
-				self.ast_module_to_hir_module(
-					&root_module,
-					&mut ModulePath::new(false, Vec::new()),
-				),
-			],
+			extern_table,
+			modules: vec![root_module],
 		}
+	}
+
+	pub fn gen_extern_table(&self, module: &parser::Module) -> Vec<ExternDefinition> {
+		let mut externs = Vec::new();
+		module.traverse(
+			&mut |module_path: &ModulePath, module: &parser::Module| {
+				for extern_fn in &module.body.extern_fns {
+					externs.push(ExternDefinition {
+						name: PathItem {
+							module_path: module_path.clone(),
+							item: extern_fn.name.clone(),
+						},
+						args: extern_fn.args.clone(),
+						return_type: extern_fn.return_type.clone().unwrap_or_else(PathItem::root),
+					})
+				}
+			},
+			&mut ModulePath::new(false, Vec::new()),
+		);
+		externs
 	}
 
 	/// Resolve all paths in a module to absolute paths with this module as a root.
@@ -382,6 +417,7 @@ impl HIRGenerator {
 			&mut |current_path: &ModulePath, module: &mut parser::Module| {
 				let types = &mut module.body.types;
 				let functions = &mut module.body.functions;
+				let extern_fns = &mut module.body.extern_fns;
 				let uses = &module.body.uses;
 
 				// Resolve all the paths in each function of this module
@@ -431,6 +467,25 @@ impl HIRGenerator {
 						member_type.module_path = arg_type_name.module_path;
 					}
 				}
+
+				for extern_fn in extern_fns {
+					// Resolve the types of the arguments of the function
+					for (_arg_name, arg_type) in &mut extern_fn.args {
+						let mut arg_type_name =
+							arg_type.clone().map(|arg_type_name| arg_type_name.name);
+						resolve_path(&current_path, uses, &mut arg_type_name);
+						arg_type.module_path = arg_type_name.module_path;
+					}
+
+					// Resolve the return type of the function
+
+					if let Some(return_type) = extern_fn.return_type.as_mut() {
+						let mut arg_type_name =
+							return_type.clone().map(|arg_type_name| arg_type_name.name);
+						resolve_path(&current_path, uses, &mut arg_type_name);
+						return_type.module_path = arg_type_name.module_path;
+					};
+				}
 			},
 			module_path,
 		);
@@ -470,6 +525,21 @@ impl HIRGenerator {
 							}
 						},
 						function
+							.return_type
+							.clone()
+							.unwrap_or_else(PathItem::<TypeName>::root),
+					);
+				}
+
+				for extern_fn in &module.body.extern_fns {
+					self.function_defs_returns.insert(
+						{
+							PathItem {
+								module_path: current_path.clone(),
+								item: extern_fn.name.clone(),
+							}
+						},
+						extern_fn
 							.return_type
 							.clone()
 							.unwrap_or_else(PathItem::<TypeName>::root),

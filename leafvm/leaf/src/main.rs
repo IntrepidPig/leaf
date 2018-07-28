@@ -52,17 +52,18 @@ fn main() {
 		.apply()
 		.expect("Failed to initialize logger");
 
-	let instruction_input: Box<Read> = if input_file == "-" {
+	let bin_input: Box<Read> = if input_file == "-" {
 		Box::new(io::stdin())
 	} else {
 		Box::new(fs::File::open(input_file).unwrap())
 	};
 
-	let instructions = leafvm::instruction::parse::read_instructions(instruction_input).unwrap();
+	let bin = leafvm::binary::parse::read_binary(bin_input).unwrap();
 
 	if debug {
-		leafvm::instruction::parse::print_instructions(&instructions);
+		leafvm::binary::parse::print_instructions(&bin.instructions);
 	}
 
-	leafvm::vm::run_instructions(&instructions, debug).unwrap();
+	let mut vm = leafvm::vm::VM::new(bin, std::collections::HashMap::new());
+	vm.run(debug).unwrap();
 }

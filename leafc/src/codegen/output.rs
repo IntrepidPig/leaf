@@ -1,6 +1,31 @@
 use std::io::{self, Write};
 
+use codegen::vmgen::LIR;
+
 use leafvm::instruction::Instruction;
+
+pub fn serialize_lir_bin<W: Write>(lir: &LIR, mut output: W) -> io::Result<()> {
+	// Link table
+	write_val(&0u8, &mut output)?;
+	// Extern table
+	let mut extern_table: Vec<u8> = Vec::new();
+	serialize_externs(&lir.extern_table, &mut extern_table)?;
+	write_val(&extern_table, &mut output)?;
+	// Instruction table
+	let mut instruction_table: Vec<u8> = Vec::new();
+	serialize_instructions(lir.instructions.clone(), &mut instruction_table)?;
+	write_val(&instruction_table, &mut output)?;
+
+	Ok(())
+}
+
+pub fn serialize_externs<W: Write>(externs: &[String], mut output: W) -> io::Result<()> {
+	for extern_item in externs {
+		write_val(extern_item, &mut output)?;
+	}
+
+	Ok(())
+}
 
 pub fn serialize_instructions<W: Write>(
 	instructions: Vec<Instruction>,
@@ -58,6 +83,12 @@ pub fn serialize_instructions<W: Write>(
 				write_val(&23u8, &mut output)?;
 				write_val(&val, &mut output)?;
 			},
+			Instruction::ExternCall(lib_idx, symbol_idx, argc) => {
+				write_val(&24u8, &mut output)?;
+				write_val(&lib_idx, &mut output)?;
+				write_val(&symbol_idx, &mut output)?;
+				write_val(&argc, &mut output)?;
+			},
 		}
 	}
 	write_val(&0u8, &mut output)?;
@@ -114,5 +145,17 @@ impl ToBytesLe for usize {
 impl ToBytesLe for bool {
 	fn to_bytes_le(&self) -> Vec<u8> {
 		vec![*self as u8]
+	}
+}
+
+impl ToBytesLe for String {
+	fn to_bytes_le(&self) -> Vec<u8> {
+		self.as_bytes().to_vec()
+	}
+}
+
+impl ToBytesLe for Vec<u8> {
+	fn to_bytes_le(&self) -> Vec<u8> {
+		self.clone()
 	}
 }

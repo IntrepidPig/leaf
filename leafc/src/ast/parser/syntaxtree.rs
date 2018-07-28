@@ -113,6 +113,20 @@ mod structures {
 		}
 	}
 
+	impl ::std::fmt::Display for PathItem<Identifier> {
+		fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+			if !self.module_path.relative {
+				write!(f, "::")?;
+			}
+			for module in &self.module_path.path {
+				write!(f, "{}::", module.name)?;
+			}
+			write!(f, "{}", self.item.name)?;
+
+			Ok(())
+		}
+	}
+
 	impl Module {
 		pub fn new(body: SyntaxTree) -> Self {
 			Module { body }
@@ -139,7 +153,7 @@ mod structures {
 		pub extern_fns: Vec<ExternFunction>,
 		pub modules: Vec<(Identifier, Module)>,
 	}
-	
+
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub struct ExternFunction {
 		pub name: Identifier,

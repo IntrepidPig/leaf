@@ -1,5 +1,6 @@
 use std::io::{self, Read};
 use instruction::Instruction;
+use binary::Binary;
 
 pub fn read_item<R: Read>(mut input: R) -> io::Result<Vec<u8>> {
 	let mut len = [0u8; 1];
@@ -73,12 +74,38 @@ pub fn read_instructions<R: Read>(mut raw: R) -> io::Result<Vec<Instruction>> {
 			21 => Instruction::Terminate,
 			22 => Instruction::PushRoot,
 			23 => Instruction::PushBool(next_usize(&mut raw)? != 0),
-			24 => Instruction::ExternCall(next_usize(&mut raw)?, next_usize(&mut raw)?, next_usize(&mut raw)?)
+			24 => Instruction::ExternCall(
+				next_usize(&mut raw)?,
+				next_usize(&mut raw)?,
+				next_usize(&mut raw)?,
+			),
 			_ => panic!("Unknown opcode {}", opcode),
 		};
 		instructions.push(instruction);
 	}
 	Ok(instructions)
+}
+
+pub fn read_externs<R: Read>(mut raw: R) -> io::Result<Vec<String>> {
+	let mut externs = Vec::new();
+	while let Ok(item) = read_item(&mut raw) {
+		externs.push(String::from_utf8(item).unwrap())
+	}
+	Ok(externs)
+}
+
+pub fn read_binary<R: Read>(mut raw: R) -> io::Result<Binary> {
+	let _symbol_table = read_item(&mut raw)?;
+	let extern_table = read_item(&mut raw)?;
+	let externs = read_externs(extern_table.as_slice())?;
+	let instruction_table = read_item(&mut raw)?;
+	let instructions = read_instructions(instruction_table.as_slice())?;
+
+	Ok(Binary {
+		symbol_table: Vec::new(),
+		extern_table: externs,
+		instructions,
+	})
 }
 
 pub fn print_instructions(instructions: &[Instruction]) {
@@ -88,6 +115,15 @@ pub fn print_instructions(instructions: &[Instruction]) {
 		for _ in 0..max_length - i_str.len() {
 			eprint!(" ");
 		}
-		eprint!("{}: {:?}", i_str, instr);
+		eprint!("{}: {:?}\n", i_str, instr);
 	}
+}
+
+pub fn print_bin(bin: &Binary) {
+	eprintln!("External Functions:\n-------------------");
+	for extern_fn in &bin.extern_table {
+		eprintln!("{}", extern_fn);
+	}
+	eprintln!("Instructions:\n-------------");
+	print_instructions(&bin.instructions);
 }

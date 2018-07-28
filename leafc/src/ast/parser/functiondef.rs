@@ -71,7 +71,7 @@ pub fn take_functiondef(in_tokens: &[TokenTree]) -> ParseResult<Function> {
 
 pub fn take_externfn(in_tokens: &[TokenTree]) -> ParseResult<ExternFunction> {
 	let mut tokens = in_tokens;
-	
+
 	match tokens.get(0) {
 		Some(TokenTree::Token(Token::Keyword(Keyword::Extern))) => {
 			tokens = &tokens[1..];

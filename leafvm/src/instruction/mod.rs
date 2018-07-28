@@ -1,5 +1,3 @@
-pub mod parse;
-
 /// An instruction/opcode for the vm
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Instruction {
@@ -49,4 +47,9 @@ pub enum Instruction {
 	PushRoot,
 	/// Push a boolean onto the operand stack
 	PushBool(bool),
+	/// Call an external function at the specified index of the symbol table with specified amount of arguments
+	/// The first is the index of the library in the library table. 0 will be the root
+	/// The second is the index of the symbol in the library's symbol table
+	/// The third is the amount of arguments to pass to the function
+	ExternCall(usize, usize, usize),
 }
