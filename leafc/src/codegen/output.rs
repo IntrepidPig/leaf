@@ -95,14 +95,14 @@ pub fn serialize_instructions<W: Write>(
 	Ok(())
 }
 
-fn write_val<T: ToBytesLe, W: Write>(val: &T, mut out: W) -> io::Result<()> {
+fn write_val<T: ToBytesLe, W: Write>(val: &T, out: &mut W) -> io::Result<()> {
 	let bytes = val.to_bytes_le();
 	let size = bytes.len();
 	if size < 255 {
 		out.write_all(&[size as u8])?;
 	} else {
 		out.write_all(&[255u8])?;
-		out.write_all(&size.to_bytes_le())?;
+		write_val(&size, out)?;
 	}
 
 	out.write_all(&bytes)?;
@@ -138,6 +138,15 @@ impl ToBytesLe for usize {
 		for i in 0..size {
 			buf.push(((*self >> (i * 8)) & 0xffusize) as u8);
 		}
+		// Cut off exmpty bytes at the end of usize for space effieciency
+		let mut size = 0;
+		for (i, item) in buf.iter().enumerate() {
+			if *item > 0 {
+				size = i;
+			}
+		}
+		size += 1;
+		buf.split_off(::std::cmp::max(size, 1));
 		buf
 	}
 }

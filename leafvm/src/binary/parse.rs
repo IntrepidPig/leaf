@@ -2,19 +2,17 @@ use std::io::{self, Read};
 use instruction::Instruction;
 use binary::Binary;
 
-pub fn read_item<R: Read>(mut input: R) -> io::Result<Vec<u8>> {
+pub fn read_item(input: &mut Read) -> io::Result<Vec<u8>> {
 	let mut len = [0u8; 1];
 	input.read_exact(&mut len)?;
 	let len = len[0];
-	let len: u64 = if len == 255 {
-		let mut long_len = [0u8; 8];
-		input.read_exact(&mut long_len)?;
-		u8s_to_u64_le(&long_len)
+	let len: usize = if len == 255 {
+		next_usize(&mut *input)?
 	} else {
-		u64::from(len)
+		usize::from(len)
 	};
 	let mut buf: Vec<u8> = Vec::with_capacity(len as usize);
-	let mut handle = input.take(len);
+	let mut handle = input.take(len as u64);
 	handle.read_to_end(&mut buf)?;
 	Ok(buf)
 }
@@ -30,6 +28,14 @@ fn u8s_to_u64_le(input: &[u8]) -> u64 {
 	val
 }
 
+fn next_bool<R: Read>(mut input: R) -> io::Result<bool> {
+	let num_bytes = read_item(&mut input)?;
+	if num_bytes.len() != 1 {
+		panic!("Got an item that wasn't a boolean")
+	}
+	Ok(num_bytes[0] != 0)
+}
+
 fn next_u64<R: Read>(mut input: R) -> io::Result<u64> {
 	let num_bytes = read_item(&mut input)?;
 	let num = u8s_to_u64_le(&num_bytes);
@@ -38,7 +44,7 @@ fn next_u64<R: Read>(mut input: R) -> io::Result<u64> {
 
 fn next_usize<R: Read>(mut input: R) -> io::Result<usize> {
 	let num_bytes = read_item(&mut input)?;
-	if num_bytes.len() > ::std::mem::size_of::<usize>() || num_bytes.len() > 8 {
+	if num_bytes.len() > ::std::mem::size_of::<usize>() {
 		panic!("Tried to load a pointer that was larger than this systems address size")
 	}
 	let num = u8s_to_u64_le(&num_bytes);
@@ -73,7 +79,7 @@ pub fn read_instructions<R: Read>(mut raw: R) -> io::Result<Vec<Instruction>> {
 			20 => Instruction::Ref(next_usize(&mut raw)?),
 			21 => Instruction::Terminate,
 			22 => Instruction::PushRoot,
-			23 => Instruction::PushBool(next_usize(&mut raw)? != 0),
+			23 => Instruction::PushBool(next_bool(&mut raw)?),
 			24 => Instruction::ExternCall(
 				next_usize(&mut raw)?,
 				next_usize(&mut raw)?,
