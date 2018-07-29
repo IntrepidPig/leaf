@@ -67,7 +67,7 @@ fn main() {
 		})
 		.chain(std::io::stderr())
 		.apply()
-		.expect("Failed to initialize logger");
+		.unwrap_or_else(|e| eprintln!("Failed to initialize the logger.\n{}", e));
 
 	let includes: Vec<&Path> = if let Some(includes) = matches.values_of_os("includes") {
 		includes
@@ -80,31 +80,54 @@ fn main() {
 	let input_file = matches.value_of_os("FILE").unwrap();
 	let output_file = matches.value_of_os("OUTPUT").unwrap();
 
-	let lir = if input_file == "-" {
+	let lir_result = if input_file == "-" {
 		let mut input = String::new();
 		io::stdin().read_to_string(&mut input).unwrap();
 		leafc::leafc_str(
 			&input,
 			Path::new("/usr/local/lib/leaf/libcore/core.leaf"),
 			&includes,
-		).unwrap()
+		)
 	} else {
 		leafc::leafc(
 			Path::new(input_file),
 			Path::new("/usr/local/lib/leaf/libcore/core.leaf"),
 			&includes,
-		).unwrap()
+		)
+	};
+
+	let lir = match lir_result {
+		Ok(lir) => lir,
+		Err(e) => {
+			eprintln!("Errors occurred during compilation.\n{}", e);
+			std::process::exit(1);
+		},
 	};
 
 	let mut output_file: Box<Write> = if output_file == "-" {
 		Box::new(io::stdout())
 	} else {
-		Box::new(fs::File::create(output_file).unwrap())
+		match fs::File::create(output_file) {
+			Ok(f) => Box::new(f),
+			Err(e) => {
+				eprintln!("Failed to open the output file for writing.\n{}", e);
+				std::process::exit(2);
+			},
+		}
 	};
 
 	if debug {
 		leafvm::binary::parse::print_instructions(&lir.instructions);
 	}
 
-	leafc::codegen::output::serialize_lir_bin(&lir, &mut output_file).unwrap();
+	match leafc::codegen::output::serialize_lir_bin(&lir, &mut output_file) {
+		Ok(_) => {},
+		Err(e) => {
+			eprintln!(
+				"An error occurred while writing the compiled output to a file.\n{}",
+				e
+			);
+			std::process::exit(3);
+		},
+	};
 }

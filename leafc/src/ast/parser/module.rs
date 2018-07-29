@@ -15,12 +15,12 @@ pub fn take_module(in_tokens: &[TokenTree]) -> ParseResult<(Identifier, Module)>
 			tokens = &tokens[1..];
 			Identifier::try_from_str(name)
 		},
-		_ => return Err(ParseError::Other.into()), // Module was not given a name
+		_ => return Err(ParseError::Expected(vec![Expected::Identifier]).into()), // Module was not given a name
 	};
 
 	let body = match tokens.get(0) {
 		Some(TokenTree::Brace(ref mod_tokens)) => parse(mod_tokens)?,
-		_ => return Err(ParseError::Other.into()), // needed a a block of code after module
+		_ => return Err(ParseError::Expected(vec![Expected::Block]).into()), // needed a a block of code after module
 	};
 
 	tokens = &tokens[1..];

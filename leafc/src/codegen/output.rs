@@ -27,10 +27,7 @@ pub fn serialize_externs<W: Write>(externs: &[String], mut output: W) -> io::Res
 	Ok(())
 }
 
-pub fn serialize_instructions<W: Write>(
-	instructions: Vec<Instruction>,
-	mut output: W,
-) -> io::Result<()> {
+pub fn serialize_instructions<W: Write>(instructions: Vec<Instruction>, mut output: W) -> io::Result<()> {
 	for instruction in instructions {
 		match instruction {
 			Instruction::Call(ptr, argc) => {

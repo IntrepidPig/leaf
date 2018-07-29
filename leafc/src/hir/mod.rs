@@ -2,8 +2,7 @@
 //! generate HIR from an AST.
 
 use std::collections::HashMap;
-use ast::parser::{self, BinaryOp, Identifier, ModulePath, PathItem, PostfixOp, PrefixOp,
-                  SyntaxTree, TypeName};
+use ast::parser::{self, BinaryOp, Identifier, ModulePath, PathItem, PostfixOp, PrefixOp, SyntaxTree, TypeName};
 
 /// A function definition
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -283,11 +282,7 @@ pub struct Module {
 impl Module {
 	/// Traverse this module and the modules within it mutably. Performs `f` on each module including
 	/// the current one.
-	pub fn traverse_mut<F: FnMut(&ModulePath, &mut Module)>(
-		&mut self,
-		f: &mut F,
-		start_path: &mut ModulePath,
-	) {
+	pub fn traverse_mut<F: FnMut(&ModulePath, &mut Module)>(&mut self, f: &mut F, start_path: &mut ModulePath) {
 		f(start_path, self);
 		for (name, module) in &mut self.modules {
 			start_path.path.push(name.clone());
@@ -358,8 +353,7 @@ impl HIRGenerator {
 
 		let extern_table = self.gen_extern_table(&root_module);
 
-		let root_module =
-			self.ast_module_to_hir_module(&root_module, &mut ModulePath::new(false, Vec::new()));
+		let root_module = self.ast_module_to_hir_module(&root_module, &mut ModulePath::new(false, Vec::new()));
 
 		HIR {
 			extern_table,
@@ -392,11 +386,7 @@ impl HIRGenerator {
 		// Only does anything if `to_resolve` isn't already relative.
 		// If to_resolve is in the uses, change it to that. If not, then it must be declared in this module so
 		// append it's path to the current module path.
-		fn resolve_path<T: Eq + Clone>(
-			current: &ModulePath,
-			uses: &[PathItem<T>],
-			to_resolve: &mut PathItem<T>,
-		) {
+		fn resolve_path<T: Eq + Clone>(current: &ModulePath, uses: &[PathItem<T>], to_resolve: &mut PathItem<T>) {
 			if to_resolve.module_path.relative {
 				for u in uses {
 					if u.item == to_resolve.item {
@@ -424,8 +414,7 @@ impl HIRGenerator {
 				for function in functions {
 					// Resolve the types of the arguments of the function
 					for (_arg_name, arg_type) in &mut function.args {
-						let mut arg_type_name =
-							arg_type.clone().map(|arg_type_name| arg_type_name.name);
+						let mut arg_type_name = arg_type.clone().map(|arg_type_name| arg_type_name.name);
 						resolve_path(&current_path, uses, &mut arg_type_name);
 						arg_type.module_path = arg_type_name.module_path;
 					}
@@ -433,8 +422,7 @@ impl HIRGenerator {
 					// Resolve the return type of the function
 
 					if let Some(return_type) = function.return_type.as_mut() {
-						let mut arg_type_name =
-							return_type.clone().map(|arg_type_name| arg_type_name.name);
+						let mut arg_type_name = return_type.clone().map(|arg_type_name| arg_type_name.name);
 						resolve_path(&current_path, uses, &mut arg_type_name);
 						return_type.module_path = arg_type_name.module_path;
 					};
@@ -442,27 +430,23 @@ impl HIRGenerator {
 					// Resolve all of the function calls and instantiations in this function
 					function
 						.body
-						.traverse_expressions_mut(
-							&mut |expr: &mut parser::Expression| match expr {
-								parser::Expression::Instantiation(ref mut name, _) => {
-									let mut arg_type_name =
-										name.clone().map(|arg_type_name| arg_type_name.name);
-									resolve_path(&current_path, uses, &mut arg_type_name);
-									name.module_path = arg_type_name.module_path;
-								},
-								parser::Expression::FunctionCall { ref mut name, .. } => {
-									resolve_path(&current_path, uses, name);
-								},
-								_ => {},
+						.traverse_expressions_mut(&mut |expr: &mut parser::Expression| match expr {
+							parser::Expression::Instantiation(ref mut name, _) => {
+								let mut arg_type_name = name.clone().map(|arg_type_name| arg_type_name.name);
+								resolve_path(&current_path, uses, &mut arg_type_name);
+								name.module_path = arg_type_name.module_path;
 							},
-						);
+							parser::Expression::FunctionCall { ref mut name, .. } => {
+								resolve_path(&current_path, uses, name);
+							},
+							_ => {},
+						});
 				}
 
 				// Resolve all of the types of fields in each type definition of this module
 				for typedef in types {
 					for (_member_name, member_type) in &mut typedef.members {
-						let mut arg_type_name =
-							member_type.clone().map(|arg_type_name| arg_type_name.name);
+						let mut arg_type_name = member_type.clone().map(|arg_type_name| arg_type_name.name);
 						resolve_path(&current_path, uses, &mut arg_type_name);
 						member_type.module_path = arg_type_name.module_path;
 					}
@@ -471,8 +455,7 @@ impl HIRGenerator {
 				for extern_fn in extern_fns {
 					// Resolve the types of the arguments of the function
 					for (_arg_name, arg_type) in &mut extern_fn.args {
-						let mut arg_type_name =
-							arg_type.clone().map(|arg_type_name| arg_type_name.name);
+						let mut arg_type_name = arg_type.clone().map(|arg_type_name| arg_type_name.name);
 						resolve_path(&current_path, uses, &mut arg_type_name);
 						arg_type.module_path = arg_type_name.module_path;
 					}
@@ -480,8 +463,7 @@ impl HIRGenerator {
 					// Resolve the return type of the function
 
 					if let Some(return_type) = extern_fn.return_type.as_mut() {
-						let mut arg_type_name =
-							return_type.clone().map(|arg_type_name| arg_type_name.name);
+						let mut arg_type_name = return_type.clone().map(|arg_type_name| arg_type_name.name);
 						resolve_path(&current_path, uses, &mut arg_type_name);
 						return_type.module_path = arg_type_name.module_path;
 					};
@@ -493,11 +475,7 @@ impl HIRGenerator {
 
 	/// Convert an AST module to an HIR module. Assumes all paths are resolved as absolute, and will fail
 	/// if they aren't.
-	pub fn ast_module_to_hir_module(
-		&mut self,
-		module: &parser::Module,
-		module_path: &mut ModulePath,
-	) -> Module {
+	pub fn ast_module_to_hir_module(&mut self, module: &parser::Module, module_path: &mut ModulePath) -> Module {
 		// Add all type definitions to the global list of type definitions with it's full path
 		// Add all functions to the global list of function return types with it's full path
 		module.traverse(
@@ -689,37 +667,27 @@ impl HIRGenerator {
 				right: self.ast_expr_to_hir_expr(right),
 				op: *op,
 			})),
-			parser::Expression::Postfix { left, op } => {
-				ExpressionType::Postfix(Box::new(Postfix {
-					left: self.ast_expr_to_hir_expr(left),
-					op: *op,
-				}))
-			},
-			parser::Expression::FunctionCall { name, args } => {
-				ExpressionType::FunctionCall(FunctionCall {
-					name: name.clone(),
-					args: args.iter()
-						.map(|arg| self.ast_expr_to_hir_expr(arg))
-						.collect(),
-				})
-			},
-			parser::Expression::Debug(ref expr) => {
-				ExpressionType::Debug(Box::new(self.ast_expr_to_hir_expr(expr)))
-			},
+			parser::Expression::Postfix { left, op } => ExpressionType::Postfix(Box::new(Postfix {
+				left: self.ast_expr_to_hir_expr(left),
+				op: *op,
+			})),
+			parser::Expression::FunctionCall { name, args } => ExpressionType::FunctionCall(FunctionCall {
+				name: name.clone(),
+				args: args.iter()
+					.map(|arg| self.ast_expr_to_hir_expr(arg))
+					.collect(),
+			}),
+			parser::Expression::Debug(ref expr) => ExpressionType::Debug(Box::new(self.ast_expr_to_hir_expr(expr))),
 			parser::Expression::Break(ref expr_opt) => ExpressionType::Break(
 				expr_opt
 					.as_ref()
 					.map(|expr| Box::new(self.ast_expr_to_hir_expr(expr.as_ref()))),
 			),
-			parser::Expression::Assign(ref assignment) => {
-				ExpressionType::Assignment(Box::new(Assignment {
-					ident: assignment.ident.clone(),
-					expr: self.ast_expr_to_hir_expr(&assignment.expr),
-				}))
-			},
-			parser::Expression::Loop(ref expr) => {
-				ExpressionType::Loop(Box::new(self.ast_expr_to_hir_expr(expr)))
-			},
+			parser::Expression::Assign(ref assignment) => ExpressionType::Assignment(Box::new(Assignment {
+				ident: assignment.ident.clone(),
+				expr: self.ast_expr_to_hir_expr(&assignment.expr),
+			})),
+			parser::Expression::Loop(ref expr) => ExpressionType::Loop(Box::new(self.ast_expr_to_hir_expr(expr))),
 			parser::Expression::If(ref if_expr) => ExpressionType::If(Box::new(If {
 				condition: self.ast_expr_to_hir_expr(&if_expr.condition),
 				body: self.ast_expr_to_hir_expr(&if_expr.body),
@@ -729,23 +697,18 @@ impl HIRGenerator {
 					.as_ref()
 					.map(|expr| self.ast_expr_to_hir_expr(expr)),
 			})),
-			parser::Expression::StringLiteral(ref string) => {
-				ExpressionType::StringLiteral(string.clone())
-			},
+			parser::Expression::StringLiteral(ref string) => ExpressionType::StringLiteral(string.clone()),
 			parser::Expression::BoolLiteral(ref b) => ExpressionType::BoolLiteral(*b),
-			parser::Expression::Instantiation(ref name, ref fields) => {
-				ExpressionType::Instantiation(Instantiation {
-					typename: name.clone(),
-					fields: fields
-						.iter()
-						.map(|field| (field.0.clone(), self.ast_expr_to_hir_expr(&field.1)))
-						.collect(),
-				})
+			parser::Expression::Instantiation(ref name, ref fields) => ExpressionType::Instantiation(Instantiation {
+				typename: name.clone(),
+				fields: fields
+					.iter()
+					.map(|field| (field.0.clone(), self.ast_expr_to_hir_expr(&field.1)))
+					.collect(),
+			}),
+			parser::Expression::FieldAccess(ref base, ref field) => {
+				ExpressionType::FieldAccess(Box::new(self.ast_expr_to_hir_expr(base)), field.clone())
 			},
-			parser::Expression::FieldAccess(ref base, ref field) => ExpressionType::FieldAccess(
-				Box::new(self.ast_expr_to_hir_expr(base)),
-				field.clone(),
-			),
 		}
 	}
 
@@ -786,9 +749,7 @@ impl HIRGenerator {
 				.map(|expr| expr.expr_out)
 				.unwrap_or_else(PathItem::<TypeName>::root),
 			ExpressionType::Debug(_) => PathItem::<TypeName>::root(),
-			ExpressionType::FunctionCall(ref call) => {
-				self.function_defs_returns.get(&call.name).cloned().unwrap()
-			},
+			ExpressionType::FunctionCall(ref call) => self.function_defs_returns.get(&call.name).cloned().unwrap(),
 			ExpressionType::Loop(ref expr) => {
 				let mut break_type: Option<PathItem<TypeName>> = None;
 				expr.traverse(&mut |test_expr: &Expression| {
@@ -932,10 +893,8 @@ impl Expression {
 			ExpressionType::FieldAccess(ref base, _) => {
 				base.traverse(f);
 			},
-			ExpressionType::Instantiation(ref instantiation) => {
-				for (_, expr) in &instantiation.fields {
-					expr.traverse(f);
-				}
+			ExpressionType::Instantiation(ref instantiation) => for (_, expr) in &instantiation.fields {
+				expr.traverse(f);
 			},
 		}
 	}

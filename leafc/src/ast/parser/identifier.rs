@@ -12,11 +12,7 @@ impl IdentifierTaker {
 impl ExpressionTaker for IdentifierTaker {
 	type Args = ();
 
-	fn take_expression<'a>(
-		&self,
-		in_tokens: &'a [TokenTree],
-		_args: Self::Args,
-	) -> ParseResult<'a, Expression> {
+	fn take_expression<'a>(&self, in_tokens: &'a [TokenTree], _args: Self::Args) -> ParseResult<'a, Expression> {
 		Ok(Some((
 			match in_tokens.get(0) {
 				Some(TokenTree::Token(Token::Name(ref name))) => {

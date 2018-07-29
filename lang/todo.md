@@ -7,3 +7,4 @@
 - Compile error messages
 - Generics
 - Polymorphism
+- Add tests for compile errors

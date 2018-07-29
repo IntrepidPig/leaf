@@ -230,10 +230,7 @@ fn treeify_loops(in_tokens: &[TokenTree]) -> Result<Vec<TokenTree>, Error<Treeif
 	Ok(tokens)
 }
 
-fn get_sub<T, F: FnMut(&T) -> i32>(
-	in_tokens: &[T],
-	mut predicate: F,
-) -> Result<(&[T], &[T]), Error<TreeifyError>> {
+fn get_sub<T, F: FnMut(&T) -> i32>(in_tokens: &[T], mut predicate: F) -> Result<(&[T], &[T]), Error<TreeifyError>> {
 	let mut count = 0;
 	for (i, token) in in_tokens.iter().enumerate() {
 		count += predicate(token);

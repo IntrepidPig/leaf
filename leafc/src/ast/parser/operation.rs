@@ -16,11 +16,7 @@ impl ExpressionTaker for OperationTaker {
 	// The end of the expression predicate
 	type Args = Box<FnMut(&TokenTree) -> bool>;
 
-	fn take_expression<'a>(
-		&self,
-		tokens: &'a [TokenTree],
-		args: Self::Args,
-	) -> ParseResult<'a, Expression> {
+	fn take_expression<'a>(&self, tokens: &'a [TokenTree], args: Self::Args) -> ParseResult<'a, Expression> {
 		if tokens.is_empty() {
 			return Ok(None);
 		}
@@ -80,9 +76,7 @@ mod parse {
 		// Separate operators from operands and put them in expr_items
 		'outer: while !tokens.is_empty() {
 			for item_taker in item_takers {
-				if let Some((item, next_item_takers, leftover_tokens)) =
-					item_taker.next_item(tokens)?
-				{
+				if let Some((item, next_item_takers, leftover_tokens)) = item_taker.next_item(tokens)? {
 					expr_items.push(item);
 					item_takers = next_item_takers;
 					tokens = leftover_tokens;
@@ -90,7 +84,7 @@ mod parse {
 				}
 			}
 
-			return Err(ParseError::Other.into());
+			return Err(ParseError::UnexpectedToken.into());
 		}
 
 		// Simplifies the list of expression items into a single expression. Works recursively, step by step, with a lot of
@@ -99,14 +93,14 @@ mod parse {
 		fn simplify(items: &[ExpressionItem]) -> Result<Expression, Error<ParseError>> {
 			if items.is_empty() {
 				// A previous iteration returned something bad
-				return Err(ParseError::Other.into());
+				panic!("An operand was empty")
 			}
 
 			// If there's only one item left it should be an expression and not an operator
 			if items.len() == 1 {
 				match items[0] {
 					ExpressionItem::Operand(ref expr) => return Ok(expr.clone()),
-					ExpressionItem::Operator(_) => return Err(ParseError::Other.into()), // The expression parsed into an operator
+					ExpressionItem::Operator(_) => return Err(ParseError::Expected(vec![Expected::Expression]).into()), // The expression parsed into an operator
 				}
 			}
 
@@ -118,9 +112,7 @@ mod parse {
 
 			for (i, item) in items.iter().enumerate() {
 				if let ExpressionItem::Operator(op) = item {
-					if (op.precedence() < priority)
-						|| (op.left_associative() && op.precedence() == priority)
-					{
+					if (op.precedence() < priority) || (op.left_associative() && op.precedence() == priority) {
 						priority = op.precedence();
 						priority_op = i;
 					}
@@ -129,63 +121,65 @@ mod parse {
 
 			// Recursively call simplify on each side of an operator that will have an expression
 			match items[priority_op] {
-				ExpressionItem::Operator(op) => match op {
-					Operator::Binary(binop) => {
-						// Simplify the tokens to the left and to the right of the binary operation
-						let lhs = &items[..priority_op];
-						let rhs = &items[priority_op + 1..];
-						let lhs = simplify(lhs)?;
-						let rhs = simplify(rhs)?;
-						match binop {
-							// Assign is a special case that returns a special expression, not a binary operation
-							// and requires the lhs to be an identifier
-							BinaryOp::Assign => {
-								match lhs {
-									Expression::Identifier(ref ident) => {
-										Ok(Expression::Assign(Box::new(Assignment {
-											ident: ident.to_owned(),
-											expr: rhs,
-										})))
-									},
-									_ => Err(ParseError::Other.into()), // The left hand side wasn't an identifier
-								}
-							},
-							BinaryOp::Dot => {
-								match rhs {
-									Expression::Identifier(ref ident) => {
-										Ok(Expression::FieldAccess(Box::new(lhs), ident.clone()))
-									},
-									_ => Err(ParseError::Other.into()), // Right hand side wasn't an identifier
-								}
-							},
-							binop => Ok(Expression::Binary {
-								left: Box::new(lhs),
+				ExpressionItem::Operator(op) => {
+					match op {
+						Operator::Binary(binop) => {
+							// Simplify the tokens to the left and to the right of the binary operation
+							let lhs = &items[..priority_op];
+							let rhs = &items[priority_op + 1..];
+							let lhs = simplify(lhs)?;
+							let rhs = simplify(rhs)?;
+							match binop {
+								// Assign is a special case that returns a special expression, not a binary operation
+								// and requires the lhs to be an identifier
+								BinaryOp::Assign => {
+									match lhs {
+										Expression::Identifier(ref ident) => {
+											Ok(Expression::Assign(Box::new(Assignment {
+												ident: ident.to_owned(),
+												expr: rhs,
+											})))
+										},
+										_ => Err(ParseError::Expected(vec![Expected::Identifier]).into()), // The left hand side wasn't an identifier
+									}
+								},
+								BinaryOp::Dot => {
+									match rhs {
+										Expression::Identifier(ref ident) => {
+											Ok(Expression::FieldAccess(Box::new(lhs), ident.clone()))
+										},
+										_ => Err(ParseError::Expected(vec![Expected::Identifier]).into()), // Right hand side wasn't an identifier
+									}
+								},
+								binop => Ok(Expression::Binary {
+									left: Box::new(lhs),
+									right: Box::new(rhs),
+									op: binop,
+								}),
+							}
+						},
+						Operator::Prefix(preop) => {
+							// Simplify the items to the right of a prefix operator
+							let rhs = &items[priority_op + 1..];
+							let rhs = simplify(rhs)?;
+							Ok(Expression::Prefix {
 								right: Box::new(rhs),
-								op: binop,
-							}),
-						}
-					},
-					Operator::Prefix(preop) => {
-						// Simplify the items to the right of a prefix operator
-						let rhs = &items[priority_op + 1..];
-						let rhs = simplify(rhs)?;
-						Ok(Expression::Prefix {
-							right: Box::new(rhs),
-							op: preop,
-						})
-					},
-					Operator::Postfix(postop) => {
-						// Simplify the items to the left of a postfix operator
-						let lhs = &items[..priority_op];
-						let lhs = simplify(lhs)?;
-						Ok(Expression::Postfix {
-							left: Box::new(lhs),
-							op: postop,
-						})
-					},
+								op: preop,
+							})
+						},
+						Operator::Postfix(postop) => {
+							// Simplify the items to the left of a postfix operator
+							let lhs = &items[..priority_op];
+							let lhs = simplify(lhs)?;
+							Ok(Expression::Postfix {
+								left: Box::new(lhs),
+								op: postop,
+							})
+						},
+					}
 				},
 				ExpressionItem::Operand(_) => {
-					Err(ParseError::Other.into()) // The token at this index should be an operator
+					Err(ParseError::Expected(vec![Expected::Operator]).into()) // The token at this index should be an operator
 				},
 			}
 		}
@@ -193,7 +187,7 @@ mod parse {
 		let expr = simplify(&expr_items)?;
 
 		if !tokens.is_empty() {
-			return Err(ParseError::Other.into()); // Not all the tokens were used up
+			return Err(ParseError::UnexpectedToken.into()); // Not all the tokens were used up
 		}
 
 		Ok(expr)
@@ -265,7 +259,7 @@ mod parse {
 				&ifexpr::IfTaker,
 				&breakexpr::BreakTaker,
 				&literal::LiteralTaker,
-				&functioncall::FunctionCallTaker, // has to be before identifier
+				&functioncall::FunctionCallTaker,   // has to be before identifier
 				&instantiation::InstantiationTaker, // has to be before block and identifier
 				&identifier::IdentifierTaker,
 				&block::BlockTaker,
@@ -282,7 +276,7 @@ mod parse {
 				}
 			}
 
-			Err(ParseError::Other.into()) // Failed to parse operand
+			Err(ParseError::UnexpectedToken.into()) // Failed to parse operand
 		}
 	}
 }

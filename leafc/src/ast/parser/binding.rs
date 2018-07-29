@@ -6,11 +6,7 @@ pub struct BindingTaker;
 impl ExpressionTaker for BindingTaker {
 	type Args = ();
 
-	fn take_expression<'a>(
-		&self,
-		in_tokens: &'a [TokenTree],
-		_args: Self::Args,
-	) -> ParseResult<'a, Expression> {
+	fn take_expression<'a>(&self, in_tokens: &'a [TokenTree], _args: Self::Args) -> ParseResult<'a, Expression> {
 		if in_tokens.is_empty() {
 			return Ok(None);
 		}
@@ -34,7 +30,7 @@ impl ExpressionTaker for BindingTaker {
 
 		let ident = match tokens.get(0) {
 			Some(TokenTree::Token(Token::Name(ref name))) => Identifier::try_from_str(name),
-			_ => return Err(ParseError::Other.into()), // expected an identifier after let
+			_ => return Err(ParseError::Expected(vec![Expected::Identifier]).into()),
 		};
 		tokens = &tokens[1..];
 
@@ -44,7 +40,7 @@ impl ExpressionTaker for BindingTaker {
 				let (typename, leftovers) = if let Some(res) = next_type(tokens)? {
 					res
 				} else {
-					return Err(ParseError::Other.into()); // expected a type after let binding colon
+					return Err(ParseError::Expected(vec![Expected::Typename]).into());
 				};
 				tokens = leftovers;
 				Some(typename)
@@ -56,16 +52,17 @@ impl ExpressionTaker for BindingTaker {
 			Some(TokenTree::Token(Token::Symbol(TokenSymbol::Assign))) => {
 				tokens = &tokens[1..];
 			},
-			_ => return Err(ParseError::Other.into()), // expected assign symbol in let binding
+			// expected assign symbol in let binding
+			_ => return Err(ParseError::Expected(vec![Expected::Symbol(TokenSymbol::Assign)]).into()),
 		}
 
-		let (bindexpr, leftovers) =
-			if let Some(res) = next_expression(tokens, Box::new(|token| token.is_semicolon()))? {
-				res
-			} else {
-				// expected an expression after the assign symbol
-				return Err(ParseError::Other.into());
-			};
+		let (bindexpr, leftovers) = if let Some(res) = next_expression(tokens, Box::new(|token| token.is_semicolon()))?
+		{
+			res
+		} else {
+			// expected an expression after the assign symbol
+			return Err(ParseError::Expected(vec![Expected::Expression]).into());
+		};
 
 		tokens = leftovers;
 

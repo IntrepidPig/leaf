@@ -6,11 +6,7 @@ pub struct FunctionCallTaker;
 impl ExpressionTaker for FunctionCallTaker {
 	type Args = ();
 
-	fn take_expression<'a>(
-		&self,
-		in_tokens: &'a [TokenTree],
-		_args: Self::Args,
-	) -> ParseResult<'a, Expression> {
+	fn take_expression<'a>(&self, in_tokens: &'a [TokenTree], _args: Self::Args) -> ParseResult<'a, Expression> {
 		if in_tokens.is_empty() {
 			return Ok(None);
 		}
@@ -62,7 +58,7 @@ fn parse_args(in_tokens: &[TokenTree]) -> Result<Vec<Expression>, Error<ParseErr
 		if let Some((expression, leftovers)) = next_expression(arg_tokens, Box::new(|_| false))? {
 			if !leftovers.is_empty() {
 				// didn't parse the entire argument expression tokens
-				return Err(ParseError::Other.into());
+				return Err(ParseError::UnexpectedToken.into());
 			}
 
 			args.push(expression);

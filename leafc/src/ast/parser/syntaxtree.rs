@@ -15,11 +15,7 @@ pub type ParseResult<'a, T> = Result<Option<(T, &'a [TokenTree])>, Error<ParseEr
 pub trait ExpressionTaker {
 	type Args;
 
-	fn take_expression<'a>(
-		&self,
-		in_tokens: &'a [TokenTree],
-		args: Self::Args,
-	) -> ParseResult<'a, Expression>;
+	fn take_expression<'a>(&self, in_tokens: &'a [TokenTree], args: Self::Args) -> ParseResult<'a, Expression>;
 }
 
 mod structures {
@@ -41,11 +37,7 @@ mod structures {
 	}
 
 	impl Module {
-		pub fn traverse_mut<F: FnMut(&ModulePath, &mut Module)>(
-			&mut self,
-			f: &mut F,
-			start_path: &mut ModulePath,
-		) {
+		pub fn traverse_mut<F: FnMut(&ModulePath, &mut Module)>(&mut self, f: &mut F, start_path: &mut ModulePath) {
 			f(&start_path, self);
 			for (name, module) in &mut self.body.modules {
 				start_path.path.push(name.clone());
@@ -54,11 +46,7 @@ mod structures {
 			}
 		}
 
-		pub fn traverse<F: FnMut(&ModulePath, &Module)>(
-			&self,
-			f: &mut F,
-			start_path: &mut ModulePath,
-		) {
+		pub fn traverse<F: FnMut(&ModulePath, &Module)>(&self, f: &mut F, start_path: &mut ModulePath) {
 			f(&start_path, self);
 			for (name, module) in &self.body.modules {
 				start_path.path.push(name.clone());
@@ -348,35 +336,89 @@ mod structures {
 }
 
 mod errors {
+	use super::*;
 	/// An error that occurs while parsing
-	#[derive(Debug, Clone)]
+	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub enum ParseError {
 		UnexpectedToken,
-		UnclosedBrace,
-		Other,
+		Expected(Vec<Expected>),
+		LoopWithOutput,
+	}
+
+	#[derive(Debug, Clone, PartialEq, Eq)]
+	pub enum Expected {
+		Identifier,
+		Semicolon,
+		Colon,
+		Typename,
+		Block,
+		Brackets,
+		Parentheses,
+		Keyword(Keyword),
+		Symbol(TokenSymbol),
+		Expression,
+		Operator,
+		ModulePath,
 	}
 
 	impl ::std::fmt::Display for ParseError {
 		fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-			write!(f, "{:?}", self)
+			write!(
+				f,
+				"{}",
+				match *self {
+					ParseError::UnexpectedToken => "Unexpected token".to_owned(),
+					ParseError::Expected(ref expected) => {
+						let mut items_str = "Expected one of: ".to_owned();
+						if expected.len() > 1 {
+							for (i, item) in expected.iter().enumerate() {
+								items_str.push_str(&item.to_string());
+								if i < expected.len() - 2 {
+									items_str.push_str(", ");
+								} else if i == expected.len() - 2 {
+									items_str.push_str(", or ");
+								}
+							}
+						} else {
+							items_str = format!("Expected: {}", &expected[0].to_string());
+						}
+						items_str
+					},
+					ParseError::LoopWithOutput => "Loop blocks cannot have an output".to_owned(),
+				}
+			)
+		}
+	}
+
+	impl ::std::fmt::Display for Expected {
+		fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+			write!(
+				f,
+				"{}",
+				match *self {
+					Expected::Identifier => "identifier".to_owned(),
+					Expected::Semicolon => "semicolon".to_owned(),
+					Expected::Colon => "colon".to_owned(),
+					Expected::Typename => "type name".to_owned(),
+					Expected::Block => "block".to_owned(),
+					Expected::Brackets => "brackets".to_owned(),
+					Expected::Parentheses => "parentheses".to_owned(),
+					Expected::Keyword(keyword) => keyword.to_string(),
+					Expected::Symbol(symbol) => symbol.to_string(),
+					Expected::Expression => "expression".to_owned(),
+					Expected::Operator => "operator".to_owned(),
+					Expected::ModulePath => "module path".to_owned(),
+				}
+			)
 		}
 	}
 
 	impl ::std::error::Error for ParseError {}
 }
 
-static mut RECURSION_LEVEL: usize = 0;
-
 /// Gets statements until it can't from the tokens, and then gets a final expression if there is one
 /// TODO don't return option
 pub fn parse_block(mut tokens: &[TokenTree]) -> Result<Block, Error<ParseError>> {
-	unsafe {
-		RECURSION_LEVEL += 1;
-		if RECURSION_LEVEL > 4096 {
-			return Err(ParseError::Other.into()); // Too much nesting DEBUG purposes only
-		}
-	}
-
 	let mut block = Block::new();
 
 	// Parse each statement until none are left
@@ -397,9 +439,7 @@ pub fn parse_block(mut tokens: &[TokenTree]) -> Result<Block, Error<ParseError>>
 
 /// Gets the next statement requiring a terminating semicolon
 pub fn next_statement(in_tokens: &[TokenTree]) -> ParseResult<Expression> {
-	if let Some((expr, leftovers)) =
-		next_expression(in_tokens, Box::new(|token| token.is_semicolon()))?
-	{
+	if let Some((expr, leftovers)) = next_expression(in_tokens, Box::new(|token| token.is_semicolon()))? {
 		if let Some(TokenTree::Token(Token::Symbol(TokenSymbol::Semicolon))) = leftovers.get(0) {
 			Ok(Some((expr, &leftovers[1..])))
 		} else {
@@ -418,11 +458,9 @@ pub fn next_expression<'a>(
 		return Ok(None);
 	}
 
-	if let Some((expression, leftovers)) =
-		operation::OperationTaker::new().take_expression(in_tokens, end_predicate)?
-	{
+	if let Some((expression, leftovers)) = operation::OperationTaker::new().take_expression(in_tokens, end_predicate)? {
 		return Ok(Some((expression, leftovers)));
 	}
 
-	Err(ParseError::Other.into()) // Could not parse the next expression
+	Err(ParseError::UnexpectedToken.into()) // Could not parse the next expression
 }

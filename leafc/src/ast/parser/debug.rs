@@ -7,11 +7,7 @@ pub struct DebugTaker;
 impl ExpressionTaker for DebugTaker {
 	type Args = ();
 
-	fn take_expression<'a>(
-		&self,
-		in_tokens: &'a [TokenTree],
-		_args: Self::Args,
-	) -> ParseResult<'a, Expression> {
+	fn take_expression<'a>(&self, in_tokens: &'a [TokenTree], _args: Self::Args) -> ParseResult<'a, Expression> {
 		if in_tokens.is_empty() {
 			return Ok(None);
 		}

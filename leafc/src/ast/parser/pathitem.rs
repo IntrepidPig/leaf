@@ -27,9 +27,7 @@ pub fn next_type<'a>(in_tokens: &'a [TokenTree]) -> ParseResult<'a, PathItem<Typ
 	)))
 }
 
-pub fn next_path<'a>(
-	in_tokens: &'a [TokenTree],
-) -> Result<Option<(ModulePath, &'a [TokenTree])>, Error<ParseError>> {
+pub fn next_path<'a>(in_tokens: &'a [TokenTree]) -> Result<Option<(ModulePath, &'a [TokenTree])>, Error<ParseError>> {
 	let mut relative = true;
 	let mut pathitems: Vec<Identifier> = Vec::new();
 

@@ -1,3 +1,5 @@
+use std::fmt;
+
 // TODO include index information with each lexeme
 
 /// A list of lexemes
@@ -165,6 +167,24 @@ pub enum LexError {
 	Other,
 }
 
+impl fmt::Display for LexError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(
+			f,
+			"{}",
+			match self {
+				LexError::Unexpected(location) => format!("Unexpected character at index {}", location),
+				LexError::UnknownEscape(c) => format!("Unknown escape character '{}'", c),
+				LexError::UnterminatedStringLiteral(location) => format!("Unterminated string literal at {}", location),
+				LexError::Empty => "Unexpected end of input".to_owned(),
+				LexError::Other => "Unknown error occurred while lexing".to_owned(),
+			}
+		)
+	}
+}
+
+impl ::std::error::Error for LexError {}
+
 /// Return a Vec<Lexeme> from an input string.
 pub fn lex(old_input: &str) -> Result<Lexemes, LexError> {
 	let mut input = old_input;
@@ -183,9 +203,7 @@ pub fn lex(old_input: &str) -> Result<Lexemes, LexError> {
 	// Keep cutting down the input string slice with lexeme takers until it's empty
 	'outer: while !input.is_empty() {
 		for lexeme_taker in lexeme_takers {
-			if let Some((lexeme, remaining)) =
-				lexeme_taker.next_lexeme(input, old_input.len() - input.len())?
-			{
+			if let Some((lexeme, remaining)) = lexeme_taker.next_lexeme(input, old_input.len() - input.len())? {
 				input = remaining;
 				lexemes.push(lexeme);
 				continue 'outer;
@@ -200,11 +218,7 @@ pub fn lex(old_input: &str) -> Result<Lexemes, LexError> {
 }
 
 pub trait LexemeTaker: ::std::fmt::Debug {
-	fn next_lexeme<'a>(
-		&self,
-		input: &'a str,
-		actual_index: usize,
-	) -> Result<Option<(Lexeme<'a>, &'a str)>, LexError>;
+	fn next_lexeme<'a>(&self, input: &'a str, actual_index: usize) -> Result<Option<(Lexeme<'a>, &'a str)>, LexError>;
 }
 
 /// Takes next available whitespace
@@ -212,11 +226,7 @@ pub trait LexemeTaker: ::std::fmt::Debug {
 #[derive(Debug)]
 struct WhitespaceTaker;
 impl LexemeTaker for WhitespaceTaker {
-	fn next_lexeme<'a>(
-		&self,
-		input: &'a str,
-		_actual_index: usize,
-	) -> Result<Option<(Lexeme<'a>, &'a str)>, LexError> {
+	fn next_lexeme<'a>(&self, input: &'a str, _actual_index: usize) -> Result<Option<(Lexeme<'a>, &'a str)>, LexError> {
 		// The whitespace type we are getting (tab | newline | space)
 		let mut whitespace_type = None;
 		// The end of the whitespace
@@ -264,11 +274,7 @@ impl LexemeTaker for WhitespaceTaker {
 #[derive(Debug)]
 struct WordTaker;
 impl LexemeTaker for WordTaker {
-	fn next_lexeme<'a>(
-		&self,
-		input: &'a str,
-		_actual_index: usize,
-	) -> Result<Option<(Lexeme<'a>, &'a str)>, LexError> {
+	fn next_lexeme<'a>(&self, input: &'a str, _actual_index: usize) -> Result<Option<(Lexeme<'a>, &'a str)>, LexError> {
 		// The end of the word
 		let mut end = 0;
 
@@ -295,11 +301,7 @@ impl LexemeTaker for WordTaker {
 #[derive(Debug)]
 struct BracketTaker;
 impl LexemeTaker for BracketTaker {
-	fn next_lexeme<'a>(
-		&self,
-		input: &'a str,
-		_actual_index: usize,
-	) -> Result<Option<(Lexeme<'a>, &'a str)>, LexError> {
+	fn next_lexeme<'a>(&self, input: &'a str, _actual_index: usize) -> Result<Option<(Lexeme<'a>, &'a str)>, LexError> {
 		// Make sure there is another char available (always should be, except lexemetakers can modify the input without returning a token TODO)
 		let c = if let Some(c) = input.chars().next() {
 			c
@@ -327,11 +329,7 @@ impl LexemeTaker for BracketTaker {
 #[derive(Debug)]
 struct StringTaker;
 impl LexemeTaker for StringTaker {
-	fn next_lexeme<'a>(
-		&self,
-		input: &'a str,
-		actual_index: usize,
-	) -> Result<Option<(Lexeme<'a>, &'a str)>, LexError> {
+	fn next_lexeme<'a>(&self, input: &'a str, actual_index: usize) -> Result<Option<(Lexeme<'a>, &'a str)>, LexError> {
 		let mut chars = input.chars();
 		// start of string after quote marks marks
 		let mut start = 0;
@@ -415,11 +413,7 @@ impl LexemeTaker for StringTaker {
 #[derive(Debug)]
 struct SymbolTaker;
 impl LexemeTaker for SymbolTaker {
-	fn next_lexeme<'a>(
-		&self,
-		input: &'a str,
-		_actual_index: usize,
-	) -> Result<Option<(Lexeme<'a>, &'a str)>, LexError> {
+	fn next_lexeme<'a>(&self, input: &'a str, _actual_index: usize) -> Result<Option<(Lexeme<'a>, &'a str)>, LexError> {
 		// Make sure there's at least one character
 		let mut chars = input.chars();
 		let c1 = if let Some(c1) = chars.next() {
@@ -475,11 +469,7 @@ impl LexemeTaker for SymbolTaker {
 #[derive(Debug)]
 struct NumLiteralTaker;
 impl LexemeTaker for NumLiteralTaker {
-	fn next_lexeme<'a>(
-		&self,
-		input: &'a str,
-		_actual_index: usize,
-	) -> Result<Option<(Lexeme<'a>, &'a str)>, LexError> {
+	fn next_lexeme<'a>(&self, input: &'a str, _actual_index: usize) -> Result<Option<(Lexeme<'a>, &'a str)>, LexError> {
 		let mut end = 0;
 
 		for c in input.chars() {

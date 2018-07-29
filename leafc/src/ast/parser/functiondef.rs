@@ -15,7 +15,7 @@ pub fn take_functiondef(in_tokens: &[TokenTree]) -> ParseResult<Function> {
 			tokens = &tokens[1..];
 			Identifier::try_from_str(name)
 		},
-		_ => return Err(ParseError::Other.into()), // needed a function name
+		_ => return Err(ParseError::Expected(vec![Expected::Identifier]).into()), // needed a function name
 	};
 
 	let args = match tokens.get(0) {
@@ -27,7 +27,7 @@ pub fn take_functiondef(in_tokens: &[TokenTree]) -> ParseResult<Function> {
 				Vec::new()
 			}
 		},
-		_ => return Err(ParseError::Other.into()), // needed parens with arguments inside
+		_ => return Err(ParseError::Expected(vec![Expected::Parentheses]).into()), // needed parens with arguments inside
 	};
 
 	let return_type = match tokens.get(0) {
@@ -36,7 +36,7 @@ pub fn take_functiondef(in_tokens: &[TokenTree]) -> ParseResult<Function> {
 			let (typename, leftovers) = if let Some(res) = next_type(tokens)? {
 				res
 			} else {
-				return Err(ParseError::Other.into()); // Expected a type after the colon
+				return Err(ParseError::Expected(vec![Expected::Typename]).into()); // Expected a type after the colon
 			};
 			tokens = leftovers;
 			Some(typename)
@@ -48,12 +48,12 @@ pub fn take_functiondef(in_tokens: &[TokenTree]) -> ParseResult<Function> {
 	let (block, leftovers) = if let Some(block) = block_taker.take_expression(tokens, ())? {
 		block
 	} else {
-		return Err(ParseError::Other.into()); // needed a block after the args or return type
+		return Err(ParseError::Expected(vec![Expected::Block]).into()); // needed a block after the args or return type
 	};
 
 	let block = match block {
 		Expression::Block(block) => *block,
-		_ => return Err(ParseError::Other.into()), // Got an expression that wasn't a block
+		_ => unreachable!(), // Got an expression that wasn't a block
 	};
 
 	tokens = leftovers;
@@ -91,7 +91,7 @@ pub fn take_externfn(in_tokens: &[TokenTree]) -> ParseResult<ExternFunction> {
 			tokens = &tokens[1..];
 			Identifier::try_from_str(name)
 		},
-		_ => return Err(ParseError::Other.into()), // needed a function name
+		_ => return Err(ParseError::Expected(vec![Expected::Identifier]).into()), // needed a function name
 	};
 
 	let args = match tokens.get(0) {
@@ -103,7 +103,7 @@ pub fn take_externfn(in_tokens: &[TokenTree]) -> ParseResult<ExternFunction> {
 				Vec::new()
 			}
 		},
-		_ => return Err(ParseError::Other.into()), // needed parens with arguments inside
+		_ => return Err(ParseError::Expected(vec![Expected::Parentheses]).into()), // needed parens with arguments inside
 	};
 
 	let return_type = match tokens.get(0) {
@@ -112,7 +112,7 @@ pub fn take_externfn(in_tokens: &[TokenTree]) -> ParseResult<ExternFunction> {
 			let (typename, leftovers) = if let Some(res) = next_type(tokens)? {
 				res
 			} else {
-				return Err(ParseError::Other.into()); // Expected a type after the colon
+				return Err(ParseError::Expected(vec![Expected::Typename]).into()); // Expected a type after the colon
 			};
 			tokens = leftovers;
 			Some(typename)
@@ -130,29 +130,27 @@ pub fn take_externfn(in_tokens: &[TokenTree]) -> ParseResult<ExternFunction> {
 	)))
 }
 
-fn parse_args(
-	in_tokens: &[TokenTree],
-) -> Result<Vec<(Identifier, PathItem<TypeName>)>, Error<ParseError>> {
+fn parse_args(in_tokens: &[TokenTree]) -> Result<Vec<(Identifier, PathItem<TypeName>)>, Error<ParseError>> {
 	let mut args = Vec::new();
 	for arg_tokens in separated::parse_separated(in_tokens, |token| token.is_comma())? {
 		let name = match arg_tokens.get(0) {
 			Some(TokenTree::Token(Token::Name(ref name))) => Identifier::try_from_str(name),
-			_ => return Err(ParseError::Other.into()), // Got an argument that wasn't a name
+			_ => return Err(ParseError::Expected(vec![Expected::Identifier]).into()), // Got an argument that wasn't a name
 		};
 
 		match arg_tokens.get(1) {
 			Some(TokenTree::Token(Token::Symbol(TokenSymbol::Colon))) => {},
-			_ => return Err(ParseError::Other.into()), // Argument name needed colon after it
+			_ => return Err(ParseError::Expected(vec![Expected::Colon]).into()), // Argument name needed colon after it
 		}
 
 		let (typename, leftovers) = if let Some(res) = next_type(&arg_tokens[2..])? {
 			res
 		} else {
-			return Err(ParseError::Other.into()); // Didn't get type after argument
+			return Err(ParseError::Expected(vec![Expected::Typename]).into()); // Didn't get type after argument
 		};
 
 		if !leftovers.is_empty() {
-			return Err(ParseError::Other.into()); // There were leftover tokens after the parameter type
+			return Err(ParseError::UnexpectedToken.into()); // There were leftover tokens after the parameter type
 		}
 
 		args.push((name, typename));

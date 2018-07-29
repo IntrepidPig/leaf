@@ -307,10 +307,9 @@ impl VM {
 						.pop()
 						.unwrap();
 					let output = match (left.var_info, right.var_info) {
-						(
-							VarInfo::Primitive(Primitive::U64(left)),
-							VarInfo::Primitive(Primitive::U64(right)),
-						) => left + right,
+						(VarInfo::Primitive(Primitive::U64(left)), VarInfo::Primitive(Primitive::U64(right))) => {
+							left + right
+						},
 						_ => panic!("Tried to add types that don't support it"), // This is ok now because the conversion to hir changes operators to use the add method when they're not primitives
 					};
 					stack
@@ -342,10 +341,9 @@ impl VM {
 						.pop()
 						.unwrap();
 					let output = match (left.var_info, right.var_info) {
-						(
-							VarInfo::Primitive(Primitive::U64(left)),
-							VarInfo::Primitive(Primitive::U64(right)),
-						) => left - right,
+						(VarInfo::Primitive(Primitive::U64(left)), VarInfo::Primitive(Primitive::U64(right))) => {
+							left - right
+						},
 						_ => panic!("Tried to add types that don't support it"), // This is ok now because the conversion to hir changes operators to use the add method when they're not primitives
 					};
 					stack
@@ -377,10 +375,9 @@ impl VM {
 						.pop()
 						.unwrap();
 					let output = match (left.var_info, right.var_info) {
-						(
-							VarInfo::Primitive(Primitive::U64(left)),
-							VarInfo::Primitive(Primitive::U64(right)),
-						) => left * right,
+						(VarInfo::Primitive(Primitive::U64(left)), VarInfo::Primitive(Primitive::U64(right))) => {
+							left * right
+						},
 						_ => panic!("Tried to add types that don't support it"), // This is ok now because the conversion to hir changes operators to use the add method when they're not primitives
 					};
 					stack
@@ -412,10 +409,9 @@ impl VM {
 						.pop()
 						.unwrap();
 					let output = match (left.var_info, right.var_info) {
-						(
-							VarInfo::Primitive(Primitive::U64(left)),
-							VarInfo::Primitive(Primitive::U64(right)),
-						) => left / right,
+						(VarInfo::Primitive(Primitive::U64(left)), VarInfo::Primitive(Primitive::U64(right))) => {
+							left / right
+						},
 						_ => panic!("Tried to add types that don't support it"), // This is ok now because the conversion to hir changes operators to use the add method when they're not primitives
 					};
 					stack

@@ -5,19 +5,14 @@ pub struct IfTaker;
 impl ExpressionTaker for IfTaker {
 	type Args = ();
 
-	fn take_expression<'a>(
-		&self,
-		in_tokens: &'a [TokenTree],
-		_args: Self::Args,
-	) -> ParseResult<'a, Expression> {
+	fn take_expression<'a>(&self, in_tokens: &'a [TokenTree], _args: Self::Args) -> ParseResult<'a, Expression> {
 		match in_tokens.get(0) {
 			Some(TokenTree::If(tokens)) => {
-				let (until_then, leftovers) =
-					operation::split_at(tokens, Box::new(|token| token.is_then()), false);
+				let (until_then, leftovers) = operation::split_at(tokens, Box::new(|token| token.is_then()), false);
 				let condition = parse_block(until_then)?;
 
 				if !(leftovers.get(0) == Some(&TokenTree::Token(Token::Keyword(Keyword::Then)))) {
-					return Err(ParseError::Other.into()); // needed `then` keyword
+					return Err(ParseError::Expected(vec![Expected::Keyword(Keyword::Then)]).into());
 				}
 
 				let (body_tokens, leftovers) =
@@ -36,7 +31,7 @@ impl ExpressionTaker for IfTaker {
 							Some(else_body)
 						},
 						// needed else or nothing after then
-						_ => return Err(ParseError::Other.into()),
+						_ => return Err(ParseError::Expected(vec![Expected::Keyword(Keyword::Then)]).into()),
 					}
 				};
 

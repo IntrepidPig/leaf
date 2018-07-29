@@ -1,3 +1,5 @@
+use std::fmt;
+
 use ast::lexer::{Bracket, BracketState, Lexeme, Lexemes};
 
 #[derive(Debug, Clone)]
@@ -68,6 +70,64 @@ pub enum Symbol {
 	Namespace,
 }
 
+impl ::std::fmt::Display for Symbol {
+	fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+		write!(
+			f,
+			"{}",
+			match self {
+				Symbol::Colon => "colon (:)",
+				Symbol::Comma => "comma (,)",
+				Symbol::Dot => "dot (.)",
+				Symbol::Equals => "equals (=)",
+				Symbol::Semicolon => "semicolon (;)",
+				Symbol::Asterisk => "asterisk (*)",
+				Symbol::Greater => "greater (>)",
+				Symbol::Less => "less (<)",
+				Symbol::Assign => "assign (:=)",
+				Symbol::Equality => "equality (==)",
+				Symbol::Ampersand => "ampersand (&)",
+				Symbol::Question => "question (?)",
+				Symbol::Exclamation => "exclamation (!)",
+				Symbol::Plus => "plus (+)",
+				Symbol::Minus => "minus (-)",
+				Symbol::Slash => "slash (/)",
+				Symbol::Namespace => "namespace (::)",
+			}
+		)
+	}
+}
+
+impl ::std::fmt::Display for Keyword {
+	fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+		write!(
+			f,
+			"{}",
+			match self {
+				Keyword::Function => "fn",
+				Keyword::Return => "return",
+				Keyword::Let => "let",
+				Keyword::While => "while",
+				Keyword::If => "if",
+				Keyword::Else => "else",
+				Keyword::Debug => "debug",
+				Keyword::Loop => "loop",
+				Keyword::Break => "break",
+				Keyword::Then => "then",
+				Keyword::End => "end",
+				Keyword::Back => "back",
+				Keyword::True => "true",
+				Keyword::False => "false",
+				Keyword::Type => "type",
+				Keyword::Module => "mod",
+				Keyword::Use => "use",
+				Keyword::Mutable => "mut",
+				Keyword::Extern => "extern",
+			}
+		)
+	}
+}
+
 #[derive(Debug, Clone)]
 pub struct Tokens {
 	pub tokens: Vec<Token>,
@@ -77,6 +137,20 @@ pub struct Tokens {
 pub enum TokenizeError {
 	Other,
 }
+
+impl fmt::Display for TokenizeError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(
+			f,
+			"{}",
+			match self {
+				TokenizeError::Other => "An error occurred while tokenizing".to_owned(),
+			}
+		)
+	}
+}
+
+impl ::std::error::Error for TokenizeError {}
 
 impl<'a> Tokenizer<'a> {
 	pub fn new(lexemes: Lexemes<'a>) -> Self {

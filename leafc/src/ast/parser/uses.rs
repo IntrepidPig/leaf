@@ -13,7 +13,7 @@ pub fn take_use<'a>(in_tokens: &'a [TokenTree]) -> ParseResult<'a, PathItem<Iden
 	let (use_path, leftovers) = if let Some(res) = pathitem::next_path(tokens)? {
 		res
 	} else {
-		return Err(ParseError::Other.into());
+		return Err(ParseError::Expected(vec![Expected::ModulePath]).into());
 	};
 
 	tokens = leftovers;
@@ -23,7 +23,8 @@ pub fn take_use<'a>(in_tokens: &'a [TokenTree]) -> ParseResult<'a, PathItem<Iden
 			tokens = &tokens[1..];
 			Identifier::try_from_str(name)
 		},
-		_ => return Err(ParseError::Other.into()), // Expected an identifier after the use path
+		// Expected an identifier after the use path
+		_ => return Err(ParseError::Expected(vec![Expected::Identifier]).into()),
 	};
 
 	Ok(Some((

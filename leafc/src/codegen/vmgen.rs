@@ -250,11 +250,11 @@ impl<'a> CodeGenerator<'a> {
 					BinaryOp::Mul => self.instructions.push(Instruction::Mul),
 					BinaryOp::Div => self.instructions.push(Instruction::Div),
 					BinaryOp::Equality => self.instructions.push(Instruction::Equal),
-					BinaryOp::Assign => {
-						panic!("Assign binary operator found. This should have been converted to a standalone\
-						expression during the parsing phase, not a binary operation")
-					},
-					_ => unimplemented!()
+					BinaryOp::Assign => panic!(
+						"Assign binary operator found. This should have been converted to a standalone\
+						 expression during the parsing phase, not a binary operation"
+					),
+					_ => unimplemented!(),
 				};
 			},
 			ExpressionType::Assignment(ref assignment) => {
