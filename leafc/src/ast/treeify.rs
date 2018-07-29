@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ast::lexer::{Bracket, BracketState};
-use ast::tokenizer::{Keyword, Symbol, Token as OldToken};
+use ast::tokenizer::{Keyword, Symbol, TokenKind as OldTokenKind, Token as OldToken};
 use failure::Error;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -15,13 +15,13 @@ pub enum Token {
 
 impl Token {
 	pub fn from_old_token(old: OldToken) -> Result<Token, Error<TreeifyError>> {
-		Ok(match old {
-			OldToken::Keyword(keyword) => Token::Keyword(keyword),
-			OldToken::Name(name) => Token::Name(name),
-			OldToken::NumberLiteral(num) => Token::NumberLiteral(num),
-			OldToken::StringLiteral(string) => Token::StringLiteral(string),
-			OldToken::Symbol(symbol) => Token::Symbol(symbol),
-			OldToken::Bracket(_, _) => return Err(TreeifyError::IncorrectBrace.into()),
+		Ok(match old.kind {
+			OldTokenKind::Keyword(keyword) => Token::Keyword(keyword),
+			OldTokenKind::Name(name) => Token::Name(name),
+			OldTokenKind::NumberLiteral(num) => Token::NumberLiteral(num),
+			OldTokenKind::StringLiteral(string) => Token::StringLiteral(string),
+			OldTokenKind::Symbol(symbol) => Token::Symbol(symbol),
+			OldTokenKind::Bracket(_, _) => return Err(TreeifyError::IncorrectBrace.into()),
 		})
 	}
 }
@@ -107,14 +107,14 @@ fn treeify_brackets(in_tokens: &[OldToken]) -> Result<Vec<TokenTree>, Error<Tree
 	let mut tokens: Vec<TokenTree> = Vec::new();
 	let mut old_tokens = in_tokens;
 	while !old_tokens.is_empty() {
-		match &old_tokens[0] {
-			OldToken::Bracket(bracket, state) => {
+		match &old_tokens[0].kind {
+			OldTokenKind::Bracket(bracket, state) => {
 				if *state == BracketState::Close {
 					return Err(TreeifyError::IncorrectBrace.into());
 				}
-				let (sub, leftovers) = get_sub(old_tokens, |old_token| match old_token {
-					OldToken::Bracket(test_bracket, test_state) => {
-						if test_bracket == bracket {
+				let (sub, leftovers) = get_sub(old_tokens, |old_token| match old_token.kind {
+					OldTokenKind::Bracket(test_bracket, test_state) => {
+						if test_bracket == *bracket {
 							match test_state {
 								BracketState::Open => 1,
 								BracketState::Close => -1,
@@ -131,8 +131,8 @@ fn treeify_brackets(in_tokens: &[OldToken]) -> Result<Vec<TokenTree>, Error<Tree
 					Bracket::Square => tokens.push(TokenTree::Bracket(treeify_brackets(sub)?)),
 				}
 
-				if let Some(OldToken::Bracket(test_bracket, test_state)) = leftovers.get(0) {
-					if !(test_bracket == bracket && *test_state == BracketState::Close) {
+				if let Some(OldTokenKind::Bracket(test_bracket, test_state)) = leftovers.get(0).map(|t| &t.kind) {
+					if !(test_bracket == bracket && test_state == &BracketState::Close) {
 						return Err(TreeifyError::UnclosedBrace.into()); // There was no close bracket
 					}
 				}
@@ -140,8 +140,8 @@ fn treeify_brackets(in_tokens: &[OldToken]) -> Result<Vec<TokenTree>, Error<Tree
 				// cut off the close bracket
 				old_tokens = &leftovers[1..];
 			},
-			token => {
-				tokens.push(TokenTree::Token(Token::from_old_token(token.clone())?));
+			_ => {
+				tokens.push(TokenTree::Token(Token::from_old_token(old_tokens[0].clone())?));
 				old_tokens = &old_tokens[1..];
 			},
 		}

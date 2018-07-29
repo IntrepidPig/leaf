@@ -17,14 +17,14 @@ impl<'a> Lexemes<'a> {
 	pub fn de_lex(&self) -> String {
 		let mut out = String::new();
 		for lexeme in &self.lexemes {
-			match *lexeme {
-				Lexeme::Word(word) => {
+			match lexeme.kind {
+				LexemeKind::Word(word) => {
 					out.push_str(word);
 				},
-				Lexeme::Bracket(bracket, state) => {
+				LexemeKind::Bracket(bracket, state) => {
 					out.push_str(bracket.de_lex(state));
 				},
-				Lexeme::String(ref string) => {
+				LexemeKind::String(ref string) => {
 					out.push('"');
 					for c in string.chars() {
 						let c = match c {
@@ -41,25 +41,25 @@ impl<'a> Lexemes<'a> {
 					}
 					out.push('"');
 				},
-				Lexeme::Number(num_string) => out.push_str(num_string),
-				Lexeme::Colon => out.push(':'),
-				Lexeme::Comma => out.push(','),
-				Lexeme::Dot => out.push('.'),
-				Lexeme::Equals => out.push('='),
-				Lexeme::Semicolon => out.push(';'),
-				Lexeme::Asterisk => out.push('*'),
-				Lexeme::Greater => out.push('>'),
-				Lexeme::Less => out.push('<'),
-				Lexeme::Assign => out.push_str(":="),
-				Lexeme::Equality => out.push_str("=="),
-				Lexeme::Ampersand => out.push('&'),
-				Lexeme::Question => out.push('?'),
-				Lexeme::Exclamation => out.push('!'),
-				Lexeme::Plus => out.push('+'),
-				Lexeme::Minus => out.push('-'),
-				Lexeme::Slash => out.push('/'),
-				Lexeme::Namespace => out.push_str("::"),
-				Lexeme::Whitespace {
+				LexemeKind::Number(num_string) => out.push_str(num_string),
+				LexemeKind::Colon => out.push(':'),
+				LexemeKind::Comma => out.push(','),
+				LexemeKind::Dot => out.push('.'),
+				LexemeKind::Equals => out.push('='),
+				LexemeKind::Semicolon => out.push(';'),
+				LexemeKind::Asterisk => out.push('*'),
+				LexemeKind::Greater => out.push('>'),
+				LexemeKind::Less => out.push('<'),
+				LexemeKind::Assign => out.push_str(":="),
+				LexemeKind::Equality => out.push_str("=="),
+				LexemeKind::Ampersand => out.push('&'),
+				LexemeKind::Question => out.push('?'),
+				LexemeKind::Exclamation => out.push('!'),
+				LexemeKind::Plus => out.push('+'),
+				LexemeKind::Minus => out.push('-'),
+				LexemeKind::Slash => out.push('/'),
+				LexemeKind::Namespace => out.push_str("::"),
+				LexemeKind::Whitespace {
 					whitespace_type,
 					amount,
 				} => for _ in 0..amount {
@@ -72,9 +72,15 @@ impl<'a> Lexemes<'a> {
 	}
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Lexeme<'a> {
+	pub kind: LexemeKind<'a>,
+	pub location: Location,
+}
+
 /// A lexeme is a category of characters and the characters involved. It involves symbols, words, literals, and whitespace.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Lexeme<'a> {
+pub enum LexemeKind<'a> {
 	Word(&'a str),
 	Bracket(Bracket, BracketState),
 	String(String),
@@ -160,8 +166,8 @@ pub enum BracketState {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Location {
-	line: u32,
-	col: u32,
+	pub line: u32,
+	pub col: u32,
 }
 
 impl fmt::Display for Location {
@@ -172,8 +178,8 @@ impl fmt::Display for Location {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LexError {
-	kind: LexErrorKind,
-	location: Location,
+	pub kind: LexErrorKind,
+	pub location: Location,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -208,7 +214,7 @@ impl ::std::error::Error for LexError {}
 pub fn lex(old_input: &str) -> Result<Lexemes, LexError> {
 	let mut input = old_input;
 
-	let mut lexemes = Vec::new();
+	let mut lexemes: Vec<Lexeme> = Vec::new();
 	// Order of lexemes to try to parse the next as
 	let lexeme_takers: &[&LexemeTaker] = &[
 		&WhitespaceTaker,
@@ -228,7 +234,7 @@ pub fn lex(old_input: &str) -> Result<Lexemes, LexError> {
 	'outer: while !input.is_empty() {
 		for lexeme_taker in lexeme_takers {
 			if let Some((lexeme, remaining)) = lexeme_taker.next_lexeme(input).map_err(|e| LexError { kind: e, location })? {
-				if let Lexeme::Whitespace { whitespace_type, amount } = lexeme {
+				if let LexemeKind::Whitespace { whitespace_type, amount } = lexeme {
 					if whitespace_type == WhitespaceType::Newline {
 						location.line += amount;
 						location.col = 0;
@@ -237,7 +243,10 @@ pub fn lex(old_input: &str) -> Result<Lexemes, LexError> {
 					location.col += (input.len() - remaining.len()) as u32;
 				}
 				input = remaining;
-				lexemes.push(lexeme);
+				lexemes.push(Lexeme {
+					kind: lexeme,
+					location,
+				});
 				continue 'outer;
 			}
 		}
@@ -253,7 +262,7 @@ pub fn lex(old_input: &str) -> Result<Lexemes, LexError> {
 }
 
 pub trait LexemeTaker: ::std::fmt::Debug {
-	fn next_lexeme<'a>(&self, input: &'a str) -> Result<Option<(Lexeme<'a>, &'a str)>, LexErrorKind>;
+	fn next_lexeme<'a>(&self, input: &'a str) -> Result<Option<(LexemeKind<'a>, &'a str)>, LexErrorKind>;
 }
 
 /// Takes next available whitespace
@@ -261,7 +270,7 @@ pub trait LexemeTaker: ::std::fmt::Debug {
 #[derive(Debug)]
 struct WhitespaceTaker;
 impl LexemeTaker for WhitespaceTaker {
-	fn next_lexeme<'a>(&self, input: &'a str) -> Result<Option<(Lexeme<'a>, &'a str)>, LexErrorKind> {
+	fn next_lexeme<'a>(&self, input: &'a str) -> Result<Option<(LexemeKind<'a>, &'a str)>, LexErrorKind> {
 		// The whitespace type we are getting (tab | newline | space)
 		let mut whitespace_type = None;
 		// The end of the whitespace
@@ -293,7 +302,7 @@ impl LexemeTaker for WhitespaceTaker {
 		// If we have a nonzero whitespace amount
 		if end > 0 {
 			Ok(Some((
-				Lexeme::Whitespace {
+				LexemeKind::Whitespace {
 					whitespace_type: whitespace_type.unwrap(), // If the end is nonzero then the whitespace_type was set
 					amount: input[0..end].chars().count() as u32, // Count the chars in the substring to get the amount
 				},
@@ -309,7 +318,7 @@ impl LexemeTaker for WhitespaceTaker {
 #[derive(Debug)]
 struct WordTaker;
 impl LexemeTaker for WordTaker {
-	fn next_lexeme<'a>(&self, input: &'a str) -> Result<Option<(Lexeme<'a>, &'a str)>, LexErrorKind> {
+	fn next_lexeme<'a>(&self, input: &'a str) -> Result<Option<(LexemeKind<'a>, &'a str)>, LexErrorKind> {
 		// The end of the word
 		let mut end = 0;
 
@@ -325,7 +334,7 @@ impl LexemeTaker for WordTaker {
 		}
 
 		if end > 0 {
-			Ok(Some((Lexeme::Word(&input[0..end]), &input[end..])))
+			Ok(Some((LexemeKind::Word(&input[0..end]), &input[end..])))
 		} else {
 			Ok(None)
 		}
@@ -336,7 +345,7 @@ impl LexemeTaker for WordTaker {
 #[derive(Debug)]
 struct BracketTaker;
 impl LexemeTaker for BracketTaker {
-	fn next_lexeme<'a>(&self, input: &'a str) -> Result<Option<(Lexeme<'a>, &'a str)>, LexErrorKind> {
+	fn next_lexeme<'a>(&self, input: &'a str) -> Result<Option<(LexemeKind<'a>, &'a str)>, LexErrorKind> {
 		// Make sure there is another char available (always should be, except lexemetakers can modify the input without returning a token TODO)
 		let c = if let Some(c) = input.chars().next() {
 			c
@@ -346,12 +355,12 @@ impl LexemeTaker for BracketTaker {
 
 		Ok(Some((
 			match c {
-				'{' => Lexeme::Bracket(Bracket::Curly, BracketState::Open),
-				'[' => Lexeme::Bracket(Bracket::Square, BracketState::Open),
-				'(' => Lexeme::Bracket(Bracket::Paren, BracketState::Open),
-				'}' => Lexeme::Bracket(Bracket::Curly, BracketState::Close),
-				']' => Lexeme::Bracket(Bracket::Square, BracketState::Close),
-				')' => Lexeme::Bracket(Bracket::Paren, BracketState::Close),
+				'{' => LexemeKind::Bracket(Bracket::Curly, BracketState::Open),
+				'[' => LexemeKind::Bracket(Bracket::Square, BracketState::Open),
+				'(' => LexemeKind::Bracket(Bracket::Paren, BracketState::Open),
+				'}' => LexemeKind::Bracket(Bracket::Curly, BracketState::Close),
+				']' => LexemeKind::Bracket(Bracket::Square, BracketState::Close),
+				')' => LexemeKind::Bracket(Bracket::Paren, BracketState::Close),
 				_ => return Ok(None),
 			},
 			&input[c.len_utf8()..],
@@ -364,7 +373,7 @@ impl LexemeTaker for BracketTaker {
 #[derive(Debug)]
 struct StringTaker;
 impl LexemeTaker for StringTaker {
-	fn next_lexeme<'a>(&self, input: &'a str) -> Result<Option<(Lexeme<'a>, &'a str)>, LexErrorKind> {
+	fn next_lexeme<'a>(&self, input: &'a str) -> Result<Option<(LexemeKind<'a>, &'a str)>, LexErrorKind> {
 		let mut chars = input.chars();
 		// start of string after quote marks marks
 		let mut start = 0;
@@ -423,7 +432,7 @@ impl LexemeTaker for StringTaker {
 		}
 
 		if found_end {
-			Ok(Some((Lexeme::String(string), &input[end..])))
+			Ok(Some((LexemeKind::String(string), &input[end..])))
 		} else {
 			Err(LexErrorKind::UnterminatedStringLiteral)
 		}
@@ -448,7 +457,7 @@ impl LexemeTaker for StringTaker {
 #[derive(Debug)]
 struct SymbolTaker;
 impl LexemeTaker for SymbolTaker {
-	fn next_lexeme<'a>(&self, input: &'a str) -> Result<Option<(Lexeme<'a>, &'a str)>, LexErrorKind> {
+	fn next_lexeme<'a>(&self, input: &'a str) -> Result<Option<(LexemeKind<'a>, &'a str)>, LexErrorKind> {
 		// Make sure there's at least one character
 		let mut chars = input.chars();
 		let c1 = if let Some(c1) = chars.next() {
@@ -468,30 +477,30 @@ impl LexemeTaker for SymbolTaker {
 			match (c1, c2) {
 				(':', Some('=')) => {
 					char2_len = c2.unwrap().len_utf8();
-					Lexeme::Assign
+					LexemeKind::Assign
 				},
 				('=', Some('=')) => {
 					char2_len = c2.unwrap().len_utf8();
-					Lexeme::Equality
+					LexemeKind::Equality
 				},
 				(':', Some(':')) => {
 					char2_len = c2.unwrap().len_utf8();
-					Lexeme::Namespace
+					LexemeKind::Namespace
 				},
-				(':', _) => Lexeme::Colon,
-				(',', _) => Lexeme::Comma,
-				('.', _) => Lexeme::Dot,
-				('=', _) => Lexeme::Equals,
-				(';', _) => Lexeme::Semicolon,
-				('*', _) => Lexeme::Asterisk,
-				('>', _) => Lexeme::Greater,
-				('<', _) => Lexeme::Less,
-				('&', _) => Lexeme::Ampersand,
-				('?', _) => Lexeme::Question,
-				('!', _) => Lexeme::Exclamation,
-				('+', _) => Lexeme::Plus,
-				('-', _) => Lexeme::Minus,
-				('/', _) => Lexeme::Slash,
+				(':', _) => LexemeKind::Colon,
+				(',', _) => LexemeKind::Comma,
+				('.', _) => LexemeKind::Dot,
+				('=', _) => LexemeKind::Equals,
+				(';', _) => LexemeKind::Semicolon,
+				('*', _) => LexemeKind::Asterisk,
+				('>', _) => LexemeKind::Greater,
+				('<', _) => LexemeKind::Less,
+				('&', _) => LexemeKind::Ampersand,
+				('?', _) => LexemeKind::Question,
+				('!', _) => LexemeKind::Exclamation,
+				('+', _) => LexemeKind::Plus,
+				('-', _) => LexemeKind::Minus,
+				('/', _) => LexemeKind::Slash,
 				(_, _) => return Ok(None),
 			},
 			&input[c1.len_utf8() + char2_len..],
@@ -504,7 +513,7 @@ impl LexemeTaker for SymbolTaker {
 #[derive(Debug)]
 struct NumLiteralTaker;
 impl LexemeTaker for NumLiteralTaker {
-	fn next_lexeme<'a>(&self, input: &'a str) -> Result<Option<(Lexeme<'a>, &'a str)>, LexErrorKind> {
+	fn next_lexeme<'a>(&self, input: &'a str) -> Result<Option<(LexemeKind<'a>, &'a str)>, LexErrorKind> {
 		let mut end = 0;
 
 		for c in input.chars() {
@@ -517,7 +526,7 @@ impl LexemeTaker for NumLiteralTaker {
 
 		if end > 0 {
 			let num_str = &input[0..end];
-			Ok(Some((Lexeme::Number(num_str), &input[end..])))
+			Ok(Some((LexemeKind::Number(num_str), &input[end..])))
 		} else {
 			Ok(None)
 		}

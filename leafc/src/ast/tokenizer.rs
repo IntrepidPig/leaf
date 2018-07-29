@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ast::lexer::{Bracket, BracketState, Lexeme, Lexemes};
+use ast::lexer::{Bracket, BracketState, LexemeKind, Lexemes, Location};
 
 #[derive(Debug, Clone)]
 pub struct Tokenizer<'a> {
@@ -8,7 +8,13 @@ pub struct Tokenizer<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Token {
+pub struct Token {
+	pub kind: TokenKind,
+	pub location: Location,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TokenKind {
 	Keyword(Keyword),
 	Name(String),
 	NumberLiteral(u64),
@@ -17,10 +23,10 @@ pub enum Token {
 	Symbol(Symbol),
 }
 
-impl Token {
+impl TokenKind {
 	pub fn as_bracket(&self) -> Option<(Bracket, BracketState)> {
 		match *self {
-			Token::Bracket(bracket, state) => Some((bracket, state)),
+			TokenKind::Bracket(bracket, state) => Some((bracket, state)),
 			_ => None,
 		}
 	}
@@ -163,92 +169,96 @@ impl<'a> Tokenizer<'a> {
 		while !self.lexemes.lexemes.is_empty() {
 			let lexeme = self.lexemes.lexemes.remove(0);
 
-			match lexeme {
-				Lexeme::Word(word) => match word {
-					"fn" => tokens.push(Token::Keyword(Keyword::Function)),
-					"return" => tokens.push(Token::Keyword(Keyword::Return)),
-					"let" => tokens.push(Token::Keyword(Keyword::Let)),
-					"while" => tokens.push(Token::Keyword(Keyword::While)),
-					"if" => tokens.push(Token::Keyword(Keyword::If)),
-					"else" => tokens.push(Token::Keyword(Keyword::Else)),
-					"debug" => tokens.push(Token::Keyword(Keyword::Debug)),
-					"loop" => tokens.push(Token::Keyword(Keyword::Loop)),
-					"break" => tokens.push(Token::Keyword(Keyword::Break)),
-					"then" => tokens.push(Token::Keyword(Keyword::Then)),
-					"end" => tokens.push(Token::Keyword(Keyword::End)),
-					"back" => tokens.push(Token::Keyword(Keyword::Back)),
-					"true" => tokens.push(Token::Keyword(Keyword::True)),
-					"false" => tokens.push(Token::Keyword(Keyword::False)),
-					"type" => tokens.push(Token::Keyword(Keyword::Type)),
-					"mod" => tokens.push(Token::Keyword(Keyword::Module)),
-					"use" => tokens.push(Token::Keyword(Keyword::Use)),
-					"mut" => tokens.push(Token::Keyword(Keyword::Mutable)),
-					"extern" => tokens.push(Token::Keyword(Keyword::Extern)),
-					word => tokens.push(Token::Name(word.to_owned())),
+			let kind = match lexeme.kind {
+				LexemeKind::Word(word) => match word {
+					"fn" => TokenKind::Keyword(Keyword::Function),
+					"return" => TokenKind::Keyword(Keyword::Return),
+					"let" => TokenKind::Keyword(Keyword::Let),
+					"while" => TokenKind::Keyword(Keyword::While),
+					"if" => TokenKind::Keyword(Keyword::If),
+					"else" => TokenKind::Keyword(Keyword::Else),
+					"debug" => TokenKind::Keyword(Keyword::Debug),
+					"loop" => TokenKind::Keyword(Keyword::Loop),
+					"break" => TokenKind::Keyword(Keyword::Break),
+					"then" => TokenKind::Keyword(Keyword::Then),
+					"end" => TokenKind::Keyword(Keyword::End),
+					"back" => TokenKind::Keyword(Keyword::Back),
+					"true" => TokenKind::Keyword(Keyword::True),
+					"false" => TokenKind::Keyword(Keyword::False),
+					"type" => TokenKind::Keyword(Keyword::Type),
+					"mod" => TokenKind::Keyword(Keyword::Module),
+					"use" => TokenKind::Keyword(Keyword::Use),
+					"mut" => TokenKind::Keyword(Keyword::Mutable),
+					"extern" => TokenKind::Keyword(Keyword::Extern),
+					word => TokenKind::Name(word.to_owned()),
 				},
-				Lexeme::Bracket(bracket, state) => {
-					tokens.push(Token::Bracket(bracket, state));
+				LexemeKind::Bracket(bracket, state) => {
+					TokenKind::Bracket(bracket, state)
 				},
-				Lexeme::String(string) => {
-					tokens.push(Token::StringLiteral(string));
+				LexemeKind::String(string) => {
+					TokenKind::StringLiteral(string)
 				},
-				Lexeme::Number(num_string) => match num_string.parse() {
-					Ok(n) => tokens.push(Token::NumberLiteral(n)),
+				LexemeKind::Number(num_string) => match num_string.parse() {
+					Ok(n) => TokenKind::NumberLiteral(n),
 					Err(_e) => return Err(TokenizeError::Other),
 				},
-				Lexeme::Colon => {
-					tokens.push(Token::Symbol(Symbol::Colon));
+				LexemeKind::Colon => {
+					TokenKind::Symbol(Symbol::Colon)
 				},
-				Lexeme::Comma => {
-					tokens.push(Token::Symbol(Symbol::Comma));
+				LexemeKind::Comma => {
+					TokenKind::Symbol(Symbol::Comma)
 				},
-				Lexeme::Dot => {
-					tokens.push(Token::Symbol(Symbol::Dot));
+				LexemeKind::Dot => {
+					TokenKind::Symbol(Symbol::Dot)
 				},
-				Lexeme::Equals => {
-					tokens.push(Token::Symbol(Symbol::Equals));
+				LexemeKind::Equals => {
+					TokenKind::Symbol(Symbol::Equals)
 				},
-				Lexeme::Semicolon => {
-					tokens.push(Token::Symbol(Symbol::Semicolon));
+				LexemeKind::Semicolon => {
+					TokenKind::Symbol(Symbol::Semicolon)
 				},
-				Lexeme::Asterisk => {
-					tokens.push(Token::Symbol(Symbol::Asterisk));
+				LexemeKind::Asterisk => {
+					TokenKind::Symbol(Symbol::Asterisk)
 				},
-				Lexeme::Greater => {
-					tokens.push(Token::Symbol(Symbol::Greater));
+				LexemeKind::Greater => {
+					TokenKind::Symbol(Symbol::Greater)
 				},
-				Lexeme::Less => {
-					tokens.push(Token::Symbol(Symbol::Less));
+				LexemeKind::Less => {
+					TokenKind::Symbol(Symbol::Less)
 				},
-				Lexeme::Equality => {
-					tokens.push(Token::Symbol(Symbol::Equality));
+				LexemeKind::Equality => {
+					TokenKind::Symbol(Symbol::Equality)
 				},
-				Lexeme::Assign => {
-					tokens.push(Token::Symbol(Symbol::Assign));
+				LexemeKind::Assign => {
+					TokenKind::Symbol(Symbol::Assign)
 				},
-				Lexeme::Ampersand => {
-					tokens.push(Token::Symbol(Symbol::Ampersand));
+				LexemeKind::Ampersand => {
+					TokenKind::Symbol(Symbol::Ampersand)
 				},
-				Lexeme::Question => {
-					tokens.push(Token::Symbol(Symbol::Question));
+				LexemeKind::Question => {
+					TokenKind::Symbol(Symbol::Question)
 				},
-				Lexeme::Exclamation => {
-					tokens.push(Token::Symbol(Symbol::Exclamation));
+				LexemeKind::Exclamation => {
+					TokenKind::Symbol(Symbol::Exclamation)
 				},
-				Lexeme::Plus => {
-					tokens.push(Token::Symbol(Symbol::Plus));
+				LexemeKind::Plus => {
+					TokenKind::Symbol(Symbol::Plus)
 				},
-				Lexeme::Minus => {
-					tokens.push(Token::Symbol(Symbol::Minus));
+				LexemeKind::Minus => {
+					TokenKind::Symbol(Symbol::Minus)
 				},
-				Lexeme::Slash => {
-					tokens.push(Token::Symbol(Symbol::Slash));
+				LexemeKind::Slash => {
+					TokenKind::Symbol(Symbol::Slash)
 				},
-				Lexeme::Namespace => {
-					tokens.push(Token::Symbol(Symbol::Namespace));
+				LexemeKind::Namespace => {
+					TokenKind::Symbol(Symbol::Namespace)
 				},
-				Lexeme::Whitespace { .. } => {}, // whitespace isn't syntax python
-			}
+				LexemeKind::Whitespace { .. } => continue, // whitespace isn't syntax python
+			};
+			tokens.push(Token {
+				kind,
+				location: lexeme.location,
+			});
 		}
 
 		Ok(Tokens { tokens })
