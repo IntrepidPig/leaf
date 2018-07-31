@@ -7,12 +7,16 @@ impl ExpressionTaker for IfTaker {
 
 	fn take_expression<'a>(&self, in_tokens: &'a [TokenTree], _args: Self::Args) -> ParseResult<'a, Expression> {
 		match in_tokens.get(0) {
-			Some(TokenTree::If(tokens)) => {
+			Some(TokenTree::Block(BlockType::If, tokens, start_location, end_location)) => {
 				let (until_then, leftovers) = operation::split_at(tokens, Box::new(|token| token.is_then()), false);
 				let condition = parse_block(until_then)?;
 
-				if !(leftovers.get(0) == Some(&TokenTree::Token(Token::Keyword(Keyword::Then)))) {
-					return Err(ParseError::Expected(vec![Expected::Keyword(Keyword::Then)]).into());
+				match leftovers.get(0) {
+					Some(&TokenTree::Token(Token { kind: TokenKind::Keyword(Keyword::Then), .. })) => {},
+					t => return Err(ParseError {
+						kind: ParseErrorKind::Expected(vec![Expected::Keyword(Keyword::Then)]),
+						location: t.map(|t| t.get_location()).unwrap_or(*start_location), // TODO better default location
+					}.into()), // Should never happen?
 				}
 
 				let (body_tokens, leftovers) =
@@ -25,13 +29,16 @@ impl ExpressionTaker for IfTaker {
 					None
 				} else {
 					match leftovers.get(0) {
-						Some(TokenTree::Token(Token::Keyword(Keyword::Else))) => {
+						Some(TokenTree::Token(Token { kind: TokenKind::Keyword(Keyword::Else), .. })) => {
 							let else_body = parse_block(&leftovers[1..])?;
 
 							Some(else_body)
 						},
 						// needed else or nothing after then
-						_ => return Err(ParseError::Expected(vec![Expected::Keyword(Keyword::Then)]).into()),
+						t => return Err(ParseError {
+							kind: ParseErrorKind::Expected(vec![Expected::Keyword(Keyword::Then)]),
+							location: t.map(|t| t.get_location()).unwrap_or(*start_location), // TODO better default location
+						}.into()),
 					}
 				};
 

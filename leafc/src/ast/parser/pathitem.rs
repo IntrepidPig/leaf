@@ -11,7 +11,7 @@ pub fn next_type<'a>(in_tokens: &'a [TokenTree]) -> ParseResult<'a, PathItem<Typ
 	tokens = leftovers;
 
 	let typename = match leftovers.get(0) {
-		Some(TokenTree::Token(Token::Name(ref name))) => {
+		Some(TokenTree::Token(Token { kind: TokenKind::Name(ref name), .. })) => {
 			tokens = &tokens[1..];
 			TypeName::from_ident(Identifier::try_from_str(name))
 		},
@@ -34,7 +34,7 @@ pub fn next_path<'a>(in_tokens: &'a [TokenTree]) -> Result<Option<(ModulePath, &
 	let mut tokens = in_tokens;
 
 	match tokens.get(0) {
-		Some(TokenTree::Token(Token::Symbol(TokenSymbol::Namespace))) => {
+		Some(TokenTree::Token(Token { kind: TokenKind::Symbol(TokenSymbol::Namespace), .. })) => {
 			relative = false;
 			tokens = &tokens[1..];
 		},
@@ -44,12 +44,12 @@ pub fn next_path<'a>(in_tokens: &'a [TokenTree]) -> Result<Option<(ModulePath, &
 
 	loop {
 		let ident = match tokens.get(0) {
-			Some(TokenTree::Token(Token::Name(ref name))) => Identifier::from_string(name.clone()),
+			Some(TokenTree::Token(Token { kind: TokenKind::Name(ref name), .. })) => Identifier::from_string(name.clone()),
 			_ => return Ok(None),
 		};
 
 		match tokens.get(1) {
-			Some(TokenTree::Token(Token::Symbol(TokenSymbol::Namespace))) => {
+			Some(TokenTree::Token(Token { kind: TokenKind::Symbol(TokenSymbol::Namespace), .. })) => {
 				pathitems.push(ident);
 			},
 			_ => {

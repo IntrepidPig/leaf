@@ -55,9 +55,15 @@ mod parse {
 		>,
 		Error<ParseError>,
 	>;
-
+	
 	#[derive(Debug, Clone, PartialEq, Eq)]
-	pub enum ExpressionItem {
+	pub struct ExpressionItem {
+		kind: ExpressionItemKind,
+		location: Location,
+	}
+	
+	#[derive(Debug, Clone, PartialEq, Eq)]
+	pub enum ExpressionItemKind {
 		Operator(Operator),
 		Operand(Expression),
 	}
@@ -84,7 +90,10 @@ mod parse {
 				}
 			}
 
-			return Err(ParseError::UnexpectedToken.into());
+			return Err(ParseError {
+				kind: ParseErrorKind::UnexpectedToken,
+				location: tokens[0].get_location(),
+			}.into());
 		}
 
 		// Simplifies the list of expression items into a single expression. Works recursively, step by step, with a lot of
@@ -99,8 +108,9 @@ mod parse {
 			// If there's only one item left it should be an expression and not an operator
 			if items.len() == 1 {
 				match items[0] {
-					ExpressionItem::Operand(ref expr) => return Ok(expr.clone()),
-					ExpressionItem::Operator(_) => return Err(ParseError::Expected(vec![Expected::Expression]).into()), // The expression parsed into an operator
+					ExpressionItem { kind: ExpressionItemKind::Operand(ref expr), .. } => return Ok(expr.clone()),
+					// The expression parsed into an operator, hopefully this is actually unreachable
+					ExpressionItem { kind: ExpressionItemKind::Operator(_), .. } => unreachable!(), 
 				}
 			}
 
@@ -111,17 +121,20 @@ mod parse {
 			let mut priority_op: usize = 0;
 
 			for (i, item) in items.iter().enumerate() {
-				if let ExpressionItem::Operator(op) = item {
-					if (op.precedence() < priority) || (op.left_associative() && op.precedence() == priority) {
-						priority = op.precedence();
-						priority_op = i;
-					}
+				match item {
+					ExpressionItem { kind: ExpressionItemKind::Operator(op), .. } => {
+						if (op.precedence() < priority) || (op.left_associative() && op.precedence() == priority) {
+							priority = op.precedence();
+							priority_op = i;
+						}
+					},
+					_ => {},
 				}
 			}
 
 			// Recursively call simplify on each side of an operator that will have an expression
 			match items[priority_op] {
-				ExpressionItem::Operator(op) => {
+				ExpressionItem { kind: ExpressionItemKind::Operator(op), location } => {
 					match op {
 						Operator::Binary(binop) => {
 							// Simplify the tokens to the left and to the right of the binary operation
@@ -140,7 +153,11 @@ mod parse {
 												expr: rhs,
 											})))
 										},
-										_ => Err(ParseError::Expected(vec![Expected::Identifier]).into()), // The left hand side wasn't an identifier
+										_ => Err(ParseError {
+											kind: ParseErrorKind::Expected(vec![Expected::Identifier]),
+											location,
+										}.into()), // The left hand side wasn't an identifier
+										// TODO get location of expression
 									}
 								},
 								BinaryOp::Dot => {
@@ -148,7 +165,10 @@ mod parse {
 										Expression::Identifier(ref ident) => {
 											Ok(Expression::FieldAccess(Box::new(lhs), ident.clone()))
 										},
-										_ => Err(ParseError::Expected(vec![Expected::Identifier]).into()), // Right hand side wasn't an identifier
+										_ => Err(ParseError {
+											kind: ParseErrorKind::Expected(vec![Expected::Identifier]),
+											location,
+										}.into()), // Right hand side wasn't an identifier
 									}
 								},
 								binop => Ok(Expression::Binary {
@@ -178,8 +198,11 @@ mod parse {
 						},
 					}
 				},
-				ExpressionItem::Operand(_) => {
-					Err(ParseError::Expected(vec![Expected::Operator]).into()) // The token at this index should be an operator
+				ExpressionItem { kind: ExpressionItemKind::Operand(_), location } => {
+					Err(ParseError {
+						kind: ParseErrorKind::Expected(vec![Expected::Operator]),
+						location,
+					}.into()) // The token at this index should be an operator
 				},
 			}
 		}
@@ -187,7 +210,10 @@ mod parse {
 		let expr = simplify(&expr_items)?;
 
 		if !tokens.is_empty() {
-			return Err(ParseError::UnexpectedToken.into()); // Not all the tokens were used up
+			return Err(ParseError {
+				kind: ParseErrorKind::UnexpectedToken,
+				location: tokens[0].get_location()
+			}.into()); // Not all the tokens were used up
 		}
 
 		Ok(expr)
@@ -200,14 +226,17 @@ mod parse {
 		fn next_item<'a>(&self, tokens: &'a [TokenTree]) -> ItemTakerResult<'a> {
 			if let Some(token) = tokens.get(0) {
 				Ok(Some((
-					ExpressionItem::Operator(Operator::Prefix(match token {
-						TokenTree::Token(Token::Symbol(symbol)) => match symbol {
-							TokenSymbol::Asterisk => PrefixOp::Asterisk,
-							TokenSymbol::Ampersand => PrefixOp::Ampersand,
+					ExpressionItem {
+						kind: ExpressionItemKind::Operator(Operator::Prefix(match token {
+							TokenTree::Token(Token { kind: TokenKind::Symbol(symbol), .. }) => match symbol {
+								TokenSymbol::Asterisk => PrefixOp::Asterisk,
+								TokenSymbol::Ampersand => PrefixOp::Ampersand,
+								_ => return Ok(None),
+							},
 							_ => return Ok(None),
-						},
-						_ => return Ok(None),
-					})),
+						})),
+						location: token.get_location(),
+					},
 					&[&PrefixTaker, &OperandTaker],
 					&tokens[1..],
 				)))
@@ -224,19 +253,22 @@ mod parse {
 		fn next_item<'a>(&self, tokens: &'a [TokenTree]) -> ItemTakerResult<'a> {
 			if let Some(token) = tokens.get(0) {
 				Ok(Some((
-					ExpressionItem::Operator(Operator::Binary(match token {
-						TokenTree::Token(Token::Symbol(symbol)) => match symbol {
-							TokenSymbol::Plus => BinaryOp::Add,
-							TokenSymbol::Minus => BinaryOp::Sub,
-							TokenSymbol::Asterisk => BinaryOp::Mul,
-							TokenSymbol::Slash => BinaryOp::Div,
-							TokenSymbol::Assign => BinaryOp::Assign,
-							TokenSymbol::Equality => BinaryOp::Equality,
-							TokenSymbol::Dot => BinaryOp::Dot,
+					ExpressionItem {
+						kind: ExpressionItemKind::Operator(Operator::Binary(match token {
+							TokenTree::Token(Token { kind: TokenKind::Symbol(symbol), .. }) => match symbol {
+								TokenSymbol::Plus => BinaryOp::Add,
+								TokenSymbol::Minus => BinaryOp::Sub,
+								TokenSymbol::Asterisk => BinaryOp::Mul,
+								TokenSymbol::Slash => BinaryOp::Div,
+								TokenSymbol::Assign => BinaryOp::Assign,
+								TokenSymbol::Equality => BinaryOp::Equality,
+								TokenSymbol::Dot => BinaryOp::Dot,
+								_ => return Ok(None),
+							},
 							_ => return Ok(None),
-						},
-						_ => return Ok(None),
-					})),
+						})),
+						location: token.get_location(),
+					},
 					&[&PrefixTaker, &OperandTaker],
 					&tokens[1..],
 				)))
@@ -269,14 +301,17 @@ mod parse {
 				let expr_opt = expression_taker.take_expression(in_tokens, ())?;
 				if let Some((expr, leftovers)) = expr_opt {
 					return Ok(Some((
-						ExpressionItem::Operand(expr),
+						ExpressionItem { kind: ExpressionItemKind::Operand(expr), location: in_tokens[0].get_location() },
 						&[&BinaryTaker],
 						leftovers,
 					)));
 				}
 			}
 
-			Err(ParseError::UnexpectedToken.into()) // Failed to parse operand
+			Err(ParseError {
+				kind: ParseErrorKind::UnexpectedToken,
+				location: in_tokens[0].get_location(),
+			}.into()) // Failed to parse operand
 		}
 	}
 }

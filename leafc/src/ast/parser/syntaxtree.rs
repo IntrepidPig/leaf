@@ -1,3 +1,4 @@
+use ast::lexer::Location;
 use ast::tokenizer::Symbol as TokenSymbol;
 use ast::treeify::*;
 use ast::parser::*;
@@ -339,10 +340,17 @@ mod errors {
 	use super::*;
 	/// An error that occurs while parsing
 	#[derive(Debug, Clone, PartialEq, Eq)]
-	pub enum ParseError {
+	pub enum ParseErrorKind {
 		UnexpectedToken,
 		Expected(Vec<Expected>),
 		LoopWithOutput,
+	}
+	
+	/// An error that occurs while parsing
+	#[derive(Debug, Clone, PartialEq, Eq)]
+	pub struct ParseError {
+		pub kind: ParseErrorKind,
+		pub location: Location,
 	}
 
 	#[derive(Debug, Clone, PartialEq, Eq)]
@@ -365,10 +373,10 @@ mod errors {
 		fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
 			write!(
 				f,
-				"{}",
-				match *self {
-					ParseError::UnexpectedToken => "Unexpected token".to_owned(),
-					ParseError::Expected(ref expected) => {
+				"{}\n{}",
+				match self.kind {
+					ParseErrorKind::UnexpectedToken => "Unexpected token".to_owned(),
+					ParseErrorKind::Expected(ref expected) => {
 						let mut items_str = "Expected one of: ".to_owned();
 						if expected.len() > 1 {
 							for (i, item) in expected.iter().enumerate() {
@@ -384,8 +392,9 @@ mod errors {
 						}
 						items_str
 					},
-					ParseError::LoopWithOutput => "Loop blocks cannot have an output".to_owned(),
-				}
+					ParseErrorKind::LoopWithOutput => "Loop blocks cannot have an output".to_owned(),
+				},
+				&self.location
 			)
 		}
 	}
@@ -429,7 +438,10 @@ pub fn parse_block(mut tokens: &[TokenTree]) -> Result<Block, Error<ParseError>>
 	// Parse the final expression if there is one
 	if let Some((expr, leftovers)) = next_expression(tokens, Box::new(|_| false))? {
 		if !leftovers.is_empty() {
-			return Err(ParseError::UnexpectedToken.into()); // There were tokens after the final expression which there shouldn't be
+			return Err(ParseError {
+				kind: ParseErrorKind::UnexpectedToken,
+				location: leftovers[0].get_location(),
+			}.into()); // There were tokens after the final expression which there shouldn't be
 		}
 		block.output = Some(expr);
 	}
@@ -440,7 +452,7 @@ pub fn parse_block(mut tokens: &[TokenTree]) -> Result<Block, Error<ParseError>>
 /// Gets the next statement requiring a terminating semicolon
 pub fn next_statement(in_tokens: &[TokenTree]) -> ParseResult<Expression> {
 	if let Some((expr, leftovers)) = next_expression(in_tokens, Box::new(|token| token.is_semicolon()))? {
-		if let Some(TokenTree::Token(Token::Symbol(TokenSymbol::Semicolon))) = leftovers.get(0) {
+		if let Some(TokenTree::Token(Token { kind: TokenKind::Symbol(TokenSymbol::Semicolon), .. })) = leftovers.get(0) {
 			Ok(Some((expr, &leftovers[1..])))
 		} else {
 			Ok(None)
@@ -462,5 +474,8 @@ pub fn next_expression<'a>(
 		return Ok(Some((expression, leftovers)));
 	}
 
-	Err(ParseError::UnexpectedToken.into()) // Could not parse the next expression
+	Err(ParseError {
+		kind: ParseErrorKind::UnexpectedToken,
+		location: in_tokens[0].get_location(),
+	}.into()) // Could not parse the next expression
 }

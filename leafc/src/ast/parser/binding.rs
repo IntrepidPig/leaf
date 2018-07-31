@@ -13,55 +13,75 @@ impl ExpressionTaker for BindingTaker {
 
 		let mut tokens = in_tokens;
 
-		match tokens.get(0) {
-			Some(TokenTree::Token(Token::Keyword(Keyword::Let))) => {
+		let last_location = match tokens.get(0) {
+			Some(TokenTree::Token(Token { kind: TokenKind::Keyword(Keyword::Let), location })) => {
 				tokens = &tokens[1..];
+				*location
 			},
 			_ => return Ok(None),
-		}
-
-		let mutable = match tokens.get(0) {
-			Some(TokenTree::Token(Token::Keyword(Keyword::Mutable))) => {
-				tokens = &tokens[1..];
-				true
-			},
-			_ => false,
 		};
 
-		let ident = match tokens.get(0) {
-			Some(TokenTree::Token(Token::Name(ref name))) => Identifier::try_from_str(name),
-			_ => return Err(ParseError::Expected(vec![Expected::Identifier]).into()),
+		let (mutable, last_location) = match tokens.get(0) {
+			Some(TokenTree::Token(Token { kind: TokenKind::Keyword(Keyword::Mutable), location })) => {
+				tokens = &tokens[1..];
+				(true, *location)
+			},
+			_ => (false, last_location),
+		};
+
+		let (ident, last_location) = match tokens.get(0) {
+			Some(TokenTree::Token(Token { kind: TokenKind::Name(ref name), location  })) => {
+				(Identifier::try_from_str(name), last_location)
+			},
+			Some(t) => return Err(ParseError {
+				kind: ParseErrorKind::Expected(vec![Expected::Identifier]),
+				location: t.get_location(),
+			}.into()),
+			None => return Err(ParseError {
+				kind: ParseErrorKind::Expected(vec![Expected::Identifier]),
+				location: last_location,
+			}.into()),
 		};
 		tokens = &tokens[1..];
 
-		let bindtype = match tokens.get(0) {
-			Some(TokenTree::Token(Token::Symbol(TokenSymbol::Colon))) => {
+		let (bindtype, last_location) = match tokens.get(0) {
+			Some(TokenTree::Token(Token { kind: TokenKind::Symbol(TokenSymbol::Colon), location })) => {
 				tokens = &tokens[1..];
 				let (typename, leftovers) = if let Some(res) = next_type(tokens)? {
 					res
 				} else {
-					return Err(ParseError::Expected(vec![Expected::Typename]).into());
+					return Err(ParseError {
+						kind: ParseErrorKind::Expected(vec![Expected::Typename]),
+						location: *location,
+					}.into());
 				};
 				tokens = leftovers;
-				Some(typename)
+				(Some(typename), *location)
 			},
-			_ => None,
+			_ => (None, last_location),
 		};
 
-		match tokens.get(0) {
-			Some(TokenTree::Token(Token::Symbol(TokenSymbol::Assign))) => {
+		let last_location = match tokens.get(0) {
+			Some(TokenTree::Token(Token { kind: TokenKind::Symbol(TokenSymbol::Assign), location })) => {
 				tokens = &tokens[1..];
+				*location
 			},
 			// expected assign symbol in let binding
-			_ => return Err(ParseError::Expected(vec![Expected::Symbol(TokenSymbol::Assign)]).into()),
-		}
+			t => return Err(ParseError {
+				kind: ParseErrorKind::Expected(vec![Expected::Symbol(TokenSymbol::Assign)]),
+				location: t.map(|t| t.get_location()).unwrap_or(last_location),
+			}.into()),
+		};
 
 		let (bindexpr, leftovers) = if let Some(res) = next_expression(tokens, Box::new(|token| token.is_semicolon()))?
 		{
 			res
 		} else {
 			// expected an expression after the assign symbol
-			return Err(ParseError::Expected(vec![Expected::Expression]).into());
+			return Err(ParseError {
+				kind: ParseErrorKind::Expected(vec![Expected::Expression]),
+				location: last_location,
+			}.into());
 		};
 
 		tokens = leftovers;

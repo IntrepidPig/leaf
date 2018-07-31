@@ -15,7 +15,7 @@ impl ExpressionTaker for IdentifierTaker {
 	fn take_expression<'a>(&self, in_tokens: &'a [TokenTree], _args: Self::Args) -> ParseResult<'a, Expression> {
 		Ok(Some((
 			match in_tokens.get(0) {
-				Some(TokenTree::Token(Token::Name(ref name))) => {
+				Some(TokenTree::Token(Token { kind: TokenKind::Name(ref name), .. })) => {
 					Expression::Identifier(Identifier::from_string(name.clone()))
 				},
 				_ => return Ok(None),

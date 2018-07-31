@@ -12,7 +12,7 @@ impl ExpressionTaker for BlockTaker {
 			return Ok(None);
 		}
 		match in_tokens[0] {
-			TokenTree::Brace(ref tokens) => {
+			TokenTree::Block(BlockType::Brace, ref tokens, _, _) => {
 				let ast = parse_block(tokens)?;
 				Ok(Some((Expression::Block(Box::new(ast)), &in_tokens[1..])))
 			},

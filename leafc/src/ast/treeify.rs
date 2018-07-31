@@ -1,11 +1,18 @@
 use std::fmt;
 
-use ast::lexer::{Bracket, BracketState};
+use ast::lexer::{Bracket, BracketState, Location};
 use ast::tokenizer::{Keyword, Symbol, TokenKind as OldTokenKind, Token as OldToken};
 use failure::Error;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Token {
+pub struct Token {
+	pub kind: TokenKind,
+	pub location: Location,
+}
+
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TokenKind {
 	Keyword(Keyword),
 	Name(String),
 	NumberLiteral(u64),
@@ -15,13 +22,17 @@ pub enum Token {
 
 impl Token {
 	pub fn from_old_token(old: OldToken) -> Result<Token, Error<TreeifyError>> {
-		Ok(match old.kind {
-			OldTokenKind::Keyword(keyword) => Token::Keyword(keyword),
-			OldTokenKind::Name(name) => Token::Name(name),
-			OldTokenKind::NumberLiteral(num) => Token::NumberLiteral(num),
-			OldTokenKind::StringLiteral(string) => Token::StringLiteral(string),
-			OldTokenKind::Symbol(symbol) => Token::Symbol(symbol),
+		let kind = match old.kind {
+			OldTokenKind::Keyword(keyword) => TokenKind::Keyword(keyword),
+			OldTokenKind::Name(name) => TokenKind::Name(name),
+			OldTokenKind::NumberLiteral(num) => TokenKind::NumberLiteral(num),
+			OldTokenKind::StringLiteral(string) => TokenKind::StringLiteral(string),
+			OldTokenKind::Symbol(symbol) => TokenKind::Symbol(symbol),
 			OldTokenKind::Bracket(_, _) => return Err(TreeifyError::IncorrectBrace.into()),
+		};
+		Ok(Token {
+			kind,
+			location: old.location,
 		})
 	}
 }
@@ -29,53 +40,65 @@ impl Token {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TokenTree {
 	Token(Token),
-	Paren(Vec<TokenTree>),
-	Brace(Vec<TokenTree>),
-	Bracket(Vec<TokenTree>),
-	If(Vec<TokenTree>),
-	Loop(Vec<TokenTree>),
+	Block(BlockType, Vec<TokenTree>, Location, Location),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BlockType {
+	Paren,
+	Brace,
+	Bracket,
+	If,
+	Loop,
 }
 
 impl TokenTree {
 	pub fn is_semicolon(&self) -> bool {
 		match self {
-			TokenTree::Token(Token::Symbol(Symbol::Semicolon)) => true,
+			TokenTree::Token(Token { kind: TokenKind::Symbol(Symbol::Semicolon), .. }) => true,
 			_ => false,
 		}
 	}
 
 	pub fn is_then(&self) -> bool {
 		match self {
-			TokenTree::Token(Token::Keyword(Keyword::Then)) => true,
+			TokenTree::Token(Token { kind: TokenKind::Keyword(Keyword::Then), .. }) => true,
 			_ => false,
 		}
 	}
 
 	pub fn is_else(&self) -> bool {
 		match self {
-			TokenTree::Token(Token::Keyword(Keyword::Else)) => true,
+			TokenTree::Token(Token { kind: TokenKind::Keyword(Keyword::Else), .. }) => true,
 			_ => false,
 		}
 	}
 
 	pub fn is_end(&self) -> bool {
 		match self {
-			TokenTree::Token(Token::Keyword(Keyword::End)) => true,
+			TokenTree::Token(Token { kind: TokenKind::Keyword(Keyword::End), .. }) => true,
 			_ => false,
 		}
 	}
 
 	pub fn is_brace_expr(&self) -> bool {
 		match self {
-			TokenTree::Brace(_) => true,
+			TokenTree::Block(BlockType::Brace, _, _, _) => true,
 			_ => false,
 		}
 	}
 
 	pub fn is_comma(&self) -> bool {
 		match self {
-			TokenTree::Token(Token::Symbol(Symbol::Comma)) => true,
+			TokenTree::Token(Token { kind: TokenKind::Symbol(Symbol::Comma), .. }) => true,
 			_ => false,
+		}
+	}
+	
+	pub fn get_location(&self) -> Location {
+		match self {
+			TokenTree::Token(token) => token.location,
+			TokenTree::Block(_, _, location, _end_location) => *location,
 		}
 	}
 }
@@ -107,12 +130,12 @@ fn treeify_brackets(in_tokens: &[OldToken]) -> Result<Vec<TokenTree>, Error<Tree
 	let mut tokens: Vec<TokenTree> = Vec::new();
 	let mut old_tokens = in_tokens;
 	while !old_tokens.is_empty() {
-		match &old_tokens[0].kind {
-			OldTokenKind::Bracket(bracket, state) => {
+		match &old_tokens[0] {
+			OldToken { kind: OldTokenKind::Bracket(bracket, state), location } => {
 				if *state == BracketState::Close {
 					return Err(TreeifyError::IncorrectBrace.into());
 				}
-				let (sub, leftovers) = get_sub(old_tokens, |old_token| match old_token.kind {
+				let (sub, leftovers, end_location) = get_sub(old_tokens, |old_token| match old_token.kind {
 					OldTokenKind::Bracket(test_bracket, test_state) => {
 						if test_bracket == *bracket {
 							match test_state {
@@ -126,9 +149,9 @@ fn treeify_brackets(in_tokens: &[OldToken]) -> Result<Vec<TokenTree>, Error<Tree
 					_ => 0,
 				})?;
 				match bracket {
-					Bracket::Curly => tokens.push(TokenTree::Brace(treeify_brackets(sub)?)),
-					Bracket::Paren => tokens.push(TokenTree::Paren(treeify_brackets(sub)?)),
-					Bracket::Square => tokens.push(TokenTree::Bracket(treeify_brackets(sub)?)),
+					Bracket::Curly => tokens.push(TokenTree::Block(BlockType::Brace, treeify_brackets(sub)?, *location, end_location)),
+					Bracket::Paren => tokens.push(TokenTree::Block(BlockType::Paren, treeify_brackets(sub)?, *location, end_location)),
+					Bracket::Square => tokens.push(TokenTree::Block(BlockType::Bracket, treeify_brackets(sub)?, *location, end_location)),
 				}
 
 				if let Some(OldTokenKind::Bracket(test_bracket, test_state)) = leftovers.get(0).map(|t| &t.kind) {
@@ -156,30 +179,18 @@ fn treeify_ifs(in_tokens: &[TokenTree]) -> Result<Vec<TokenTree>, Error<TreeifyE
 
 	while !old_tokens.is_empty() {
 		match &old_tokens[0] {
-			TokenTree::Token(Token::Keyword(Keyword::If)) => {
-				let (sub, leftovers) = get_sub(old_tokens, |token| match token {
-					TokenTree::Token(Token::Keyword(Keyword::If)) => 1,
-					TokenTree::Token(Token::Keyword(Keyword::End)) => -1,
+			TokenTree::Token(Token { kind: TokenKind::Keyword(Keyword::If), location }) => {
+				let (sub, leftovers, end_location) = get_sub(old_tokens, |token| match token {
+					TokenTree::Token(Token { kind: TokenKind::Keyword(Keyword::If), .. }) => 1,
+					TokenTree::Token(Token { kind: TokenKind::Keyword(Keyword::End), .. }) => -1,
 					_ => 0,
 				})?;
 
-				tokens.push(TokenTree::If(treeify_ifs(sub)?));
+				tokens.push(TokenTree::Block(BlockType::If, treeify_ifs(sub)?, *location, end_location));
 				old_tokens = &leftovers[1..];
 			},
-			TokenTree::Brace(sub_tokens) => {
-				tokens.push(TokenTree::Brace(treeify_ifs(sub_tokens)?));
-				old_tokens = &old_tokens[1..];
-			},
-			TokenTree::Paren(sub_tokens) => {
-				tokens.push(TokenTree::Paren(treeify_ifs(sub_tokens)?));
-				old_tokens = &old_tokens[1..];
-			},
-			TokenTree::Bracket(sub_tokens) => {
-				tokens.push(TokenTree::Bracket(treeify_ifs(sub_tokens)?));
-				old_tokens = &old_tokens[1..];
-			},
-			TokenTree::Loop(sub_tokens) => {
-				tokens.push(TokenTree::Loop(treeify_ifs(sub_tokens)?));
+			TokenTree::Block(block_type, sub_tokens, start_location, end_location) => {
+				tokens.push(TokenTree::Block(*block_type, treeify_ifs(sub_tokens)?, *start_location, *end_location));
 				old_tokens = &old_tokens[1..];
 			},
 			token => {
@@ -198,26 +209,18 @@ fn treeify_loops(in_tokens: &[TokenTree]) -> Result<Vec<TokenTree>, Error<Treeif
 
 	while !old_tokens.is_empty() {
 		match &old_tokens[0] {
-			TokenTree::Token(Token::Keyword(Keyword::Loop)) => {
-				let (sub, leftovers) = get_sub(old_tokens, |token| match token {
-					TokenTree::Token(Token::Keyword(Keyword::Loop)) => 1,
-					TokenTree::Token(Token::Keyword(Keyword::Back)) => -1,
+			TokenTree::Token(Token { kind: TokenKind::Keyword(Keyword::Loop), location }) => {
+				let (sub, leftovers, end_location) = get_sub(old_tokens, |token| match token {
+					TokenTree::Token(Token { kind: TokenKind::Keyword(Keyword::Loop), .. }) => 1,
+					TokenTree::Token(Token { kind: TokenKind::Keyword(Keyword::Back), .. }) => -1,
 					_ => 0,
 				})?;
 
-				tokens.push(TokenTree::Loop(treeify_loops(sub)?));
+				tokens.push(TokenTree::Block(BlockType::Loop, treeify_loops(sub)?, *location, end_location));
 				old_tokens = &leftovers[1..];
 			},
-			TokenTree::Brace(sub_tokens) => {
-				tokens.push(TokenTree::Brace(treeify_loops(sub_tokens)?));
-				old_tokens = &old_tokens[1..];
-			},
-			TokenTree::Paren(sub_tokens) => {
-				tokens.push(TokenTree::Paren(treeify_loops(sub_tokens)?));
-				old_tokens = &old_tokens[1..];
-			},
-			TokenTree::Bracket(sub_tokens) => {
-				tokens.push(TokenTree::Bracket(treeify_loops(sub_tokens)?));
+			TokenTree::Block(block_type, sub_tokens, start_location, end_location) => {
+				tokens.push(TokenTree::Block(*block_type, treeify_loops(sub_tokens)?, *start_location, *end_location));
 				old_tokens = &old_tokens[1..];
 			},
 			token => {
@@ -230,15 +233,31 @@ fn treeify_loops(in_tokens: &[TokenTree]) -> Result<Vec<TokenTree>, Error<Treeif
 	Ok(tokens)
 }
 
-fn get_sub<T, F: FnMut(&T) -> i32>(in_tokens: &[T], mut predicate: F) -> Result<(&[T], &[T]), Error<TreeifyError>> {
+fn get_sub<T: Locate, F: FnMut(&T) -> i32>(in_tokens: &[T], mut predicate: F) -> Result<(&[T], &[T], Location), Error<TreeifyError>> {
 	let mut count = 0;
 	for (i, token) in in_tokens.iter().enumerate() {
 		count += predicate(token);
 
 		if count == 0 {
-			return Ok((&in_tokens[1..i], &in_tokens[i..]));
+			return Ok((&in_tokens[1..i], &in_tokens[i..], token.get_location()));
 		}
 	}
 
 	Err(TreeifyError::UnclosedBrace.into())
+}
+
+pub trait Locate {
+	fn get_location(&self) -> Location;
+}
+
+impl Locate for OldToken {
+	fn get_location(&self) -> Location {
+		self.location
+	}
+}
+
+impl Locate for TokenTree {
+	fn get_location(&self) -> Location {
+		self.get_location()
+	}
 }
