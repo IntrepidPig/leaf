@@ -7,7 +7,7 @@ impl ExpressionTaker for IfTaker {
 
 	fn take_expression<'a>(&self, in_tokens: &'a [TokenTree], _args: Self::Args) -> ParseResult<'a, Expression> {
 		match in_tokens.get(0) {
-			Some(TokenTree::Block(BlockType::If, tokens, start_location, _end_location)) => {
+			Some(TokenTree::Block(BlockType::If, tokens, outer_span, _inner_span)) => {
 				let (until_then, leftovers) = operation::split_at(tokens, Box::new(|token| token.is_then()), false);
 				let condition = parse_block(until_then)?;
 
@@ -20,7 +20,7 @@ impl ExpressionTaker for IfTaker {
 						return Err(ParseError {
 							kind: ParseErrorKind::Expected(vec![Expected::Keyword(Keyword::Then)]),
 							// TODO better default location
-							location: t.map(|t| t.get_location()).unwrap_or(*start_location),
+							span: t.map(|t| t.get_span()).unwrap_or(*outer_span),
 						}.into());
 					}, // Should never happen?
 				}
@@ -48,7 +48,7 @@ impl ExpressionTaker for IfTaker {
 							return Err(ParseError {
 								kind: ParseErrorKind::Expected(vec![Expected::Keyword(Keyword::Then)]),
 								// TODO better default location
-								location: t.map(|t| t.get_location()).unwrap_or(*start_location),
+								span: t.map(|t| t.get_span()).unwrap_or(*outer_span),
 							}.into());
 						},
 					}

@@ -116,7 +116,7 @@ impl TokenTree {
 			TokenTree::Block(_, _, outer, _inner) => outer.start,
 		}
 	}
-	
+
 	pub fn get_span(&self) -> Span {
 		match self {
 			TokenTree::Token(token) => token.span,
@@ -244,7 +244,7 @@ fn treeify_ifs(in_tokens: &[TokenTree]) -> Result<Vec<TokenTree>, Error<TreeifyE
 					}) => -1,
 					_ => 0,
 				})?;
-				
+
 				let outer_span = Span {
 					start: span.start,
 					end: end_span.end,
@@ -301,7 +301,7 @@ fn treeify_loops(in_tokens: &[TokenTree]) -> Result<Vec<TokenTree>, Error<Treeif
 					}) => -1,
 					_ => 0,
 				})?;
-				
+
 				let outer_span = Span {
 					start: span.start,
 					end: end_span.end,

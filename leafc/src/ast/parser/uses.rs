@@ -3,13 +3,13 @@ use ast::parser::*;
 pub fn take_use<'a>(in_tokens: &'a [TokenTree]) -> ParseResult<'a, PathItem<Identifier>> {
 	let mut tokens = in_tokens;
 
-	let last_location = match tokens.get(0) {
+	let last_span = match tokens.get(0) {
 		Some(TokenTree::Token(Token {
 			kind: TokenKind::Keyword(Keyword::Use),
-			location,
+			span,
 		})) => {
 			tokens = &tokens[1..];
-			*location
+			*span
 		},
 		_ => return Ok(None),
 	};
@@ -19,10 +19,7 @@ pub fn take_use<'a>(in_tokens: &'a [TokenTree]) -> ParseResult<'a, PathItem<Iden
 	} else {
 		return Err(ParseError {
 			kind: ParseErrorKind::Expected(vec![Expected::ModulePath]),
-			location: tokens
-				.get(0)
-				.map(|t| t.get_location())
-				.unwrap_or(last_location),
+			span: tokens.get(0).map(|t| t.get_span()).unwrap_or(last_span),
 		}.into());
 	};
 
@@ -40,7 +37,7 @@ pub fn take_use<'a>(in_tokens: &'a [TokenTree]) -> ParseResult<'a, PathItem<Iden
 		t => {
 			return Err(ParseError {
 				kind: ParseErrorKind::Expected(vec![Expected::Identifier]),
-				location: t.map(|t| t.get_location()).unwrap_or(last_location),
+				span: t.map(|t| t.get_span()).unwrap_or(last_span),
 			}.into())
 		},
 	};

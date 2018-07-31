@@ -3,33 +3,30 @@ use ast::parser::*;
 pub fn take_typedef(in_tokens: &[TokenTree]) -> ParseResult<Type> {
 	let mut tokens = in_tokens;
 
-	let last_location = match tokens.get(0) {
+	let last_span = match tokens.get(0) {
 		Some(TokenTree::Token(Token {
 			kind: TokenKind::Keyword(Keyword::Type),
-			location,
+			span,
 		})) => {
 			tokens = &tokens[1..];
-			*location
+			*span
 		},
 		_ => return Ok(None),
 	};
 
-	let (name, mut last_location) = match tokens.get(0) {
+	let (name, mut last_span) = match tokens.get(0) {
 		Some(TokenTree::Token(Token {
 			kind: TokenKind::Name(ref name),
-			location,
+			span,
 		})) => {
 			// TODO parse this properly
 			tokens = &tokens[1..];
-			(
-				TypeName::from_ident(Identifier::try_from_str(name)),
-				*location,
-			)
+			(TypeName::from_ident(Identifier::try_from_str(name)), *span)
 		},
 		t => {
 			return Err(ParseError {
 				kind: ParseErrorKind::Expected(vec![Expected::Identifier]),
-				location: t.map(|t| t.get_location()).unwrap_or(last_location),
+				span: t.map(|t| t.get_span()).unwrap_or(last_span),
 			}.into())
 		}, // Type was not given a name
 	};
@@ -42,15 +39,15 @@ pub fn take_typedef(in_tokens: &[TokenTree]) -> ParseResult<Type> {
 				let name = match field_tokens.get(0) {
 					Some(TokenTree::Token(Token {
 						kind: TokenKind::Name(ref name),
-						location,
+						span,
 					})) => {
-						last_location = *location;
+						last_span = *span;
 						Identifier::try_from_str(name)
 					},
 					t => {
 						return Err(ParseError {
 							kind: ParseErrorKind::Expected(vec![Expected::Identifier]),
-							location: t.map(|t| t.get_location()).unwrap_or(last_location),
+							span: t.map(|t| t.get_span()).unwrap_or(last_span),
 						}.into())
 					}, // Got a field that wasn't a name
 				};
@@ -58,14 +55,14 @@ pub fn take_typedef(in_tokens: &[TokenTree]) -> ParseResult<Type> {
 				match field_tokens.get(1) {
 					Some(TokenTree::Token(Token {
 						kind: TokenKind::Symbol(TokenSymbol::Colon),
-						location,
+						span,
 					})) => {
-						last_location = *location;
+						last_span = *span;
 					},
 					t => {
 						return Err(ParseError {
 							kind: ParseErrorKind::Expected(vec![Expected::Colon]),
-							location: t.map(|t| t.get_location()).unwrap_or(last_location),
+							span: t.map(|t| t.get_span()).unwrap_or(last_span),
 						}.into())
 					}, // Field name didn't have a colon after it
 				}
@@ -75,14 +72,14 @@ pub fn take_typedef(in_tokens: &[TokenTree]) -> ParseResult<Type> {
 				} else {
 					return Err(ParseError {
 						kind: ParseErrorKind::Expected(vec![Expected::Typename]),
-						location: last_location,
+						span: last_span,
 					}.into()); // Field didn't specify a type
 				};
 
 				if !leftovers.is_empty() {
 					return Err(ParseError {
 						kind: ParseErrorKind::UnexpectedToken,
-						location: leftovers[0].get_location(),
+						span: leftovers[0].get_span(),
 					}.into()); // Didn't parse field type correctly
 				}
 
@@ -92,7 +89,7 @@ pub fn take_typedef(in_tokens: &[TokenTree]) -> ParseResult<Type> {
 		t => {
 			return Err(ParseError {
 				kind: ParseErrorKind::Expected(vec![Expected::Block]),
-				location: t.map(|t| t.get_location()).unwrap_or(last_location),
+				span: t.map(|t| t.get_span()).unwrap_or(last_span),
 			}.into())
 		}, // needed a a block with fields
 	};

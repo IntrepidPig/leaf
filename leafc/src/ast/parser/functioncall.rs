@@ -63,7 +63,7 @@ fn parse_args(in_tokens: &[TokenTree]) -> Result<Vec<Expression>, Error<ParseErr
 				// didn't parse the entire argument expression tokens
 				return Err(ParseError {
 					kind: ParseErrorKind::UnexpectedToken,
-					location: leftovers[0].get_location(),
+					span: leftovers[0].get_span(),
 				}.into());
 			}
 

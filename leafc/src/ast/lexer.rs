@@ -182,6 +182,16 @@ impl fmt::Display for Location {
 	}
 }
 
+impl fmt::Display for Span {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(
+			f,
+			"From line {} column {}, to line {} column {}",
+			self.start.line, self.start.col, self.end.line, self.end.col
+		)
+	}
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LexError {
 	pub kind: LexErrorKind,
@@ -257,9 +267,11 @@ pub fn lex(old_input: &str) -> Result<Lexemes, LexError> {
 					span: Span {
 						start: start_location,
 						end: location,
-					}
+					},
 				});
-				lexemes.last_mut().map(|lexeme| lexeme.span.end = location);
+				if let Some(lexeme) = lexemes.last_mut() {
+					lexeme.span.end = location
+				}
 				continue 'outer;
 			}
 		}

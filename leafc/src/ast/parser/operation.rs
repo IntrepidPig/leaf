@@ -59,7 +59,7 @@ mod parse {
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub struct ExpressionItem {
 		kind: ExpressionItemKind,
-		location: Location,
+		span: Span,
 	}
 
 	#[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,7 +92,7 @@ mod parse {
 
 			return Err(ParseError {
 				kind: ParseErrorKind::UnexpectedToken,
-				location: tokens[0].get_location(),
+				span: tokens[0].get_span(),
 			}.into());
 		}
 
@@ -143,7 +143,7 @@ mod parse {
 			match items[priority_op] {
 				ExpressionItem {
 					kind: ExpressionItemKind::Operator(op),
-					location,
+					span,
 				} => {
 					match op {
 						Operator::Binary(binop) => {
@@ -165,7 +165,7 @@ mod parse {
 										},
 										_ => Err(ParseError {
 											kind: ParseErrorKind::Expected(vec![Expected::Identifier]),
-											location,
+											span,
 										}.into()), // The left hand side wasn't an identifier
 										           // TODO get location of expression
 									}
@@ -177,7 +177,7 @@ mod parse {
 										},
 										_ => Err(ParseError {
 											kind: ParseErrorKind::Expected(vec![Expected::Identifier]),
-											location,
+											span,
 										}.into()), // Right hand side wasn't an identifier
 									}
 								},
@@ -210,11 +210,11 @@ mod parse {
 				},
 				ExpressionItem {
 					kind: ExpressionItemKind::Operand(_),
-					location,
+					span,
 				} => {
 					Err(ParseError {
 						kind: ParseErrorKind::Expected(vec![Expected::Operator]),
-						location,
+						span,
 					}.into()) // The token at this index should be an operator
 				},
 			}
@@ -225,7 +225,7 @@ mod parse {
 		if !tokens.is_empty() {
 			return Err(ParseError {
 				kind: ParseErrorKind::UnexpectedToken,
-				location: tokens[0].get_location(),
+				span: tokens[0].get_span(),
 			}.into()); // Not all the tokens were used up
 		}
 
@@ -251,7 +251,7 @@ mod parse {
 							},
 							_ => return Ok(None),
 						})),
-						location: token.get_location(),
+						span: token.get_span(),
 					},
 					&[&PrefixTaker, &OperandTaker],
 					&tokens[1..],
@@ -286,7 +286,7 @@ mod parse {
 							},
 							_ => return Ok(None),
 						})),
-						location: token.get_location(),
+						span: token.get_span(),
 					},
 					&[&PrefixTaker, &OperandTaker],
 					&tokens[1..],
@@ -322,7 +322,7 @@ mod parse {
 					return Ok(Some((
 						ExpressionItem {
 							kind: ExpressionItemKind::Operand(expr),
-							location: in_tokens[0].get_location(),
+							span: in_tokens[0].get_span(),
 						},
 						&[&BinaryTaker],
 						leftovers,
@@ -332,7 +332,7 @@ mod parse {
 
 			Err(ParseError {
 				kind: ParseErrorKind::UnexpectedToken,
-				location: in_tokens[0].get_location(),
+				span: in_tokens[0].get_span(),
 			}.into()) // Failed to parse operand
 		}
 	}

@@ -14,14 +14,14 @@ impl ExpressionTaker for LoopTaker {
 
 	fn take_expression<'a>(&self, in_tokens: &'a [TokenTree], _args: Self::Args) -> ParseResult<'a, Expression> {
 		match in_tokens.get(0) {
-			Some(TokenTree::Block(BlockType::Loop, tokens, _start_location, end_location)) => {
+			Some(TokenTree::Block(BlockType::Loop, tokens, _outer_span, inner_span)) => {
 				let expr = parse_block(tokens)?;
 
 				if expr.output.is_some() {
 					// Loop blocks can't have an output
 					return Err(ParseError {
 						kind: ParseErrorKind::LoopWithOutput,
-						location: *end_location,
+						span: *inner_span,
 					}.into());
 				}
 

@@ -3,29 +3,29 @@ use ast::parser::*;
 pub fn take_module(in_tokens: &[TokenTree]) -> ParseResult<(Identifier, Module)> {
 	let mut tokens = in_tokens;
 
-	let last_location = match tokens.get(0) {
+	let last_span = match tokens.get(0) {
 		Some(TokenTree::Token(Token {
 			kind: TokenKind::Keyword(Keyword::Module),
-			location,
+			span,
 		})) => {
 			tokens = &tokens[1..];
-			*location
+			*span
 		},
 		_ => return Ok(None),
 	};
 
-	let (name, last_location) = match tokens.get(0) {
+	let (name, last_span) = match tokens.get(0) {
 		Some(TokenTree::Token(Token {
 			kind: TokenKind::Name(ref name),
-			location,
+			span,
 		})) => {
 			tokens = &tokens[1..];
-			(Identifier::try_from_str(name), *location)
+			(Identifier::try_from_str(name), *span)
 		},
 		t => {
 			return Err(ParseError {
 				kind: ParseErrorKind::Expected(vec![Expected::Identifier]),
-				location: t.map(|t| t.get_location()).unwrap_or(last_location),
+				span: t.map(|t| t.get_span()).unwrap_or(last_span),
 			}.into())
 		}, // Module was not given a name
 	};
@@ -35,7 +35,7 @@ pub fn take_module(in_tokens: &[TokenTree]) -> ParseResult<(Identifier, Module)>
 		t => {
 			return Err(ParseError {
 				kind: ParseErrorKind::Expected(vec![Expected::Block]),
-				location: t.map(|t| t.get_location()).unwrap_or(last_location),
+				span: t.map(|t| t.get_span()).unwrap_or(last_span),
 			}.into())
 		}, // needed a a block of code after module
 	};

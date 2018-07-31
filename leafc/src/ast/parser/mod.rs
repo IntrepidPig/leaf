@@ -19,7 +19,7 @@ pub mod uses;
 pub mod module;
 
 pub use ast::tokenizer::{Keyword, Symbol as TokenSymbol};
-pub use ast::lexer::Location;
+pub use ast::lexer::{Location, Span};
 pub use self::syntaxtree::*;
 pub use self::operators::*;
 pub use ast::treeify::*;
@@ -56,7 +56,7 @@ pub fn parse(in_tokens: &[TokenTree]) -> Result<SyntaxTree, Error<ParseError>> {
 
 		return Err(ParseError {
 			kind: ParseErrorKind::UnexpectedToken,
-			location: tokens[0].get_location(),
+			span: tokens[0].get_span(),
 		}.into()); // Didn't get a function or a typedef in the root
 	}
 

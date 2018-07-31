@@ -3,57 +3,57 @@ use ast::parser::*;
 pub fn take_functiondef(in_tokens: &[TokenTree]) -> ParseResult<Function> {
 	let mut tokens = in_tokens;
 
-	let last_location = match tokens.get(0) {
+	let last_span = match tokens.get(0) {
 		Some(TokenTree::Token(Token {
 			kind: TokenKind::Keyword(Keyword::Function),
-			location,
+			span,
 		})) => {
 			tokens = &tokens[1..];
-			*location
+			*span
 		},
 		_ => return Ok(None),
 	};
 
-	let (name, last_location) = match tokens.get(0) {
+	let (name, last_span) = match tokens.get(0) {
 		Some(TokenTree::Token(Token {
 			kind: TokenKind::Name(ref name),
-			location,
+			span,
 		})) => {
 			tokens = &tokens[1..];
-			(Identifier::try_from_str(name), *location)
+			(Identifier::try_from_str(name), *span)
 		},
 		t => {
 			return Err(ParseError {
 				kind: ParseErrorKind::Expected(vec![Expected::Identifier]),
-				location: t.map(|t| t.get_location()).unwrap_or(last_location),
+				span: t.map(|t| t.get_span()).unwrap_or(last_span),
 			}.into())
 		}, // needed a function name
 	};
 
-	let (args, last_location) = match tokens.get(0) {
-		Some(TokenTree::Block(BlockType::Paren, ref args_tokens, start_location, end_location)) => {
+	let (args, last_span) = match tokens.get(0) {
+		Some(TokenTree::Block(BlockType::Paren, ref args_tokens, outer_span, inner_span)) => {
 			tokens = &tokens[1..];
 			if !args_tokens.is_empty() {
 				(
-					parse_args(args_tokens, *start_location)?,
-					args_tokens[0].get_location(),
+					parse_args(args_tokens, *outer_span)?,
+					args_tokens[0].get_span(),
 				)
 			} else {
-				(Vec::new(), *end_location)
+				(Vec::new(), *inner_span)
 			}
 		},
 		t => {
 			return Err(ParseError {
 				kind: ParseErrorKind::Expected(vec![Expected::Parentheses]),
-				location: t.map(|t| t.get_location()).unwrap_or(last_location),
+				span: t.map(|t| t.get_span()).unwrap_or(last_span),
 			}.into())
 		}, // needed parens with arguments inside
 	};
 
-	let (return_type, last_location) = match tokens.get(0) {
+	let (return_type, last_span) = match tokens.get(0) {
 		Some(TokenTree::Token(Token {
 			kind: TokenKind::Symbol(TokenSymbol::Colon),
-			location,
+			span,
 		})) => {
 			tokens = &tokens[1..];
 			let (typename, leftovers) = if let Some(res) = next_type(tokens)? {
@@ -61,19 +61,16 @@ pub fn take_functiondef(in_tokens: &[TokenTree]) -> ParseResult<Function> {
 			} else {
 				return Err(ParseError {
 					kind: ParseErrorKind::Expected(vec![Expected::Typename]),
-					location: *location,
+					span: *span,
 				}.into()); // Expected a type after the colon
 			};
 			tokens = leftovers;
 			(
 				Some(typename),
-				leftovers
-					.get(0)
-					.map(|t| t.get_location())
-					.unwrap_or(*location),
+				leftovers.get(0).map(|t| t.get_span()).unwrap_or(*span),
 			)
 		},
-		t => (None, t.map(|t| t.get_location()).unwrap_or(last_location)),
+		t => (None, t.map(|t| t.get_span()).unwrap_or(last_span)),
 	};
 
 	let block_taker = block::BlockTaker {};
@@ -82,7 +79,7 @@ pub fn take_functiondef(in_tokens: &[TokenTree]) -> ParseResult<Function> {
 	} else {
 		return Err(ParseError {
 			kind: ParseErrorKind::Expected(vec![Expected::Block]),
-			location: last_location,
+			span: last_span,
 		}.into()); // needed a block after the args or return type
 	};
 
@@ -117,29 +114,29 @@ pub fn take_externfn(in_tokens: &[TokenTree]) -> ParseResult<ExternFunction> {
 		_ => return Ok(None),
 	}
 
-	let last_location = match tokens.get(0) {
+	let last_span = match tokens.get(0) {
 		Some(TokenTree::Token(Token {
 			kind: TokenKind::Keyword(Keyword::Function),
-			location,
+			span,
 		})) => {
 			tokens = &tokens[1..];
-			*location
+			*span
 		},
 		_ => return Ok(None),
 	};
 
-	let (name, last_location) = match tokens.get(0) {
+	let (name, last_span) = match tokens.get(0) {
 		Some(TokenTree::Token(Token {
 			kind: TokenKind::Name(ref name),
-			location,
+			span,
 		})) => {
 			tokens = &tokens[1..];
-			(Identifier::try_from_str(name), *location)
+			(Identifier::try_from_str(name), *span)
 		},
 		t => {
 			return Err(ParseError {
 				kind: ParseErrorKind::Expected(vec![Expected::Identifier]),
-				location: t.map(|t| t.get_location()).unwrap_or(last_location),
+				span: t.map(|t| t.get_span()).unwrap_or(last_span),
 			}.into())
 		}, // needed a function name
 	};
@@ -159,7 +156,7 @@ pub fn take_externfn(in_tokens: &[TokenTree]) -> ParseResult<ExternFunction> {
 		t => {
 			return Err(ParseError {
 				kind: ParseErrorKind::Expected(vec![Expected::Parentheses]),
-				location: t.map(|t| t.get_location()).unwrap_or(last_location),
+				span: t.map(|t| t.get_span()).unwrap_or(last_span),
 			}.into())
 		}, // needed parens with arguments inside
 	};
@@ -167,7 +164,7 @@ pub fn take_externfn(in_tokens: &[TokenTree]) -> ParseResult<ExternFunction> {
 	let return_type = match tokens.get(0) {
 		Some(TokenTree::Token(Token {
 			kind: TokenKind::Symbol(TokenSymbol::Colon),
-			location,
+			span,
 		})) => {
 			tokens = &tokens[1..];
 			let (typename, leftovers) = if let Some(res) = next_type(tokens)? {
@@ -175,7 +172,7 @@ pub fn take_externfn(in_tokens: &[TokenTree]) -> ParseResult<ExternFunction> {
 			} else {
 				return Err(ParseError {
 					kind: ParseErrorKind::Expected(vec![Expected::Typename]),
-					location: *location,
+					span: *span,
 				}.into()); // Expected a type after the colon
 			};
 			tokens = leftovers;
@@ -196,23 +193,23 @@ pub fn take_externfn(in_tokens: &[TokenTree]) -> ParseResult<ExternFunction> {
 
 fn parse_args(
 	in_tokens: &[TokenTree],
-	start_location: Location,
+	outer_span: Span,
 ) -> Result<Vec<(Identifier, PathItem<TypeName>)>, Error<ParseError>> {
 	let mut args = Vec::new();
-	let mut last_location = start_location;
+	let mut last_span = outer_span;
 	for arg_tokens in separated::parse_separated(in_tokens, |token| token.is_comma())? {
 		let name = match arg_tokens.get(0) {
 			Some(TokenTree::Token(Token {
 				kind: TokenKind::Name(ref name),
-				location,
+				span,
 			})) => {
-				last_location = *location;
+				last_span = *span;
 				Identifier::try_from_str(name)
 			},
 			t => {
 				return Err(ParseError {
 					kind: ParseErrorKind::Expected(vec![Expected::Identifier]),
-					location: t.map(|t| t.get_location()).unwrap_or(last_location),
+					span: t.map(|t| t.get_span()).unwrap_or(last_span),
 				}.into())
 			}, // Got an argument that wasn't a name
 		};
@@ -220,14 +217,14 @@ fn parse_args(
 		match arg_tokens.get(1) {
 			Some(TokenTree::Token(Token {
 				kind: TokenKind::Symbol(TokenSymbol::Colon),
-				location,
+				span,
 			})) => {
-				last_location = *location;
+				last_span = *span;
 			},
 			t => {
 				return Err(ParseError {
 					kind: ParseErrorKind::Expected(vec![Expected::Colon]),
-					location: t.map(|t| t.get_location()).unwrap_or(last_location),
+					span: t.map(|t| t.get_span()).unwrap_or(last_span),
 				}.into())
 			}, // Argument name needed colon after it
 		}
@@ -238,14 +235,14 @@ fn parse_args(
 		} else {
 			return Err(ParseError {
 				kind: ParseErrorKind::Expected(vec![Expected::Typename]),
-				location: last_location,
+				span: last_span,
 			}.into()); // Didn't get type after argument
 		};
 
 		if !leftovers.is_empty() {
 			return Err(ParseError {
 				kind: ParseErrorKind::UnexpectedToken,
-				location: leftovers[0].get_location(),
+				span: leftovers[0].get_span(),
 			}.into()); // There were leftover tokens after the parameter type
 		}
 

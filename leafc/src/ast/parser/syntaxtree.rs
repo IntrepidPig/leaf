@@ -1,4 +1,4 @@
-use ast::lexer::Location;
+use ast::lexer::Span;
 use ast::tokenizer::Symbol as TokenSymbol;
 use ast::treeify::*;
 use ast::parser::*;
@@ -350,7 +350,7 @@ mod errors {
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub struct ParseError {
 		pub kind: ParseErrorKind,
-		pub location: Location,
+		pub span: Span,
 	}
 
 	#[derive(Debug, Clone, PartialEq, Eq)]
@@ -394,7 +394,7 @@ mod errors {
 					},
 					ParseErrorKind::LoopWithOutput => "Loop blocks cannot have an output".to_owned(),
 				},
-				&self.location
+				&self.span
 			)
 		}
 	}
@@ -440,7 +440,7 @@ pub fn parse_block(mut tokens: &[TokenTree]) -> Result<Block, Error<ParseError>>
 		if !leftovers.is_empty() {
 			return Err(ParseError {
 				kind: ParseErrorKind::UnexpectedToken,
-				location: leftovers[0].get_location(),
+				span: leftovers[0].get_span(),
 			}.into()); // There were tokens after the final expression which there shouldn't be
 		}
 		block.output = Some(expr);
@@ -480,6 +480,6 @@ pub fn next_expression<'a>(
 
 	Err(ParseError {
 		kind: ParseErrorKind::UnexpectedToken,
-		location: in_tokens[0].get_location(),
+		span: in_tokens[0].get_span(),
 	}.into()) // Could not parse the next expression
 }

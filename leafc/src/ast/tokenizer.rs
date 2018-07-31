@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ast::lexer::{Bracket, BracketState, LexemeKind, Lexemes, Location, Span};
+use ast::lexer::{Bracket, BracketState, LexemeKind, Lexemes, Span};
 
 #[derive(Debug, Clone)]
 pub struct Tokenizer<'a> {
