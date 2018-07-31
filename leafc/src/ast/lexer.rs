@@ -224,17 +224,21 @@ pub fn lex(old_input: &str) -> Result<Lexemes, LexError> {
 		&WordTaker,
 		&StringTaker,
 	];
-	
-	let mut location = Location {
-		line: 1,
-		col: 0,
-	};
+
+	let mut location = Location { line: 1, col: 0 };
 
 	// Keep cutting down the input string slice with lexeme takers until it's empty
 	'outer: while !input.is_empty() {
 		for lexeme_taker in lexeme_takers {
-			if let Some((lexeme, remaining)) = lexeme_taker.next_lexeme(input).map_err(|e| LexError { kind: e, location })? {
-				if let LexemeKind::Whitespace { whitespace_type, amount } = lexeme {
+			if let Some((lexeme, remaining)) = lexeme_taker
+				.next_lexeme(input)
+				.map_err(|e| LexError { kind: e, location })?
+			{
+				if let LexemeKind::Whitespace {
+					whitespace_type,
+					amount,
+				} = lexeme
+				{
 					if whitespace_type == WhitespaceType::Newline {
 						location.line += amount;
 						location.col = 0;
@@ -409,10 +413,10 @@ impl LexemeTaker for StringTaker {
 				// no longer escaping escaping
 				backslash = false;
 				match c {
-					'"' => string.push('"'),                     // non-terminating quotes
-					'n' => string.push('\n'),                    // newlines
-					't' => string.push('\t'),                    // tab characters
-					'\\' => string.push('\\'),                   // actual backslashes
+					'"' => string.push('"'),                         // non-terminating quotes
+					'n' => string.push('\n'),                        // newlines
+					't' => string.push('\t'),                        // tab characters
+					'\\' => string.push('\\'),                       // actual backslashes
 					c => return Err(LexErrorKind::UnknownEscape(c)), // fail if an unknown character was escaped
 				}
 			// if its a quote the string is over

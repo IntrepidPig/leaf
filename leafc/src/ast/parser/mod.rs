@@ -56,7 +56,7 @@ pub fn parse(in_tokens: &[TokenTree]) -> Result<SyntaxTree, Error<ParseError>> {
 
 		return Err(ParseError {
 			kind: ParseErrorKind::UnexpectedToken,
-			location: tokens[0].get_location()
+			location: tokens[0].get_location(),
 		}.into()); // Didn't get a function or a typedef in the root
 	}
 

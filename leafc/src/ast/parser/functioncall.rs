@@ -22,7 +22,10 @@ impl ExpressionTaker for FunctionCallTaker {
 		tokens = leftovers;
 
 		let name = match tokens.get(0) {
-			Some(TokenTree::Token(Token { kind: TokenKind::Name(ref name), .. })) => {
+			Some(TokenTree::Token(Token {
+				kind: TokenKind::Name(ref name),
+				..
+			})) => {
 				tokens = &tokens[1..];
 				Identifier::from_string(name.clone())
 			},
@@ -59,8 +62,8 @@ fn parse_args(in_tokens: &[TokenTree]) -> Result<Vec<Expression>, Error<ParseErr
 			if !leftovers.is_empty() {
 				// didn't parse the entire argument expression tokens
 				return Err(ParseError {
-					kind: ParseErrorKind::UnexpectedToken.into(),
-					location: leftovers[0].get_location()
+					kind: ParseErrorKind::UnexpectedToken,
+					location: leftovers[0].get_location(),
 				}.into());
 			}
 

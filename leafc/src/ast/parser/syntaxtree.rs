@@ -345,7 +345,7 @@ mod errors {
 		Expected(Vec<Expected>),
 		LoopWithOutput,
 	}
-	
+
 	/// An error that occurs while parsing
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub struct ParseError {
@@ -452,7 +452,11 @@ pub fn parse_block(mut tokens: &[TokenTree]) -> Result<Block, Error<ParseError>>
 /// Gets the next statement requiring a terminating semicolon
 pub fn next_statement(in_tokens: &[TokenTree]) -> ParseResult<Expression> {
 	if let Some((expr, leftovers)) = next_expression(in_tokens, Box::new(|token| token.is_semicolon()))? {
-		if let Some(TokenTree::Token(Token { kind: TokenKind::Symbol(TokenSymbol::Semicolon), .. })) = leftovers.get(0) {
+		if let Some(TokenTree::Token(Token {
+			kind: TokenKind::Symbol(TokenSymbol::Semicolon),
+			..
+		})) = leftovers.get(0)
+		{
 			Ok(Some((expr, &leftovers[1..])))
 		} else {
 			Ok(None)

@@ -16,7 +16,10 @@ impl ExpressionTaker for DebugTaker {
 
 		match tokens[0] {
 			// If the first token is debug it's a debug statement
-			TokenTree::Token(Token { kind: TokenKind::Keyword(Keyword::Debug), .. }) => {
+			TokenTree::Token(Token {
+				kind: TokenKind::Keyword(Keyword::Debug),
+				..
+			}) => {
 				// Get the expression after the keyword
 				let expr = if let Some((expr, leftovers)) =
 					next_expression(&tokens[1..], Box::new(|token| token.is_semicolon()))?

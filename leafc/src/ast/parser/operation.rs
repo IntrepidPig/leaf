@@ -55,13 +55,13 @@ mod parse {
 		>,
 		Error<ParseError>,
 	>;
-	
+
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub struct ExpressionItem {
 		kind: ExpressionItemKind,
 		location: Location,
 	}
-	
+
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub enum ExpressionItemKind {
 		Operator(Operator),
@@ -108,9 +108,15 @@ mod parse {
 			// If there's only one item left it should be an expression and not an operator
 			if items.len() == 1 {
 				match items[0] {
-					ExpressionItem { kind: ExpressionItemKind::Operand(ref expr), .. } => return Ok(expr.clone()),
+					ExpressionItem {
+						kind: ExpressionItemKind::Operand(ref expr),
+						..
+					} => return Ok(expr.clone()),
 					// The expression parsed into an operator, hopefully this is actually unreachable
-					ExpressionItem { kind: ExpressionItemKind::Operator(_), .. } => unreachable!(), 
+					ExpressionItem {
+						kind: ExpressionItemKind::Operator(_),
+						..
+					} => unreachable!(),
 				}
 			}
 
@@ -121,20 +127,24 @@ mod parse {
 			let mut priority_op: usize = 0;
 
 			for (i, item) in items.iter().enumerate() {
-				match item {
-					ExpressionItem { kind: ExpressionItemKind::Operator(op), .. } => {
-						if (op.precedence() < priority) || (op.left_associative() && op.precedence() == priority) {
-							priority = op.precedence();
-							priority_op = i;
-						}
-					},
-					_ => {},
+				if let ExpressionItem {
+					kind: ExpressionItemKind::Operator(op),
+					..
+				} = item
+				{
+					if (op.precedence() < priority) || (op.left_associative() && op.precedence() == priority) {
+						priority = op.precedence();
+						priority_op = i;
+					}
 				}
 			}
 
 			// Recursively call simplify on each side of an operator that will have an expression
 			match items[priority_op] {
-				ExpressionItem { kind: ExpressionItemKind::Operator(op), location } => {
+				ExpressionItem {
+					kind: ExpressionItemKind::Operator(op),
+					location,
+				} => {
 					match op {
 						Operator::Binary(binop) => {
 							// Simplify the tokens to the left and to the right of the binary operation
@@ -157,7 +167,7 @@ mod parse {
 											kind: ParseErrorKind::Expected(vec![Expected::Identifier]),
 											location,
 										}.into()), // The left hand side wasn't an identifier
-										// TODO get location of expression
+										           // TODO get location of expression
 									}
 								},
 								BinaryOp::Dot => {
@@ -198,7 +208,10 @@ mod parse {
 						},
 					}
 				},
-				ExpressionItem { kind: ExpressionItemKind::Operand(_), location } => {
+				ExpressionItem {
+					kind: ExpressionItemKind::Operand(_),
+					location,
+				} => {
 					Err(ParseError {
 						kind: ParseErrorKind::Expected(vec![Expected::Operator]),
 						location,
@@ -212,7 +225,7 @@ mod parse {
 		if !tokens.is_empty() {
 			return Err(ParseError {
 				kind: ParseErrorKind::UnexpectedToken,
-				location: tokens[0].get_location()
+				location: tokens[0].get_location(),
 			}.into()); // Not all the tokens were used up
 		}
 
@@ -228,7 +241,10 @@ mod parse {
 				Ok(Some((
 					ExpressionItem {
 						kind: ExpressionItemKind::Operator(Operator::Prefix(match token {
-							TokenTree::Token(Token { kind: TokenKind::Symbol(symbol), .. }) => match symbol {
+							TokenTree::Token(Token {
+								kind: TokenKind::Symbol(symbol),
+								..
+							}) => match symbol {
 								TokenSymbol::Asterisk => PrefixOp::Asterisk,
 								TokenSymbol::Ampersand => PrefixOp::Ampersand,
 								_ => return Ok(None),
@@ -255,7 +271,10 @@ mod parse {
 				Ok(Some((
 					ExpressionItem {
 						kind: ExpressionItemKind::Operator(Operator::Binary(match token {
-							TokenTree::Token(Token { kind: TokenKind::Symbol(symbol), .. }) => match symbol {
+							TokenTree::Token(Token {
+								kind: TokenKind::Symbol(symbol),
+								..
+							}) => match symbol {
 								TokenSymbol::Plus => BinaryOp::Add,
 								TokenSymbol::Minus => BinaryOp::Sub,
 								TokenSymbol::Asterisk => BinaryOp::Mul,
@@ -301,7 +320,10 @@ mod parse {
 				let expr_opt = expression_taker.take_expression(in_tokens, ())?;
 				if let Some((expr, leftovers)) = expr_opt {
 					return Ok(Some((
-						ExpressionItem { kind: ExpressionItemKind::Operand(expr), location: in_tokens[0].get_location() },
+						ExpressionItem {
+							kind: ExpressionItemKind::Operand(expr),
+							location: in_tokens[0].get_location(),
+						},
 						&[&BinaryTaker],
 						leftovers,
 					)));

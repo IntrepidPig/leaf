@@ -192,67 +192,29 @@ impl<'a> Tokenizer<'a> {
 					"extern" => TokenKind::Keyword(Keyword::Extern),
 					word => TokenKind::Name(word.to_owned()),
 				},
-				LexemeKind::Bracket(bracket, state) => {
-					TokenKind::Bracket(bracket, state)
-				},
-				LexemeKind::String(string) => {
-					TokenKind::StringLiteral(string)
-				},
+				LexemeKind::Bracket(bracket, state) => TokenKind::Bracket(bracket, state),
+				LexemeKind::String(string) => TokenKind::StringLiteral(string),
 				LexemeKind::Number(num_string) => match num_string.parse() {
 					Ok(n) => TokenKind::NumberLiteral(n),
 					Err(_e) => return Err(TokenizeError::Other),
 				},
-				LexemeKind::Colon => {
-					TokenKind::Symbol(Symbol::Colon)
-				},
-				LexemeKind::Comma => {
-					TokenKind::Symbol(Symbol::Comma)
-				},
-				LexemeKind::Dot => {
-					TokenKind::Symbol(Symbol::Dot)
-				},
-				LexemeKind::Equals => {
-					TokenKind::Symbol(Symbol::Equals)
-				},
-				LexemeKind::Semicolon => {
-					TokenKind::Symbol(Symbol::Semicolon)
-				},
-				LexemeKind::Asterisk => {
-					TokenKind::Symbol(Symbol::Asterisk)
-				},
-				LexemeKind::Greater => {
-					TokenKind::Symbol(Symbol::Greater)
-				},
-				LexemeKind::Less => {
-					TokenKind::Symbol(Symbol::Less)
-				},
-				LexemeKind::Equality => {
-					TokenKind::Symbol(Symbol::Equality)
-				},
-				LexemeKind::Assign => {
-					TokenKind::Symbol(Symbol::Assign)
-				},
-				LexemeKind::Ampersand => {
-					TokenKind::Symbol(Symbol::Ampersand)
-				},
-				LexemeKind::Question => {
-					TokenKind::Symbol(Symbol::Question)
-				},
-				LexemeKind::Exclamation => {
-					TokenKind::Symbol(Symbol::Exclamation)
-				},
-				LexemeKind::Plus => {
-					TokenKind::Symbol(Symbol::Plus)
-				},
-				LexemeKind::Minus => {
-					TokenKind::Symbol(Symbol::Minus)
-				},
-				LexemeKind::Slash => {
-					TokenKind::Symbol(Symbol::Slash)
-				},
-				LexemeKind::Namespace => {
-					TokenKind::Symbol(Symbol::Namespace)
-				},
+				LexemeKind::Colon => TokenKind::Symbol(Symbol::Colon),
+				LexemeKind::Comma => TokenKind::Symbol(Symbol::Comma),
+				LexemeKind::Dot => TokenKind::Symbol(Symbol::Dot),
+				LexemeKind::Equals => TokenKind::Symbol(Symbol::Equals),
+				LexemeKind::Semicolon => TokenKind::Symbol(Symbol::Semicolon),
+				LexemeKind::Asterisk => TokenKind::Symbol(Symbol::Asterisk),
+				LexemeKind::Greater => TokenKind::Symbol(Symbol::Greater),
+				LexemeKind::Less => TokenKind::Symbol(Symbol::Less),
+				LexemeKind::Equality => TokenKind::Symbol(Symbol::Equality),
+				LexemeKind::Assign => TokenKind::Symbol(Symbol::Assign),
+				LexemeKind::Ampersand => TokenKind::Symbol(Symbol::Ampersand),
+				LexemeKind::Question => TokenKind::Symbol(Symbol::Question),
+				LexemeKind::Exclamation => TokenKind::Symbol(Symbol::Exclamation),
+				LexemeKind::Plus => TokenKind::Symbol(Symbol::Plus),
+				LexemeKind::Minus => TokenKind::Symbol(Symbol::Minus),
+				LexemeKind::Slash => TokenKind::Symbol(Symbol::Slash),
+				LexemeKind::Namespace => TokenKind::Symbol(Symbol::Namespace),
 				LexemeKind::Whitespace { .. } => continue, // whitespace isn't syntax python
 			};
 			tokens.push(Token {
