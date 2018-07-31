@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ast::lexer::{Bracket, BracketState, LexemeKind, Lexemes, Location};
+use ast::lexer::{Bracket, BracketState, LexemeKind, Lexemes, Location, Span};
 
 #[derive(Debug, Clone)]
 pub struct Tokenizer<'a> {
@@ -10,7 +10,7 @@ pub struct Tokenizer<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Token {
 	pub kind: TokenKind,
-	pub location: Location,
+	pub span: Span,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -139,6 +139,7 @@ pub struct Tokens {
 	pub tokens: Vec<Token>,
 }
 
+// TODO contain useful info
 #[derive(Debug, Clone)]
 pub enum TokenizeError {
 	Other,
@@ -219,7 +220,7 @@ impl<'a> Tokenizer<'a> {
 			};
 			tokens.push(Token {
 				kind,
-				location: lexeme.span.start,
+				span: lexeme.span,
 			});
 		}
 

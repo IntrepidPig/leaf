@@ -1,13 +1,13 @@
 use std::fmt;
 
-use ast::lexer::{Bracket, BracketState, Location};
+use ast::lexer::{Bracket, BracketState, Location, Span};
 use ast::tokenizer::{Keyword, Symbol, Token as OldToken, TokenKind as OldTokenKind};
 use failure::Error;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Token {
 	pub kind: TokenKind,
-	pub location: Location,
+	pub span: Span,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,7 +31,7 @@ impl Token {
 		};
 		Ok(Token {
 			kind,
-			location: old.location,
+			span: old.span,
 		})
 	}
 }
@@ -39,7 +39,8 @@ impl Token {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TokenTree {
 	Token(Token),
-	Block(BlockType, Vec<TokenTree>, Location, Location),
+	/// Type of block, tokens in block, outer span, inner span
+	Block(BlockType, Vec<TokenTree>, Span, Span),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -111,8 +112,15 @@ impl TokenTree {
 
 	pub fn get_location(&self) -> Location {
 		match self {
-			TokenTree::Token(token) => token.location,
-			TokenTree::Block(_, _, location, _end_location) => *location,
+			TokenTree::Token(token) => token.span.start,
+			TokenTree::Block(_, _, outer, _inner) => outer.start,
+		}
+	}
+	
+	pub fn get_span(&self) -> Span {
+		match self {
+			TokenTree::Token(token) => token.span,
+			TokenTree::Block(_, _, outer, _inner) => *outer,
 		}
 	}
 }
@@ -147,12 +155,12 @@ fn treeify_brackets(in_tokens: &[OldToken]) -> Result<Vec<TokenTree>, Error<Tree
 		match &old_tokens[0] {
 			OldToken {
 				kind: OldTokenKind::Bracket(bracket, state),
-				location,
+				span,
 			} => {
 				if *state == BracketState::Close {
 					return Err(TreeifyError::IncorrectBrace.into());
 				}
-				let (sub, leftovers, end_location) = get_sub(old_tokens, |old_token| match old_token.kind {
+				let (sub, leftovers, end_span) = get_sub(old_tokens, |old_token| match old_token.kind {
 					OldTokenKind::Bracket(test_bracket, test_state) => {
 						if test_bracket == *bracket {
 							match test_state {
@@ -165,24 +173,32 @@ fn treeify_brackets(in_tokens: &[OldToken]) -> Result<Vec<TokenTree>, Error<Tree
 					},
 					_ => 0,
 				})?;
+				let outer_span = Span {
+					start: span.start,
+					end: end_span.end,
+				};
+				let inner_span = Span {
+					start: span.end,
+					end: end_span.start,
+				};
 				match bracket {
 					Bracket::Curly => tokens.push(TokenTree::Block(
 						BlockType::Brace,
 						treeify_brackets(sub)?,
-						*location,
-						end_location,
+						outer_span,
+						inner_span,
 					)),
 					Bracket::Paren => tokens.push(TokenTree::Block(
 						BlockType::Paren,
 						treeify_brackets(sub)?,
-						*location,
-						end_location,
+						outer_span,
+						inner_span,
 					)),
 					Bracket::Square => tokens.push(TokenTree::Block(
 						BlockType::Bracket,
 						treeify_brackets(sub)?,
-						*location,
-						end_location,
+						outer_span,
+						inner_span,
 					)),
 				}
 
@@ -215,9 +231,9 @@ fn treeify_ifs(in_tokens: &[TokenTree]) -> Result<Vec<TokenTree>, Error<TreeifyE
 		match &old_tokens[0] {
 			TokenTree::Token(Token {
 				kind: TokenKind::Keyword(Keyword::If),
-				location,
+				span,
 			}) => {
-				let (sub, leftovers, end_location) = get_sub(old_tokens, |token| match token {
+				let (sub, leftovers, end_span) = get_sub(old_tokens, |token| match token {
 					TokenTree::Token(Token {
 						kind: TokenKind::Keyword(Keyword::If),
 						..
@@ -228,12 +244,20 @@ fn treeify_ifs(in_tokens: &[TokenTree]) -> Result<Vec<TokenTree>, Error<TreeifyE
 					}) => -1,
 					_ => 0,
 				})?;
-
+				
+				let outer_span = Span {
+					start: span.start,
+					end: end_span.end,
+				};
+				let inner_span = Span {
+					start: span.end,
+					end: end_span.start,
+				};
 				tokens.push(TokenTree::Block(
 					BlockType::If,
 					treeify_ifs(sub)?,
-					*location,
-					end_location,
+					outer_span,
+					inner_span,
 				));
 				old_tokens = &leftovers[1..];
 			},
@@ -264,9 +288,9 @@ fn treeify_loops(in_tokens: &[TokenTree]) -> Result<Vec<TokenTree>, Error<Treeif
 		match &old_tokens[0] {
 			TokenTree::Token(Token {
 				kind: TokenKind::Keyword(Keyword::Loop),
-				location,
+				span,
 			}) => {
-				let (sub, leftovers, end_location) = get_sub(old_tokens, |token| match token {
+				let (sub, leftovers, end_span) = get_sub(old_tokens, |token| match token {
 					TokenTree::Token(Token {
 						kind: TokenKind::Keyword(Keyword::Loop),
 						..
@@ -277,12 +301,20 @@ fn treeify_loops(in_tokens: &[TokenTree]) -> Result<Vec<TokenTree>, Error<Treeif
 					}) => -1,
 					_ => 0,
 				})?;
-
+				
+				let outer_span = Span {
+					start: span.start,
+					end: end_span.end,
+				};
+				let inner_span = Span {
+					start: span.end,
+					end: end_span.start,
+				};
 				tokens.push(TokenTree::Block(
 					BlockType::Loop,
 					treeify_loops(sub)?,
-					*location,
-					end_location,
+					outer_span,
+					inner_span,
 				));
 				old_tokens = &leftovers[1..];
 			},
@@ -306,16 +338,16 @@ fn treeify_loops(in_tokens: &[TokenTree]) -> Result<Vec<TokenTree>, Error<Treeif
 }
 
 #[cfg_attr(feature = "cargo-clippy", allow(type_complexity))]
-fn get_sub<T: Locate, F: FnMut(&T) -> i32>(
+fn get_sub<T: Spanned, F: FnMut(&T) -> i32>(
 	in_tokens: &[T],
 	mut predicate: F,
-) -> Result<(&[T], &[T], Location), Error<TreeifyError>> {
+) -> Result<(&[T], &[T], Span), Error<TreeifyError>> {
 	let mut count = 0;
 	for (i, token) in in_tokens.iter().enumerate() {
 		count += predicate(token);
 
 		if count == 0 {
-			return Ok((&in_tokens[1..i], &in_tokens[i..], token.get_location()));
+			return Ok((&in_tokens[1..i], &in_tokens[i..], token.get_span()));
 		}
 	}
 
@@ -328,12 +360,28 @@ pub trait Locate {
 
 impl Locate for OldToken {
 	fn get_location(&self) -> Location {
-		self.location
+		self.span.start
 	}
 }
 
 impl Locate for TokenTree {
 	fn get_location(&self) -> Location {
 		self.get_location()
+	}
+}
+
+pub trait Spanned {
+	fn get_span(&self) -> Span;
+}
+
+impl Spanned for OldToken {
+	fn get_span(&self) -> Span {
+		self.span
+	}
+}
+
+impl Spanned for TokenTree {
+	fn get_span(&self) -> Span {
+		self.get_span()
 	}
 }
