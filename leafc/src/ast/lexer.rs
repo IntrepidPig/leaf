@@ -75,7 +75,7 @@ impl<'a> Lexemes<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Lexeme<'a> {
 	pub kind: LexemeKind<'a>,
-	pub location: Location,
+	pub span: Span,
 }
 
 /// A lexeme is a category of characters and the characters involved. It involves symbols, words, literals, and whitespace.
@@ -170,6 +170,12 @@ pub struct Location {
 	pub col: u32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Span {
+	pub start: Location,
+	pub end: Location,
+}
+
 impl fmt::Display for Location {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "At line {} column {}", self.line, self.col)
@@ -234,23 +240,26 @@ pub fn lex(old_input: &str) -> Result<Lexemes, LexError> {
 				.next_lexeme(input)
 				.map_err(|e| LexError { kind: e, location })?
 			{
+				let start_location = location;
 				if let LexemeKind::Whitespace {
-					whitespace_type,
+					whitespace_type: WhitespaceType::Newline,
 					amount,
 				} = lexeme
 				{
-					if whitespace_type == WhitespaceType::Newline {
-						location.line += amount;
-						location.col = 0;
-					}
+					location.line += amount;
+					location.col = 0;
 				} else {
 					location.col += (input.len() - remaining.len()) as u32;
 				}
 				input = remaining;
 				lexemes.push(Lexeme {
 					kind: lexeme,
-					location,
+					span: Span {
+						start: start_location,
+						end: location,
+					}
 				});
+				lexemes.last_mut().map(|lexeme| lexeme.span.end = location);
 				continue 'outer;
 			}
 		}

@@ -219,7 +219,7 @@ impl<'a> Tokenizer<'a> {
 			};
 			tokens.push(Token {
 				kind,
-				location: lexeme.location,
+				location: lexeme.span.start,
 			});
 		}
 
