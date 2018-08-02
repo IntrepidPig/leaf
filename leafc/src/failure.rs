@@ -37,10 +37,13 @@ where
 	}
 }
 
-pub fn transfer_bt<E: StdError, F: StdError>(e: Error<E>) -> Error<F> where F: From<E> {
+pub fn transfer_bt<E: StdError, F: StdError>(e: Error<E>) -> Error<F>
+where
+	F: From<E>,
+{
 	Error {
 		error: e.error.into(),
-		bt: e.bt
+		bt: e.bt,
 	}
 }
 

@@ -6,23 +6,22 @@ pub struct FunctionCallTaker;
 impl ExpressionTaker for FunctionCallTaker {
 	type Args = ();
 
-	fn next_expression<'a>(&self, stream: &mut TokenStream, _args: Self::Args) -> ParseResult<Expression> {
+	fn next_expression(&self, stream: &mut TokenStream, _args: Self::Args) -> ParseResult<Expression> {
 		let name = if let Some(path_ident) = next_pathitem(stream, next_ident)? {
 			path_ident
 		} else {
-			return Ok(None)
+			return Ok(None);
 		};
-		
-		let args = if let Some(TokenTree::Block(Bracket::Paren, ref mut args_token_stream, _, _)) = stream.opt_next_tokentree()? {
+
+		let args = if let Some(TokenTree::Block(Bracket::Paren, ref mut args_token_stream, _, _)) =
+			stream.opt_next_tokentree()?
+		{
 			parse_args(args_token_stream)?
 		} else {
-			return Ok(None) // It could be an identifier or a type
+			return Ok(None); // It could be an identifier or a type
 		};
-		
-		Ok(Some(Expression::FunctionCall {
-			name,
-			args,
-		}))
+
+		Ok(Some(Expression::FunctionCall { name, args }))
 	}
 }
 

@@ -343,7 +343,6 @@ impl HIRGenerator {
 	/// Convert a `SyntaxTree` to `HIR`. Make sure that the `SyntaxTree` has all the modules it
 	/// references in it's list of modules.
 	pub fn ast_to_hir(&mut self, mut root_module: parser::Module) -> HIR {
-
 		// Resolve all paths of the syntax tree to absolute paths with this module
 		// as the root.
 		self.resolve_paths(&mut root_module, &mut ModulePath::new(false, Vec::new()));

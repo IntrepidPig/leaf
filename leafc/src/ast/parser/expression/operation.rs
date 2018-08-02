@@ -1,34 +1,6 @@
 use ast::parser::*;
 
-/*/// Gets the entirety of the next expression available as a single expression. This taker only stops upon recieving a token
-/// that matches the predicate given
-#[derive(Default)]
-pub struct OperationTaker;
-
-impl OperationTaker {
-	pub fn new() -> Self {
-		OperationTaker
-	}
-}
-
-impl ExpressionTaker for OperationTaker {
-	// The end of the expression predicate
-	type Args = ();
-
-	fn take_expression(&self, stream: &mut TokenStream, _args: Self::Args) -> ParseResult<Expression> {
-		Ok(Some(parse_operation(stream)?))
-	}
-}*/
-
-type ItemTakerResult<'a> = Result<
-	Option<
-		(
-			ExpressionItem,
-			&'static [&'static ItemTaker],
-		),
-	>,
-	Error<ParseError>,
->;
+type ItemTakerResult<'a> = Result<Option<(ExpressionItem, &'static [&'static ItemTaker])>, Error<ParseError>>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExpressionItem {
@@ -50,30 +22,69 @@ pub trait ItemTaker: ::std::fmt::Debug {
 impl<'a> TokenTree<'a> {
 	pub fn is_operator(&self) -> bool {
 		match self {
-			TokenTree::Token(Token { kind: TokenKind::Symbol(Symbol::Ampersand), .. }) => true,
-			TokenTree::Token(Token { kind: TokenKind::Symbol(Symbol::Assign), .. }) => true,
-			TokenTree::Token(Token { kind: TokenKind::Symbol(Symbol::Asterisk), .. }) => true,
-			TokenTree::Token(Token { kind: TokenKind::Symbol(Symbol::Dot), .. }) => true,
-			TokenTree::Token(Token { kind: TokenKind::Symbol(Symbol::Equality), .. }) => true,
-			TokenTree::Token(Token { kind: TokenKind::Symbol(Symbol::Equals), .. }) => true,
-			TokenTree::Token(Token { kind: TokenKind::Symbol(Symbol::Exclamation), .. }) => true,
-			TokenTree::Token(Token { kind: TokenKind::Symbol(Symbol::Greater), .. }) => true,
-			TokenTree::Token(Token { kind: TokenKind::Symbol(Symbol::Less), .. }) => true,
-			TokenTree::Token(Token { kind: TokenKind::Symbol(Symbol::Minus), .. }) => true,
-			TokenTree::Token(Token { kind: TokenKind::Symbol(Symbol::Plus), .. }) => true,
-			TokenTree::Token(Token { kind: TokenKind::Symbol(Symbol::Question), .. }) => true,
-			TokenTree::Token(Token { kind: TokenKind::Symbol(Symbol::Slash), .. }) => true,
+			TokenTree::Token(Token {
+				kind: TokenKind::Symbol(Symbol::Ampersand),
+				..
+			}) => true,
+			TokenTree::Token(Token {
+				kind: TokenKind::Symbol(Symbol::Assign),
+				..
+			}) => true,
+			TokenTree::Token(Token {
+				kind: TokenKind::Symbol(Symbol::Asterisk),
+				..
+			}) => true,
+			TokenTree::Token(Token {
+				kind: TokenKind::Symbol(Symbol::Dot),
+				..
+			}) => true,
+			TokenTree::Token(Token {
+				kind: TokenKind::Symbol(Symbol::Equality),
+				..
+			}) => true,
+			TokenTree::Token(Token {
+				kind: TokenKind::Symbol(Symbol::Equals),
+				..
+			}) => true,
+			TokenTree::Token(Token {
+				kind: TokenKind::Symbol(Symbol::Exclamation),
+				..
+			}) => true,
+			TokenTree::Token(Token {
+				kind: TokenKind::Symbol(Symbol::Greater),
+				..
+			}) => true,
+			TokenTree::Token(Token {
+				kind: TokenKind::Symbol(Symbol::Less),
+				..
+			}) => true,
+			TokenTree::Token(Token {
+				kind: TokenKind::Symbol(Symbol::Minus),
+				..
+			}) => true,
+			TokenTree::Token(Token {
+				kind: TokenKind::Symbol(Symbol::Plus),
+				..
+			}) => true,
+			TokenTree::Token(Token {
+				kind: TokenKind::Symbol(Symbol::Question),
+				..
+			}) => true,
+			TokenTree::Token(Token {
+				kind: TokenKind::Symbol(Symbol::Slash),
+				..
+			}) => true,
 			_ => false,
 		}
 	}
 }
 
-/// Parse the entirety of the tokens passed as an expression. If not all the tokens are used up, then there was an error.
+/// Parse the entirety of the tokens passed as an expression. If not all the tokens are used
+/// up, then there was an error.
 pub fn parse_expression(stream: &mut TokenStream) -> Result<Expression, Error<ParseError>> {
 	let mut expr_items: Vec<ExpressionItem> = Vec::new();
 	let mut item_takers: &[&ItemTaker] = &[];
-	
-	eprintln!("Parsing operation from {:?}", stream);
+
 	'outer: while !stream.is_empty() {
 		let (mut expr_tokens, _exhausted) = stream.split_when(|t| t.is_operator(), false)?;
 		if !expr_tokens.is_empty() {
@@ -97,8 +108,6 @@ pub fn parse_expression(stream: &mut TokenStream) -> Result<Expression, Error<Pa
 			}
 		}
 	}
-	
-	eprintln!("Expr items: {:?}", expr_items);
 
 	// Simplifies the list of expression items into a single expression. Works recursively, step by step, with a lot of
 	// heap allocation.
@@ -161,12 +170,10 @@ pub fn parse_expression(stream: &mut TokenStream) -> Result<Expression, Error<Pa
 							// and requires the lhs to be an identifier
 							BinaryOp::Assign => {
 								match lhs {
-									Expression::Identifier(ref ident) => {
-										Ok(Expression::Assign(Box::new(Assignment {
-											ident: ident.to_owned(),
-											expr: rhs,
-										})))
-									},
+									Expression::Identifier(ref ident) => Ok(Expression::Assign(Box::new(Assignment {
+										ident: ident.to_owned(),
+										expr: rhs,
+									}))),
 									Expression::Binding(ref binding) => {
 										Ok(Expression::Binding(Box::new(Binding {
 											ident: binding.ident.clone(),
@@ -174,12 +181,12 @@ pub fn parse_expression(stream: &mut TokenStream) -> Result<Expression, Error<Pa
 											bind_type: binding.bind_type.clone(),
 											val: Some(rhs), // TODO understand
 										})))
-									}
+									},
 									_ => Err(ParseError {
 										kind: ParseErrorKind::Expected(vec![Expected::Identifier]),
 										span,
 									}.into()), // The left hand side wasn't an identifier
-												// TODO get location of expression
+									           // TODO get location of expression
 								}
 							},
 							BinaryOp::Dot => {
@@ -277,76 +284,32 @@ struct BinaryTaker;
 impl ItemTaker for BinaryTaker {
 	fn next_item<'a>(&self, stream: &mut TokenStream) -> ItemTakerResult<'a> {
 		let old_position = stream.get_position();
-		let item = 
-			ExpressionItem {
-				kind: ExpressionItemKind::Operator(Operator::Binary(match stream.take_tokentree()? {
-					TokenTree::Token(Token {
-						kind: TokenKind::Symbol(symbol),
-						..
-					}) => match symbol {
-						Symbol::Plus => BinaryOp::Add,
-						Symbol::Minus => BinaryOp::Sub,
-						Symbol::Asterisk => BinaryOp::Mul,
-						Symbol::Slash => BinaryOp::Div,
-						Symbol::Assign => BinaryOp::Assign,
-						Symbol::Equality => BinaryOp::Equality,
-						Symbol::Dot => BinaryOp::Dot,
-						_ => {
-							stream.seek(old_position);
-							return Ok(None)
-						},
-					},
+		let item = ExpressionItem {
+			kind: ExpressionItemKind::Operator(Operator::Binary(match stream.take_tokentree()? {
+				TokenTree::Token(Token {
+					kind: TokenKind::Symbol(symbol),
+					..
+				}) => match symbol {
+					Symbol::Plus => BinaryOp::Add,
+					Symbol::Minus => BinaryOp::Sub,
+					Symbol::Asterisk => BinaryOp::Mul,
+					Symbol::Slash => BinaryOp::Div,
+					Symbol::Assign => BinaryOp::Assign,
+					Symbol::Equality => BinaryOp::Equality,
+					Symbol::Dot => BinaryOp::Dot,
 					_ => {
 						stream.seek(old_position);
-						return Ok(None)
+						return Ok(None);
 					},
-				})),
-				span: stream.current_span,
-			};
-			
-		return Ok(Some((item, &[])))
-	}
-}
-
-/*/// Tries to get an operand
-/// The operand can be either a literal, an identifier, or a block (which will be classified as a single operand)
-#[derive(Debug)]
-struct OperandTaker;
-impl ItemTaker for OperandTaker {
-	fn next_item<'a>(&self, stream: &mut TokenStream) -> ItemTakerResult<'a> {
-		let expression_takers: &[&ExpressionTaker<Args = ()>] = &[
-			&binding::BindingTaker,
-			&debug::DebugTaker,
-			&loopexpr::LoopTaker,
-			&ifexpr::IfTaker,
-			&breakexpr::BreakTaker,
-			&literal::LiteralTaker,
-			&functioncall::FunctionCallTaker,   // has to be before identifier
-			&instantiation::InstantiationTaker, // has to be before block and identifier
-			&identifier::IdentifierTaker,
-			&block::BlockTaker,
-		];
-
-		for expression_taker in expression_takers {
-			let expr_opt = expression_taker.take_expression(stream, ())?;
-			if let Some(expr) = expr_opt {
-				stream.commit();
-				return Ok(Some((
-					ExpressionItem {
-						kind: ExpressionItemKind::Operand(expr),
-						span: stream.current_span,
-					},
-					&[&BinaryTaker],
-				)));
-			} else {
-				stream.reset();
-			}
-		}
-
-		Err(ParseError {
-			kind: ParseErrorKind::UnexpectedToken(stream.next_token().unwrap().clone()),
+				},
+				_ => {
+					stream.seek(old_position);
+					return Ok(None);
+				},
+			})),
 			span: stream.current_span,
-		}.into()) // Failed to parse operand
+		};
+
+		Ok(Some((item, &[])))
 	}
 }
-*/

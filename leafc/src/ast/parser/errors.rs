@@ -25,7 +25,7 @@ impl ParseError {
 			span: stream.current_span,
 		}
 	}
-	
+
 	pub fn unexpected(stream: &TokenStream) -> Self {
 		ParseError {
 			kind: ParseErrorKind::UnexpectedToken(stream.next_token().unwrap().clone()),

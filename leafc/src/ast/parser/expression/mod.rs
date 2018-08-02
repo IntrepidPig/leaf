@@ -140,12 +140,12 @@ pub fn parse_operand(stream: &mut TokenStream) -> Result<Expression, Error<Parse
 		&IfTaker,
 		&BreakTaker,
 		&LiteralTaker,
-		&FunctionCallTaker,   // has to be before identifier
+		&FunctionCallTaker,  // has to be before identifier
 		&InstantiationTaker, // has to be before block and identifier
 		&IdentifierTaker,
 		&BlockTaker,
 	];
-	
+
 	let mut expr_opt: Option<Expression> = None;
 	let mut old_position;
 	for expression_taker in expression_takers {
@@ -158,10 +158,10 @@ pub fn parse_operand(stream: &mut TokenStream) -> Result<Expression, Error<Parse
 			stream.seek(old_position);
 		}
 	}
-	
+
 	if !stream.is_empty() || expr_opt.is_none() {
 		return Err(ParseError::unexpected(stream).into());
 	}
-	
+
 	Ok(expr_opt.unwrap())
 }

@@ -41,56 +41,65 @@ impl ModulePath {
 	}
 }
 
-pub fn next_pathitem<T>(stream: &mut TokenStream, f: fn(&mut TokenStream) -> ParseResult<T>) -> ParseResult<PathItem<T>> {
+pub fn next_pathitem<T>(
+	stream: &mut TokenStream,
+	f: fn(&mut TokenStream) -> ParseResult<T>,
+) -> ParseResult<PathItem<T>> {
 	let module_path = if let Some(path) = next_path(stream)? {
 		path
 	} else {
-		return Err(ParseError::expected(vec![Expected::ModulePath], &*stream).into()) // unreachable as of now
+		return Err(ParseError::expected(vec![Expected::ModulePath], &*stream).into()); // unreachable as of now
 	};
-	
+
 	let item = if let Some(item) = f(stream)? {
 		item
 	} else {
-		return Ok(None)
+		return Ok(None);
 	};
-	
-	Ok(Some(PathItem {
-		module_path,
-		item,
-	}))
+
+	Ok(Some(PathItem { module_path, item }))
 }
 
 pub fn next_path(stream: &mut TokenStream) -> ParseResult<ModulePath> {
 	let mut relative = true;
-	
+
 	let old_position = stream.get_position();
-	if let TokenTree::Token(Token { kind: TokenKind::Symbol(Symbol::Namespace), .. }) = stream.take_tokentree()? {
+	if let TokenTree::Token(Token {
+		kind: TokenKind::Symbol(Symbol::Namespace),
+		..
+	}) = stream.take_tokentree()?
+	{
 		relative = false;
 	} else {
 		stream.seek(old_position);
 	}
-	
+
 	let mut path: Vec<Identifier> = Vec::new();
 	let mut old_position;
 	loop {
 		old_position = stream.get_position();
-		let name = if let Some(TokenTree::Token(Token { kind: TokenKind::Name(ref name), .. })) = stream.opt_next_tokentree()? {
+		let name = if let Some(TokenTree::Token(Token {
+			kind: TokenKind::Name(ref name),
+			..
+		})) = stream.opt_next_tokentree()?
+		{
 			Identifier::try_from_str(name)
 		} else {
 			break;
 		};
-		
-		if let Some(TokenTree::Token(Token { kind: TokenKind::Symbol(Symbol::Namespace), .. })) = stream.opt_next_tokentree()? {
-			
+
+		if let Some(TokenTree::Token(Token {
+			kind: TokenKind::Symbol(Symbol::Namespace),
+			..
+		})) = stream.opt_next_tokentree()?
+		{
+
 		} else {
 			break;
 		};
 		path.push(name);
 	}
 	stream.seek(old_position);
-	
-	Ok(Some(ModulePath {
-		relative,
-		path,
-	}))
+
+	Ok(Some(ModulePath { relative, path }))
 }

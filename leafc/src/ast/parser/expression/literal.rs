@@ -14,10 +14,22 @@ impl ExpressionTaker for LiteralTaker {
 
 	fn next_expression(&self, stream: &mut TokenStream, _args: Self::Args) -> ParseResult<Expression> {
 		Ok(Some(match stream.take_tokentree()? {
-			TokenTree::Token(Token { kind: TokenKind::NumberLiteral(ref val), .. }) => Expression::NumberLiteral(*val),
-			TokenTree::Token(Token { kind: TokenKind::StringLiteral(ref val), .. }) => Expression::StringLiteral(val.clone()),
-			TokenTree::Token(Token { kind: TokenKind::Keyword(Keyword::True), .. }) => Expression::BoolLiteral(true),
-			TokenTree::Token(Token { kind: TokenKind::Keyword(Keyword::False), .. }) => Expression::BoolLiteral(false),
+			TokenTree::Token(Token {
+				kind: TokenKind::NumberLiteral(ref val),
+				..
+			}) => Expression::NumberLiteral(*val),
+			TokenTree::Token(Token {
+				kind: TokenKind::StringLiteral(ref val),
+				..
+			}) => Expression::StringLiteral(val.clone()),
+			TokenTree::Token(Token {
+				kind: TokenKind::Keyword(Keyword::True),
+				..
+			}) => Expression::BoolLiteral(true),
+			TokenTree::Token(Token {
+				kind: TokenKind::Keyword(Keyword::False),
+				..
+			}) => Expression::BoolLiteral(false),
 			_ => return Ok(None),
 		}))
 	}

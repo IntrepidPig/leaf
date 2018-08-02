@@ -3,7 +3,6 @@ use std::path::Path;
 pub mod lexer;
 pub mod tokenizer;
 pub mod parser;
-//pub mod treeify;
 pub mod stream;
 
 use std::fs::File;
@@ -81,23 +80,23 @@ pub fn create_ast(input: &str) -> Result<Module, failure::Error<AstCreationError
 	let lexemes = lexer::lex(&input).map_err(|e| failure::transfer_bt(e.into()))?;
 	info!("\n{:?}\n\t", lexemes);
 	let mut tokenizer = tokenizer::Tokenizer::new(lexemes);
-	let tokens = tokenizer.tokenize().map_err(|e| failure::transfer_bt(e.into()))?;
+	let tokens = tokenizer
+		.tokenize()
+		.map_err(|e| failure::transfer_bt(e.into()))?;
 	info!("\n{:?}\n\t", tokens);
-	//let tokentree = treeify::treeify(&tokens.tokens)?;
-	//info!("\n{:?}\n\t", tokentree);
-	let st = parser::parse(&mut TokenStream::new(tokens.tokens.as_slice())).map_err(|e| failure::transfer_bt(e))?;
+	let st = parser::parse(&mut TokenStream::new(tokens.tokens.as_slice())).map_err(failure::transfer_bt)?;
 	info!("\n{:#?}", st);
 	Ok(st)
 }
 
-pub fn create_ast_with_includes(input: &str, includes: &[(String, &Path)]) -> Result<Module, failure::Error<AstCreationError>> {
+pub fn create_ast_with_includes(
+	input: &str,
+	includes: &[(String, &Path)],
+) -> Result<Module, failure::Error<AstCreationError>> {
 	let mut modules = Vec::new();
 	for include in includes {
 		let include_st = create_ast_from_file(&include.1, &[])?; // TODO support includes with includes? maybe should only be solved by libraries
-		modules.push((
-			Identifier::from_string(include.0.clone()),
-			include_st,
-		));
+		modules.push((Identifier::from_string(include.0.clone()), include_st));
 	}
 	let mut st = create_ast(input)?;
 	st.modules.append(&mut modules);
@@ -112,7 +111,9 @@ pub fn create_ast_from_file<P: AsRef<Path>>(
 	let mut main_file = File::open(&path).expect("Failed to open input file");
 	let input = {
 		let mut buf = String::new();
-		main_file.read_to_string(&mut buf).map_err(|e| AstCreationError::IoError(e))?;
+		main_file
+			.read_to_string(&mut buf)
+			.map_err(AstCreationError::IoError)?;
 		buf
 	};
 	create_ast_with_includes(&input, includes)
