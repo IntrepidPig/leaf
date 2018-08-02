@@ -2,7 +2,7 @@
 //! generate HIR from an AST.
 
 use std::collections::HashMap;
-use ast::parser::{self, BinaryOp, Identifier, ModulePath, PathItem, PostfixOp, PrefixOp, SyntaxTree, TypeName};
+use ast::parser::{self, BinaryOp, Identifier, ModulePath, PathItem, PostfixOp, PrefixOp, TypeName};
 
 /// A function definition
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -120,8 +120,8 @@ pub struct TypeDefinition {
 	pub fields: Vec<(Identifier, PathItem<TypeName>)>,
 }
 
-impl From<parser::Type> for TypeDefinition {
-	fn from(t: parser::Type) -> Self {
+impl From<parser::TypeDefinition> for TypeDefinition {
+	fn from(t: parser::TypeDefinition) -> Self {
 		TypeDefinition {
 			name: t.name,
 			fields: t.members,
@@ -342,10 +342,7 @@ impl HIRGenerator {
 
 	/// Convert a `SyntaxTree` to `HIR`. Make sure that the `SyntaxTree` has all the modules it
 	/// references in it's list of modules.
-	pub fn ast_to_hir(&mut self, ast: SyntaxTree) -> HIR {
-		// Create the root module from the SyntaxTree given.
-		// TODO change this to not require the name root
-		let mut root_module = parser::Module { body: ast };
+	pub fn ast_to_hir(&mut self, mut root_module: parser::Module) -> HIR {
 
 		// Resolve all paths of the syntax tree to absolute paths with this module
 		// as the root.
@@ -365,7 +362,7 @@ impl HIRGenerator {
 		let mut externs = Vec::new();
 		module.traverse(
 			&mut |module_path: &ModulePath, module: &parser::Module| {
-				for extern_fn in &module.body.extern_fns {
+				for extern_fn in &module.extern_fns {
 					externs.push(ExternDefinition {
 						name: PathItem {
 							module_path: module_path.clone(),
@@ -405,10 +402,10 @@ impl HIRGenerator {
 		// Resolve all paths to types and functions to absolute paths
 		module.traverse_mut(
 			&mut |current_path: &ModulePath, module: &mut parser::Module| {
-				let types = &mut module.body.types;
-				let functions = &mut module.body.functions;
-				let extern_fns = &mut module.body.extern_fns;
-				let uses = &module.body.uses;
+				let types = &mut module.types;
+				let functions = &mut module.functions;
+				let extern_fns = &mut module.extern_fns;
+				let uses = &module.uses;
 
 				// Resolve all the paths in each function of this module
 				for function in functions {
@@ -481,7 +478,7 @@ impl HIRGenerator {
 		module.traverse(
 			&mut |current_path: &ModulePath, module: &parser::Module| {
 				// Typedefs
-				for typedef in &module.body.types {
+				for typedef in &module.types {
 					self.types.insert(
 						{
 							PathItem {
@@ -494,7 +491,7 @@ impl HIRGenerator {
 				}
 
 				// Functions
-				for function in &module.body.functions {
+				for function in &module.functions {
 					self.function_defs_returns.insert(
 						{
 							PathItem {
@@ -509,7 +506,7 @@ impl HIRGenerator {
 					);
 				}
 
-				for extern_fn in &module.body.extern_fns {
+				for extern_fn in &module.extern_fns {
 					self.function_defs_returns.insert(
 						{
 							PathItem {
@@ -531,7 +528,7 @@ impl HIRGenerator {
 		let mut functiondefs = Vec::new();
 		module.traverse(
 			&mut |_: &ModulePath, module: &parser::Module| {
-				for function in &module.body.functions {
+				for function in &module.functions {
 					// TODO! account for blocks
 					// Push a new list of bindings on the binding stack
 					self.bindings_stack.push(HashMap::new());
@@ -585,7 +582,6 @@ impl HIRGenerator {
 		module.traverse(
 			&mut |_module_path: &ModulePath, module: &parser::Module| {
 				let mut mod_typedefs: Vec<TypeDefinition> = module
-					.body
 					.types
 					.iter()
 					.map(|typedef| typedef.clone().into())
@@ -597,7 +593,7 @@ impl HIRGenerator {
 
 		// Convert all the modules within to HIR modules recursively
 		let mut modules = Vec::new();
-		for (name, module) in &module.body.modules {
+		for (name, module) in &module.modules {
 			module_path.path.push(name.clone());
 			modules.push((
 				name.clone(),
@@ -807,7 +803,7 @@ impl HIRGenerator {
 
 	pub fn block_to_expression(&mut self, block: &parser::Block) -> ExpressionType {
 		let mut statements = Vec::new();
-		for statement in &block.block {
+		for statement in &block.statements {
 			statements.push(self.ast_expr_to_hir_expr(statement));
 		}
 

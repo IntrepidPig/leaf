@@ -37,6 +37,13 @@ where
 	}
 }
 
+pub fn transfer_bt<E: StdError, F: StdError>(e: Error<E>) -> Error<F> where F: From<E> {
+	Error {
+		error: e.error.into(),
+		bt: e.bt
+	}
+}
+
 pub trait Failure: Display {}
 
 impl<T> Failure for T

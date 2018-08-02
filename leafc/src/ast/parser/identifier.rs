@@ -1,5 +1,24 @@
 use ast::parser::*;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Identifier {
+	pub name: String,
+}
+
+impl Identifier {
+	pub fn from_string(string: String) -> Self {
+		// TODO validate identifier string and return result
+		Identifier { name: string }
+	}
+
+	pub fn try_from_str(string: &str) -> Self {
+		// TODO validate identifier string
+		Identifier {
+			name: string.to_owned(),
+		}
+	}
+}
+
 #[derive(Default)]
 pub struct IdentifierTaker;
 
@@ -12,16 +31,7 @@ impl IdentifierTaker {
 impl ExpressionTaker for IdentifierTaker {
 	type Args = ();
 
-	fn take_expression<'a>(&self, in_tokens: &'a [TokenTree], _args: Self::Args) -> ParseResult<'a, Expression> {
-		Ok(Some((
-			match in_tokens.get(0) {
-				Some(TokenTree::Token(Token {
-					kind: TokenKind::Name(ref name),
-					..
-				})) => Expression::Identifier(Identifier::from_string(name.clone())),
-				_ => return Ok(None),
-			},
-			&in_tokens[1..],
-		)))
+	fn next_expression<'a>(&self, stream: &mut TokenStream, _args: Self::Args) -> ParseResult<Expression> {
+		unimplemented!()
 	}
 }

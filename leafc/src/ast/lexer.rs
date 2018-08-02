@@ -241,7 +241,7 @@ pub fn lex(old_input: &str) -> Result<Lexemes, LexError> {
 		&StringTaker,
 	];
 
-	let mut location = Location { line: 1, col: 0 };
+	let mut location = Location { line: 1, col: 1 };
 
 	// Keep cutting down the input string slice with lexeme takers until it's empty
 	'outer: while !input.is_empty() {
@@ -257,7 +257,7 @@ pub fn lex(old_input: &str) -> Result<Lexemes, LexError> {
 				} = lexeme
 				{
 					location.line += amount;
-					location.col = 0;
+					location.col = 1;
 				} else {
 					location.col += (input.len() - remaining.len()) as u32;
 				}

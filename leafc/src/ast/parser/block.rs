@@ -1,5 +1,39 @@
 use ast::parser::*;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Block {
+	pub statements: Vec<Expression>,
+	pub output: Option<Expression>,
+}
+
+impl Block {
+	pub fn new() -> Self {
+		Block {
+			statements: Vec::new(),
+			output: None,
+		}
+	}
+
+	pub fn traverse_expressions_mut<F: FnMut(&mut Expression)>(&mut self, f: &mut F) {
+		for expression in &mut self.statements {
+			expression.traverse_expressions_mut(f);
+		}
+		if let Some(ref mut expr) = self.output {
+			expr.traverse_expressions_mut(f)
+		};
+	}
+}
+
+pub fn parse_block(stream: &mut TokenStream) -> Result<Block, Error<ParseError>> {
+	let mut block = Block::new();
+	
+	while !stream.is_empty() {
+		unimplemented!()
+	}
+	
+	Ok(block)
+}
+
 /// Gets the next block from a token list, starting from an open brace ('{') and parsing everything
 /// until the close brace, and returning everything after the last close brace as leftovers
 pub struct BlockTaker;
@@ -7,16 +41,7 @@ pub struct BlockTaker;
 impl ExpressionTaker for BlockTaker {
 	type Args = ();
 
-	fn take_expression<'a>(&self, in_tokens: &'a [TokenTree], _args: Self::Args) -> ParseResult<'a, Expression> {
-		if in_tokens.is_empty() {
-			return Ok(None);
-		}
-		match in_tokens[0] {
-			TokenTree::Block(BlockType::Brace, ref tokens, _, _) => {
-				let ast = parse_block(tokens)?;
-				Ok(Some((Expression::Block(Box::new(ast)), &in_tokens[1..])))
-			},
-			_ => Ok(None),
-		}
+	fn next_expression<'a>(&self, stream: &mut TokenStream, _args: Self::Args) -> ParseResult<Expression> {
+		unimplemented!()
 	}
 }

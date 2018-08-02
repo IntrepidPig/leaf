@@ -1,4 +1,4 @@
-pub mod syntaxtree;
+/*pub mod syntaxtree;
 pub mod operators;
 pub mod debug;
 pub mod breakexpr;
@@ -17,48 +17,105 @@ pub mod instantiation;
 pub mod pathitem;
 pub mod uses;
 pub mod module;
+pub mod errors;
+pub mod stream;
 
-pub use ast::tokenizer::{Keyword, Symbol as TokenSymbol};
-pub use ast::lexer::{Location, Span};
+
+pub use ast::tokenizer::{Token, TokenKind, Keyword, Symbol as TokenSymbol};
+pub use ast::lexer::{Location, Span, Bracket, BracketState};
 pub use self::syntaxtree::*;
+pub use self::errors::*;
 pub use self::operators::*;
-pub use ast::treeify::*;
+pub use self::stream::*;
+//pub use ast::treeify::*;
 pub use self::pathitem::*;
 pub use failure::Error;
 
-/// Parse a block from the tokens (will use all of the tokens or error)
-pub fn parse(in_tokens: &[TokenTree]) -> Result<SyntaxTree, Error<ParseError>> {
-	let mut stree = SyntaxTree::new(Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
-	let mut tokens = in_tokens;
 
-	while !tokens.is_empty() {
-		if let Some((func, leftovers)) = functiondef::take_functiondef(tokens)? {
-			tokens = leftovers;
+/// Parse a block from the tokens (will use all of the tokens or error)
+pub fn parse(stream: &mut TokenStream) -> Result<SyntaxTree, Error<ParseError>> {
+	let mut stree = SyntaxTree::new(Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
+
+	while !stream.is_empty() {
+		stream.commit();
+		if let Some(func) = functiondef::take_functiondef(stream)? {
 			stree.functions.push(func);
 			continue;
-		} else if let Some((typedef, leftovers)) = typedef::take_typedef(tokens)? {
-			tokens = leftovers;
+		} else {
+			stream.reset();
+		}
+		
+		if let Some(typedef) = typedef::take_typedef(stream)? {
 			stree.types.push(typedef);
 			continue;
-		} else if let Some((u, leftovers)) = uses::take_use(tokens)? {
-			tokens = leftovers;
+		} else {
+			stream.reset();
+		}
+		
+		if let Some(u) = uses::take_use(stream)? {
 			stree.uses.push(u);
 			continue;
-		} else if let Some((module, leftovers)) = module::take_module(tokens)? {
-			tokens = leftovers;
+		} else {
+			stream.reset();
+		}
+		
+		if let Some(module) = module::take_module(stream)? {
 			stree.modules.push(module);
 			continue;
-		} else if let Some((extern_fn, leftovers)) = functiondef::take_externfn(tokens)? {
-			tokens = leftovers;
+		} else {
+			stream.reset();
+		}
+		
+		if let Some(extern_fn) = functiondef::take_externfn(stream)? {
 			stree.extern_fns.push(extern_fn);
 			continue;
+		} else {
+			stream.reset();
 		}
 
 		return Err(ParseError {
-			kind: ParseErrorKind::UnexpectedToken,
-			span: tokens[0].get_span(),
+			kind: ParseErrorKind::UnexpectedToken(stream.next_token().unwrap().clone()),
+			span: stream.get_leftovers()[0].get_span(),
 		}.into()); // Didn't get a function or a typedef in the root
 	}
 
 	Ok(stree)
+}
+*/
+
+pub mod errors;
+pub mod block;
+pub mod module;
+pub mod identifier;
+pub mod ifexpr;
+pub mod expression;
+pub mod operators;
+pub mod pathitem;
+pub mod binding;
+pub mod assignment;
+pub mod typename;
+pub mod functiondef;
+pub mod typedef;
+
+pub use self::block::*;
+pub use self::errors::*;
+pub use self::module::*;
+pub use self::identifier::*;
+pub use self::ifexpr::*;
+pub use self::expression::*;
+pub use self::operators::*;
+pub use self::pathitem::*;
+pub use self::binding::*;
+pub use self::assignment::*;
+pub use self::typename::*;
+pub use self::functiondef::*;
+pub use self::typedef::*;
+
+pub use ast::tokenizer::*;
+pub use ast::stream::*;
+pub use ast::lexer::{Span, Bracket, BracketState};
+pub use failure::Error;
+
+pub fn parse(input: &mut TokenStream) -> Result<Module, Error<ParseError>> {
+	parse_module(input)
 }

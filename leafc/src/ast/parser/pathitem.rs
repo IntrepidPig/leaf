@@ -1,76 +1,46 @@
 use ast::parser::*;
 
-pub fn next_type<'a>(in_tokens: &'a [TokenTree]) -> ParseResult<'a, PathItem<TypeName>> {
-	let mut tokens = in_tokens;
-
-	let (modpath, leftovers) = if let Some(res) = next_path(tokens)? {
-		res
-	} else {
-		return Ok(None);
-	};
-	tokens = leftovers;
-
-	let typename = match leftovers.get(0) {
-		Some(TokenTree::Token(Token {
-			kind: TokenKind::Name(ref name),
-			..
-		})) => {
-			tokens = &tokens[1..];
-			TypeName::from_ident(Identifier::try_from_str(name))
-		},
-		_ => return Ok(None),
-	};
-
-	Ok(Some((
-		PathItem {
-			module_path: modpath,
-			item: typename,
-		},
-		&tokens,
-	)))
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PathItem<T> {
+	pub module_path: ModulePath,
+	pub item: T,
 }
 
-pub fn next_path<'a>(in_tokens: &'a [TokenTree]) -> Result<Option<(ModulePath, &'a [TokenTree])>, Error<ParseError>> {
-	let mut relative = true;
-	let mut pathitems: Vec<Identifier> = Vec::new();
-
-	let mut tokens = in_tokens;
-
-	match tokens.get(0) {
-		Some(TokenTree::Token(Token {
-			kind: TokenKind::Symbol(TokenSymbol::Namespace),
-			..
-		})) => {
-			relative = false;
-			tokens = &tokens[1..];
-		},
-		Some(_) => {},
-		None => return Ok(None),
-	}
-
-	loop {
-		let ident = match tokens.get(0) {
-			Some(TokenTree::Token(Token {
-				kind: TokenKind::Name(ref name),
-				..
-			})) => Identifier::from_string(name.clone()),
-			_ => return Ok(None),
-		};
-
-		match tokens.get(1) {
-			Some(TokenTree::Token(Token {
-				kind: TokenKind::Symbol(TokenSymbol::Namespace),
-				..
-			})) => {
-				pathitems.push(ident);
-			},
-			_ => {
-				break;
-			},
+impl<T> PathItem<T> {
+	pub fn map<O, F: Fn(T) -> O>(self, f: F) -> PathItem<O> {
+		PathItem {
+			module_path: self.module_path,
+			item: f(self.item),
 		}
-
-		tokens = &tokens[2..];
 	}
+}
 
-	Ok(Some((ModulePath::new(relative, pathitems), tokens)))
+impl ::std::fmt::Display for PathItem<Identifier> {
+	fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+		if !self.module_path.relative {
+			write!(f, "::")?;
+		}
+		for module in &self.module_path.path {
+			write!(f, "{}::", module.name)?;
+		}
+		write!(f, "{}", self.item.name)?;
+
+		Ok(())
+	}
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ModulePath {
+	pub relative: bool,
+	pub path: Vec<Identifier>,
+}
+
+impl ModulePath {
+	pub fn new(relative: bool, path: Vec<Identifier>) -> Self {
+		ModulePath { relative, path }
+	}
+}
+
+pub fn next_path(stream: &mut TokenStream) -> ParseResult<ModulePath> {
+	unimplemented!()
 }

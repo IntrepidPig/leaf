@@ -42,7 +42,7 @@ impl From<AstCreationError> for CompileError {
 
 impl ::std::error::Error for CompileError {}
 
-pub fn leafc_str<P: AsRef<Path>>(input: &str, core_path: P, includes: &[P]) -> Result<LIR, CompileError> {
+pub fn leafc_str<P: AsRef<Path>>(input: &str, core_path: P, includes: &[P]) -> Result<LIR, failure::Error<CompileError>> {
 	let mut includes: Vec<(String, &Path)> = {
 		includes
 			.iter()
@@ -54,15 +54,15 @@ pub fn leafc_str<P: AsRef<Path>>(input: &str, core_path: P, includes: &[P]) -> R
 			})
 			.collect()
 	};
-	includes.push(("core".to_owned(), core_path.as_ref()));
-	let ast = ast::create_ast_with_includes(input, &includes)?;
+	//includes.push(("core".to_owned(), core_path.as_ref()));
+	let ast = ast::create_ast_with_includes(input, &includes).map_err(|e| failure::transfer_bt(e))?;
 	let mut hir_generator = hir::HIRGenerator::new();
 	let hir = hir_generator.ast_to_hir(ast);
 	let mut code_generator = codegen::vmgen::CodeGenerator::new(&hir);
 	Ok(code_generator.gen_lir())
 }
 
-pub fn leafc<P: AsRef<Path>>(path: P, core_path: P, includes: &[P]) -> Result<LIR, CompileError> {
+pub fn leafc<P: AsRef<Path>>(path: P, core_path: P, includes: &[P]) -> Result<LIR, failure::Error<CompileError>> {
 	let mut includes: Vec<(String, &Path)> = {
 		includes
 			.iter()
@@ -74,8 +74,8 @@ pub fn leafc<P: AsRef<Path>>(path: P, core_path: P, includes: &[P]) -> Result<LI
 			})
 			.collect()
 	};
-	includes.push(("core".to_owned(), core_path.as_ref()));
-	let ast = ast::create_ast_from_file(path, &includes)?;
+	//includes.push(("core".to_owned(), core_path.as_ref()));
+	let ast = ast::create_ast_from_file(path, &includes).map_err(|e| failure::transfer_bt(e))?;
 	let mut hir_generator = hir::HIRGenerator::new();
 	let hir = hir_generator.ast_to_hir(ast);
 	let mut code_generator = codegen::vmgen::CodeGenerator::new(&hir);
