@@ -1,5 +1,29 @@
 use ast::parser::*;
 
+pub mod block;
+pub mod identifier;
+pub mod ifexpr;
+pub mod binding;
+pub mod assignment;
+pub mod literal;
+pub mod functioncall;
+pub mod debug;
+pub mod loopexpr;
+pub mod breakexpr;
+pub mod instantiation;
+pub mod operation;
+pub use self::block::*;
+pub use self::identifier::*;
+pub use self::ifexpr::*;
+pub use self::binding::*;
+pub use self::assignment::*;
+pub use self::literal::*;
+pub use self::functioncall::*;
+pub use self::debug::*;
+pub use self::loopexpr::*;
+pub use self::breakexpr::*;
+pub use self::instantiation::*;
+
 /// An expression
 /// Can be a literal, an operations, or a block that contains more expressions
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -106,4 +130,38 @@ pub trait ExpressionTaker {
 	type Args;
 
 	fn next_expression(&self, stream: &mut TokenStream, args: Self::Args) -> ParseResult<Expression>;
+}
+
+pub fn parse_operand(stream: &mut TokenStream) -> Result<Expression, Error<ParseError>> {
+	let expression_takers: &[&ExpressionTaker<Args = ()>] = &[
+		&BindingTaker,
+		&DebugTaker,
+		&LoopTaker,
+		&IfTaker,
+		&BreakTaker,
+		&LiteralTaker,
+		&FunctionCallTaker,   // has to be before identifier
+		&InstantiationTaker, // has to be before block and identifier
+		&IdentifierTaker,
+		&BlockTaker,
+	];
+	
+	let mut expr_opt: Option<Expression> = None;
+	let mut old_position;
+	for expression_taker in expression_takers {
+		old_position = stream.get_position();
+		let expr = expression_taker.next_expression(stream, ())?;
+		if let Some(expr) = expr {
+			expr_opt = Some(expr);
+			break;
+		} else {
+			stream.seek(old_position);
+		}
+	}
+	
+	if !stream.is_empty() || expr_opt.is_none() {
+		return Err(ParseError::unexpected(stream).into());
+	}
+	
+	Ok(expr_opt.unwrap())
 }

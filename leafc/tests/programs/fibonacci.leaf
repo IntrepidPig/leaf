@@ -10,9 +10,9 @@ fn fibonacci(n: Int): Int {
 	let old := 0;
 	let new := 1;
 	let i := 0;
-	loop
-		if i == n then break new; end;
+	loop {
+		if { i == n } then { break new; };
 		old := new := new + old;
 		i := i + 1;
-	back
+	}
 }

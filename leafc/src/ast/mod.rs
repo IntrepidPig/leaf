@@ -86,7 +86,7 @@ pub fn create_ast(input: &str) -> Result<Module, failure::Error<AstCreationError
 	//let tokentree = treeify::treeify(&tokens.tokens)?;
 	//info!("\n{:?}\n\t", tokentree);
 	let st = parser::parse(&mut TokenStream::new(tokens.tokens.as_slice())).map_err(|e| failure::transfer_bt(e))?;
-	info!("\n{:?}", st);
+	info!("\n{:#?}", st);
 	Ok(st)
 }
 

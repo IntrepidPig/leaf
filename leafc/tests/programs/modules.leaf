@@ -25,7 +25,7 @@ use ::vector::Vec2
 use ::vector::vec2_sub
 
 fn main() {
-	::vector::vec2_add(Vec2 { x: 13, y: 10 }, Vec2 { x: 5, y: 30, });
+	::vector::vec2_add(Vec2 { x: 13, y: 10 }, Vec2 { x: 5, y: 30 });
 	let sub := vec2_sub(Vec2 { x: 10, y: 150 }, Vec2 { x: 1, y: 50 });
 	sub.y == 100
 }

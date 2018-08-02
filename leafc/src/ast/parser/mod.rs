@@ -84,32 +84,28 @@ pub fn parse(stream: &mut TokenStream) -> Result<SyntaxTree, Error<ParseError>> 
 */
 
 pub mod errors;
-pub mod block;
-pub mod module;
-pub mod identifier;
-pub mod ifexpr;
 pub mod expression;
-pub mod operators;
-pub mod pathitem;
-pub mod binding;
-pub mod assignment;
-pub mod typename;
+pub mod separated;
+pub mod module;
 pub mod functiondef;
 pub mod typedef;
+pub mod uses;
+pub mod typename;
+pub mod pathitem;
+pub mod operators;
+pub mod typeann;
 
-pub use self::block::*;
 pub use self::errors::*;
-pub use self::module::*;
-pub use self::identifier::*;
-pub use self::ifexpr::*;
 pub use self::expression::*;
-pub use self::operators::*;
-pub use self::pathitem::*;
-pub use self::binding::*;
-pub use self::assignment::*;
-pub use self::typename::*;
+pub use self::separated::*;
+pub use self::module::*;
 pub use self::functiondef::*;
 pub use self::typedef::*;
+pub use self::uses::*;
+pub use self::typename::*;
+pub use self::pathitem::*;
+pub use self::operators::*;
+
 
 pub use ast::tokenizer::*;
 pub use ast::stream::*;

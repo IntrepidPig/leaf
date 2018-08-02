@@ -62,6 +62,10 @@ impl<'a> TokenStream<'a> {
 		}
 	}
 	
+	pub fn merge(&mut self, other: &TokenStream<'a>) {
+		self.position += other.position;
+	}
+	
 	/// Take the next tokentree from the stream, moving the position up. Returns an error if there was no token
 	pub fn take_tokentree(&mut self) -> Result<TokenTree<'a>, Error<ParseError>> {
 		if let Some(tokentree) = self.opt_next_tokentree()? {
@@ -109,6 +113,9 @@ impl<'a> TokenStream<'a> {
 						_ => {}
 					}
 					
+					outer_span.end = test_token.span.end;
+					inner_span.end = test_token.span.start;
+					
 					self.take_token();
 					
 					if count < 0 {
@@ -126,10 +133,6 @@ impl<'a> TokenStream<'a> {
 				}
 				
 				let sub_tokens = &self.all_tokens[start..end];
-				let end_token = &self.all_tokens[end];
-				
-				outer_span.end = end_token.span.end;
-				inner_span.end = end_token.span.start;
 				
 				TokenTree::Block(*bracket, TokenStream::new(sub_tokens), outer_span, inner_span)
 			},
@@ -140,6 +143,41 @@ impl<'a> TokenStream<'a> {
 		Ok(Some(tokentree))
 	}
 	
+	pub fn split_when<F: FnMut(TokenTree) -> bool>(&mut self, mut pred: F, exclusive: bool) -> Result<(TokenStream<'a>, bool), Error<ParseError>> {
+		let start_pos = self.position;
+		let (split_pos, exhausted) = loop {
+			let old_position = self.position;
+			if let Some(tokentree) = self.opt_next_tokentree()? {
+				if pred(tokentree) {
+					self.position = old_position;
+					break (self.position, false);
+				}
+			} else {
+				break (self.position, true);
+			};
+		};
+		
+		Ok((if exhausted {
+			TokenStream::new(&self.all_tokens[start_pos..split_pos])
+		} else {
+			if exclusive {
+				self.take_tokentree()?;
+			}
+			TokenStream::new(&self.all_tokens[start_pos..split_pos])
+		}, exhausted))
+	}
+	
+	pub fn split_here(&mut self, exclusive: bool) -> Result<(TokenStream<'a>, TokenStream<'a>), Error<ParseError>> {
+		let split_pos = self.get_position();
+		if exclusive {
+			self.opt_next_tokentree()?;
+		}
+		Ok((
+			TokenStream::new(&self.all_tokens[..split_pos]),
+			TokenStream::new(&self.all_tokens[self.position..]),
+		))
+	}
+	
 	/// Peek the next token
 	pub fn next_token(&self) -> Option<&'a Token> {
 		self.get_leftovers().get(0)
@@ -147,7 +185,7 @@ impl<'a> TokenStream<'a> {
 	
 	/// Take the next token, moving the positition up one
 	/// Panics if there is none
-	fn take_token(&mut self) -> &'a Token {
+	pub fn take_token(&mut self) -> &'a Token {
 		let token = &self.get_leftovers()[0];
 		self.position += 1;
 		token
@@ -177,6 +215,14 @@ impl<'a> TokenStream<'a> {
 	/// The amount of tokens left
 	pub fn left(&self) -> usize {
 		self.all_tokens.len() - self.position
+	}
+	
+	pub fn get_position(&self) -> usize {
+		self.position
+	}
+	
+	pub fn seek(&mut self, position: usize) {
+		self.position = position;
 	}
 }
 

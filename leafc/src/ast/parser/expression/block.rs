@@ -24,11 +24,24 @@ impl Block {
 	}
 }
 
-pub fn parse_block(stream: &mut TokenStream) -> Result<Block, Error<ParseError>> {
+pub fn parse_block(mut stream: &mut TokenStream) -> Result<Block, Error<ParseError>> {
 	let mut block = Block::new();
 	
 	while !stream.is_empty() {
-		unimplemented!()
+		eprintln!("Full Stream: {:?}\n", stream);
+		let (mut expr_tokenstream, output) = stream.split_when(|t| t.is_semicolon(), true)?;
+		eprintln!("Expr tokenstream: {:?}\n", expr_tokenstream);
+		if output {
+			if expr_tokenstream.is_empty() {
+				break;
+			}
+			let expr = operation::parse_expression(&mut expr_tokenstream)?;
+			block.output = Some(expr);
+			break;
+		} else {
+			let expr = operation::parse_expression(&mut expr_tokenstream)?;
+			block.statements.push(expr);
+		}
 	}
 	
 	Ok(block)
@@ -41,7 +54,11 @@ pub struct BlockTaker;
 impl ExpressionTaker for BlockTaker {
 	type Args = ();
 
-	fn next_expression<'a>(&self, stream: &mut TokenStream, _args: Self::Args) -> ParseResult<Expression> {
-		unimplemented!()
+	fn next_expression(&self, stream: &mut TokenStream, _args: Self::Args) -> ParseResult<Expression> {
+		Ok(if let TokenTree::Block(Bracket::Curly, ref mut block_token_stream, _, _) = stream.take_tokentree()? {
+			Some(Expression::Block(Box::new(parse_block(block_token_stream)?)))
+		} else {
+			None
+		})
 	}
 }

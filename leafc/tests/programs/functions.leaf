@@ -16,13 +16,13 @@ fn get_2000(): Int {
 
 fn count_to_3000(): Int {
 	let f := 0;
-	loop
-		if f == 3000 then
+	loop {
+		if { f == 3000 } then {
 			break;
-		else
+		} else {
 			f := f + 1000;
-		end;
-	back;
+		};
+	};
 	f
 }
 

@@ -63,20 +63,40 @@ pub fn parse_module(stream: &mut TokenStream) -> Result<Module, Error<ParseError
 	let mut module = Module::new();
 	
 	while !stream.is_empty() {
+		let old_position = stream.get_position();
 		if let Some((name, submodule)) = next_module(stream)? {
-			stream.commit();
 			module.modules.push((name, submodule));
 			continue;
 		} else {
-			stream.reset();
+			stream.seek(old_position);
 		}
 		
 		if let Some(functiondef) = next_functiondef(stream)? {
-			stream.commit();
 			module.functions.push(functiondef);
 			continue;
 		} else {
-			stream.reset();
+			stream.seek(old_position);
+		}
+		
+		if let Some(typedef) = next_typedef(stream)? {
+			module.types.push(typedef);
+			continue;
+		} else {
+			stream.seek(old_position);
+		}
+		
+		if let Some(extern_fn) = next_externfn(stream)? {
+			module.extern_fns.push(extern_fn);
+			continue;
+		} else {
+			stream.seek(old_position);
+		}
+		
+		if let Some(u) = take_use(stream)? {
+			module.uses.push(u);
+			continue;
+		} else {
+			stream.seek(old_position);
 		}
 		
 		return Err(ParseError {

@@ -7,10 +7,16 @@ pub struct Tokenizer<'a> {
 	lexemes: Lexemes<'a>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Token {
 	pub kind: TokenKind,
 	pub span: Span,
+}
+
+impl fmt::Debug for Token {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{:?}", self.kind)
+	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
