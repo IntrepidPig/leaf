@@ -1,3 +1,5 @@
+#![allow(unused_imports)]
+
 extern crate backtrace;
 extern crate leafvm;
 #[macro_use]
@@ -10,6 +12,7 @@ pub mod ast;
 pub mod codegen;
 pub mod failure;
 pub mod hir;
+pub mod lil;
 #[cfg(test)]
 mod tests;
 
@@ -19,6 +22,7 @@ use ast::AstCreationError;
 #[derive(Debug)]
 pub enum CompileError {
 	AstCreationError(AstCreationError),
+	LILGenError(lil::gen::LILGenError),
 	// TODO HIR gen error and lir gen error
 }
 
@@ -29,6 +33,7 @@ impl fmt::Display for CompileError {
 			"{}",
 			match *self {
 				CompileError::AstCreationError(ref err) => err.to_string(),
+				CompileError::LILGenError(ref err) => err.to_string(),
 			}
 		)
 	}
@@ -37,6 +42,12 @@ impl fmt::Display for CompileError {
 impl From<AstCreationError> for CompileError {
 	fn from(t: AstCreationError) -> Self {
 		CompileError::AstCreationError(t)
+	}
+}
+
+impl From<lil::gen::LILGenError> for CompileError {
+	fn from(t: lil::gen::LILGenError) -> Self {
+		CompileError::LILGenError(t)
 	}
 }
 
@@ -62,8 +73,9 @@ pub fn leafc_str<P: AsRef<Path>>(
 	let ast = ast::create_ast_with_includes(input, &includes).map_err(failure::transfer_bt)?;
 	let mut hir_generator = hir::HIRGenerator::new();
 	let hir = hir_generator.ast_to_hir(ast);
-	let mut code_generator = codegen::vmgen::CodeGenerator::new(&hir);
-	Ok(code_generator.gen_lir())
+	let lil = ::lil::gen::gen_lil(&hir).map_err(|e| failure::Error::from(CompileError::from(e)))?;
+	let mut code_generator = codegen::vmgen::CodeGenerator::new(&lil);
+	Ok(code_generator.gen_lir().unwrap())
 }
 
 pub fn leafc<P: AsRef<Path>>(path: P, core_path: P, includes: &[P]) -> Result<LIR, failure::Error<CompileError>> {
@@ -82,6 +94,8 @@ pub fn leafc<P: AsRef<Path>>(path: P, core_path: P, includes: &[P]) -> Result<LI
 	let ast = ast::create_ast_from_file(path, &includes).map_err(failure::transfer_bt)?;
 	let mut hir_generator = hir::HIRGenerator::new();
 	let hir = hir_generator.ast_to_hir(ast);
-	let mut code_generator = codegen::vmgen::CodeGenerator::new(&hir);
-	Ok(code_generator.gen_lir())
+	let lil = ::lil::gen::gen_lil(&hir).map_err(|e| failure::Error::from(CompileError::from(e)))?;
+	println!("{:?}", lil);
+	let mut code_generator = codegen::vmgen::CodeGenerator::new(&lil);
+	Ok(code_generator.gen_lir().unwrap())
 }

@@ -5,6 +5,9 @@
 	- Symbol checking
 	- Field existence checking
 - Compile error messages
+- Pointers/References
+- Lazy evaluation
 - Generics
 - Polymorphism
 - Add tests for compile errors
+- TYPESTATE

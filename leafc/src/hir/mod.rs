@@ -305,7 +305,7 @@ impl Module {
 
 /// A High-level Intermediate Representation of a Leaf program. HIR will have a type for all expressions that
 /// is the type they output, and it will have all reference to items that can be in seperate modules resolved
-/// to absolute paths from the root of the crate. Also, operators on non primitive types will be converted to
+/// to absolute paths from the root of the package. Also, operators on non primitive types will be converted to
 /// using the associated methods of the types.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HIR {
